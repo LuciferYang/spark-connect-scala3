@@ -389,6 +389,18 @@ final class DataFrame private[sql] (
 
   def write: DataFrameWriter = DataFrameWriter(this)
 
+  def writeStream: DataStreamWriter = DataStreamWriter(this)
+
+  /** Define a watermark on an event-time column for streaming aggregations. */
+  def withWatermark(eventTime: String, delayThreshold: String): DataFrame =
+    withRelation(_.setWithWatermark(
+      WithWatermark.newBuilder()
+        .setInput(relation)
+        .setEventTime(eventTime)
+        .setDelayThreshold(delayThreshold)
+        .build()
+    ))
+
   /** Convert this DataFrame to a strongly-typed Dataset[T]. */
   def as[T: Encoder: scala.reflect.ClassTag]: Dataset[T] = Dataset(this, summon[Encoder[T]])
 

@@ -109,6 +109,14 @@ final class SparkSession private (
   def read: DataFrameReader = DataFrameReader(this)
 
   // ---------------------------------------------------------------------------
+  // Streaming Reader / Query Manager
+  // ---------------------------------------------------------------------------
+
+  def readStream: DataStreamReader = DataStreamReader(this)
+
+  def streams: StreamingQueryManager = StreamingQueryManager(this)
+
+  // ---------------------------------------------------------------------------
   // Catalog
   // ---------------------------------------------------------------------------
 
