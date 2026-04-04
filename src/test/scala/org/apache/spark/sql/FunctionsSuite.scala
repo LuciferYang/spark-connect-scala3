@@ -96,3 +96,87 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.min("x"), "min", 1)
     assertFn(functions.max("x"), "max", 1)
   }
+
+  // ----- Phase 2 tests -----
+
+  test("regex functions") {
+    assertFn(functions.regexp_extract(Column("x"), "\\d+", 0), "regexp_extract", 3)
+    assertFn(functions.regexp_replace(Column("x"), "a", "b"), "regexp_replace", 3)
+    assertFn(functions.split(Column("x"), ","), "split", 2)
+    assertFn(functions.split(Column("x"), ",", 3), "split", 3)
+  }
+
+  test("json functions") {
+    assertFn(functions.from_json(Column("j"), "struct<a:int>"), "from_json", 2)
+    assertFn(functions.to_json(Column("s")), "to_json", 1)
+    assertFn(functions.get_json_object(Column("j"), "$.a"), "get_json_object", 2)
+  }
+
+  test("array functions") {
+    assertFn(functions.array_sort(Column("arr")), "array_sort", 1)
+    assertFn(functions.array_distinct(Column("arr")), "array_distinct", 1)
+    assertFn(functions.array_intersect(Column("a"), Column("b")), "array_intersect", 2)
+    assertFn(functions.array_union(Column("a"), Column("b")), "array_union", 2)
+    assertFn(functions.flatten(Column("nested")), "flatten", 1)
+    assertFn(functions.reverse(Column("arr")), "reverse", 1)
+    assertFn(functions.element_at(Column("arr"), 1), "element_at", 2)
+  }
+
+  test("map functions") {
+    assertFn(functions.map_keys(Column("m")), "map_keys", 1)
+    assertFn(functions.map_values(Column("m")), "map_values", 1)
+    assertFn(functions.map_entries(Column("m")), "map_entries", 1)
+    assertFn(functions.map_from_arrays(Column("k"), Column("v")), "map_from_arrays", 2)
+  }
+
+  test("extended math functions") {
+    assertFn(functions.sin(Column("x")), "sin", 1)
+    assertFn(functions.cos(Column("x")), "cos", 1)
+    assertFn(functions.cbrt(Column("x")), "cbrt", 1)
+    assertFn(functions.atan2(Column("a"), Column("b")), "atan2", 2)
+    assertFn(functions.hex(Column("x")), "hex", 1)
+    assertFn(functions.bin(Column("x")), "bin", 1)
+    assertFn(functions.log(2.0, Column("x")), "log", 2)
+  }
+
+  test("extended date functions") {
+    assertFn(functions.dayofweek(Column("d")), "dayofweek", 1)
+    assertFn(functions.dayofyear(Column("d")), "dayofyear", 1)
+    assertFn(functions.quarter(Column("d")), "quarter", 1)
+    assertFn(functions.datediff(Column("a"), Column("b")), "datediff", 2)
+    assertFn(functions.unix_timestamp(), "unix_timestamp", 0)
+    assertFn(functions.from_unixtime(Column("ts")), "from_unixtime", 1)
+  }
+
+  test("extended aggregate functions") {
+    assertFn(functions.variance(Column("x")), "variance", 1)
+    assertFn(functions.stddev(Column("x")), "stddev", 1)
+    assertFn(functions.corr(Column("a"), Column("b")), "corr", 2)
+    assertFn(functions.approx_count_distinct(Column("x")), "approx_count_distinct", 1)
+    assertFn(functions.skewness(Column("x")), "skewness", 1)
+    assertFn(functions.kurtosis(Column("x")), "kurtosis", 1)
+  }
+
+  test("extended string functions") {
+    assertFn(functions.initcap(Column("x")), "initcap", 1)
+    assertFn(functions.soundex(Column("x")), "soundex", 1)
+    assertFn(functions.ascii(Column("x")), "ascii", 1)
+    assertFn(functions.base64(Column("x")), "base64", 1)
+    assertFn(functions.repeat(Column("x"), 3), "repeat", 2)
+    assertFn(functions.format_number(Column("x"), 2), "format_number", 2)
+  }
+
+  test("misc functions") {
+    assertFn(functions.monotonically_increasing_id(), "monotonically_increasing_id", 0)
+    assertFn(functions.spark_partition_id(), "spark_partition_id", 0)
+    assertFn(functions.hash(Column("a"), Column("b")), "hash", 2)
+    assertFn(functions.md5(Column("x")), "md5", 1)
+    assertFn(functions.sha1(Column("x")), "sha1", 1)
+    assertFn(functions.crc32(Column("x")), "crc32", 1)
+  }
+
+  test("explode variants") {
+    assertFn(functions.explode_outer(Column("arr")), "explode_outer", 1)
+    assertFn(functions.posexplode(Column("arr")), "posexplode", 1)
+    assertFn(functions.posexplode_outer(Column("arr")), "posexplode_outer", 1)
+  }

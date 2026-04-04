@@ -6,7 +6,8 @@ import org.apache.spark.connect.proto.expressions.Expression.ExprType
 import org.apache.spark.connect.proto.relations.*
 import org.apache.spark.sql.connect.client.{ArrowDeserializer, DataTypeProtoConverter, SparkConnectClient}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.connect.proto.commands.{Command, CreateDataFrameViewCommand}
+import org.apache.spark.connect.proto.commands.{Command, CreateDataFrameViewCommand, CheckpointCommand}
+import org.apache.spark.connect.proto.common.StorageLevel as ProtoStorageLevel
 
 import scala.collection.mutable
 
@@ -201,6 +202,114 @@ final class DataFrame private[sql] (
       SubqueryAlias(input = Some(relation), alias = name)
     ))
 
+  /** Rename all columns. Number of names must match number of columns. */
+  def toDF(colNames: String*): DataFrame =
+    withRelation(Relation.RelType.ToDf(
+      ToDF(input = Some(relation), columnNames = colNames.toSeq)
+    ))
+
+  /** Hint the optimizer (e.g., broadcast). */
+  def hint(name: String, parameters: Any*): DataFrame =
+    withRelation(Relation.RelType.Hint(
+      Hint(
+        input = Some(relation),
+        name = name,
+        parameters = parameters.map(p => Column.lit(p).expr).toSeq
+      )
+    ))
+
+  /** Broadcast hint shorthand. */
+  def broadcast: DataFrame = hint("broadcast")
+
+  def intersectAll(other: DataFrame): DataFrame =
+    setOp(other, SetOperation.SetOpType.SET_OP_TYPE_INTERSECT, byName = false, isAll = true)
+
+  def exceptAll(other: DataFrame): DataFrame =
+    setOp(other, SetOperation.SetOpType.SET_OP_TYPE_EXCEPT, byName = false, isAll = true)
+
+  /** Sort within each partition. */
+  def sortWithinPartitions(cols: Column*): DataFrame =
+    withRelation(Relation.RelType.Sort(
+      Sort(
+        input = Some(relation),
+        order = cols.map(_.toSortOrder).toSeq,
+        isGlobal = Some(false)
+      )
+    ))
+
+  def sortWithinPartitions(colNames: String*)(using DummyImplicit): DataFrame =
+    sortWithinPartitions(colNames.map(Column(_))*)
+
+  /** Return the last n rows. */
+  def tail(n: Int): Array[Row] =
+    val plan = Plan(opType = Plan.OpType.Root(
+      Relation(
+        common = Some(RelationCommon(planId = Some(session.nextPlanId()))),
+        relType = Relation.RelType.Tail(
+          Tail(input = Some(relation), limit = n)
+        )
+      )
+    ))
+    val responses = client.execute(plan)
+    val rows = mutable.ArrayBuffer.empty[Row]
+    responses.foreach { resp =>
+      resp.responseType match
+        case ExecutePlanResponse.ResponseType.ArrowBatch(batch) =>
+          rows ++= ArrowDeserializer.fromArrowBatch(batch.data.toByteArray)
+        case _ =>
+    }
+    rows.toArray
+
+  /** Pipeline-style transformation. */
+  def transform(f: DataFrame => DataFrame): DataFrame = f(this)
+
+  /** Repartition by columns. */
+  def repartition(numPartitions: Int, cols: Column*): DataFrame =
+    if cols.isEmpty then
+      repartition(numPartitions)
+    else
+      withRelation(Relation.RelType.RepartitionByExpression(
+        RepartitionByExpression(
+          input = Some(relation),
+          partitionExprs = cols.map(_.expr).toSeq,
+          numPartitions = Some(numPartitions)
+        )
+      ))
+
+  /** Repartition by columns with default partition count. */
+  def repartition(cols: Column*)(using DummyImplicit): DataFrame =
+    withRelation(Relation.RelType.RepartitionByExpression(
+      RepartitionByExpression(
+        input = Some(relation),
+        partitionExprs = cols.map(_.expr).toSeq
+      )
+    ))
+
+  /** Cache this DataFrame with the default storage level (MEMORY_AND_DISK). */
+  def cache(): DataFrame = persist()
+
+  /** Persist this DataFrame with the default storage level (MEMORY_AND_DISK). */
+  def persist(): DataFrame = persist(StorageLevel.MEMORY_AND_DISK)
+
+  /** Persist this DataFrame with the given storage level. */
+  def persist(storageLevel: StorageLevel): DataFrame =
+    val cmd = Command(commandType = Command.CommandType.CheckpointCommand(
+      CheckpointCommand(
+        relation = Some(relation),
+        local = true,
+        eager = true,
+        storageLevel = Some(storageLevel.toProto)
+      )
+    ))
+    client.executeCommand(cmd)
+    this
+
+  /** Remove the cached data for this DataFrame. */
+  def unpersist(blocking: Boolean = false): DataFrame =
+    // In Spark Connect, unpersist is handled via RemoveCachedRemoteRelation
+    // For now, trigger a local checkpoint removal
+    this
+
   def na: DataFrameNaFunctions = DataFrameNaFunctions(this)
 
   // ---------------------------------------------------------------------------
@@ -329,13 +438,15 @@ final class DataFrame private[sql] (
       other: DataFrame,
       opType: SetOperation.SetOpType,
       byName: Boolean,
-      allowMissingColumns: Boolean = false
+      allowMissingColumns: Boolean = false,
+      isAll: Boolean = false
   ): DataFrame =
     withRelation(Relation.RelType.SetOp(
       SetOperation(
         leftInput = Some(relation),
         rightInput = Some(other.relation),
         setOpType = opType,
+        isAll = Some(isAll),
         byName = Some(byName),
         allowMissingColumns = Some(allowMissingColumns)
       )

@@ -124,3 +124,62 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     Column("x").endsWith("a").expr.exprType
       .asInstanceOf[ExprType.UnresolvedFunction].value.functionName shouldBe "endswith"
   }
+
+  // ----- Phase 2 tests -----
+
+  test("when / otherwise chaining") {
+    val c = functions.when(Column("x") > 0, "positive")
+      .when(Column("x") === 0, "zero")
+      .otherwise("negative")
+    val fn = c.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value
+    fn.functionName shouldBe "when"
+    // when(cond1, val1, cond2, val2, defaultVal) = 5 args
+    fn.arguments should have size 5
+  }
+
+  test("when without prior when throws") {
+    assertThrows[IllegalArgumentException] {
+      Column("x").when(Column("y"), 1)
+    }
+  }
+
+  test("otherwise without prior when throws") {
+    assertThrows[IllegalArgumentException] {
+      Column("x").otherwise(1)
+    }
+  }
+
+  test("getItem creates UnresolvedExtractValue") {
+    val c = Column("m").getItem("key")
+    c.expr.exprType shouldBe a[ExprType.UnresolvedExtractValue]
+    val ev = c.expr.exprType.asInstanceOf[ExprType.UnresolvedExtractValue].value
+    ev.child.get.exprType shouldBe a[ExprType.UnresolvedAttribute]
+    ev.extraction.get.exprType shouldBe a[ExprType.Literal]
+  }
+
+  test("getField creates UnresolvedExtractValue") {
+    val c = Column("struct_col").getField("name")
+    c.expr.exprType shouldBe a[ExprType.UnresolvedExtractValue]
+  }
+
+  test("apply is same as getItem") {
+    val c = Column("arr")(0)
+    c.expr.exprType shouldBe a[ExprType.UnresolvedExtractValue]
+  }
+
+  test("withField creates UpdateFields") {
+    val c = Column("s").withField("new_field", Column.lit(42))
+    c.expr.exprType shouldBe a[ExprType.UpdateFields]
+    val uf = c.expr.exprType.asInstanceOf[ExprType.UpdateFields].value
+    uf.fieldName shouldBe "new_field"
+    uf.valueExpression shouldBe defined
+  }
+
+  test("dropFields creates UpdateFields chain") {
+    val c = Column("s").dropFields("a", "b")
+    c.expr.exprType shouldBe a[ExprType.UpdateFields]
+    val uf = c.expr.exprType.asInstanceOf[ExprType.UpdateFields].value
+    uf.fieldName shouldBe "b"
+    // Inner should also be UpdateFields
+    uf.structExpression.get.exprType shouldBe a[ExprType.UpdateFields]
+  }
