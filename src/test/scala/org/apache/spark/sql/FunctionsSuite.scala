@@ -180,3 +180,202 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.posexplode(Column("arr")), "posexplode", 1)
     assertFn(functions.posexplode_outer(Column("arr")), "posexplode_outer", 1)
   }
+
+  // ----- Phase 3 (Task B) tests -----
+
+  test("sort functions") {
+    val a = functions.asc("x")
+    a.expr.hasSortOrder shouldBe true
+    a.expr.getSortOrder.getDirection.toString should include("ASCENDING")
+
+    val anf = functions.asc_nulls_first("x")
+    anf.expr.hasSortOrder shouldBe true
+    anf.expr.getSortOrder.getDirection.toString should include("ASCENDING")
+    anf.expr.getSortOrder.getNullOrdering.toString should include("NULLS_FIRST")
+
+    val anl = functions.asc_nulls_last("x")
+    anl.expr.hasSortOrder shouldBe true
+    anl.expr.getSortOrder.getDirection.toString should include("ASCENDING")
+    anl.expr.getSortOrder.getNullOrdering.toString should include("NULLS_LAST")
+
+    val d = functions.desc("x")
+    d.expr.hasSortOrder shouldBe true
+    d.expr.getSortOrder.getDirection.toString should include("DESCENDING")
+
+    val dnf = functions.desc_nulls_first("x")
+    dnf.expr.hasSortOrder shouldBe true
+    dnf.expr.getSortOrder.getDirection.toString should include("DESCENDING")
+    dnf.expr.getSortOrder.getNullOrdering.toString should include("NULLS_FIRST")
+
+    val dnl = functions.desc_nulls_last("x")
+    dnl.expr.hasSortOrder shouldBe true
+    dnl.expr.getSortOrder.getDirection.toString should include("DESCENDING")
+    dnl.expr.getSortOrder.getNullOrdering.toString should include("NULLS_LAST")
+  }
+
+  test("Column asc_nulls_first/last, desc_nulls_first/last") {
+    val c = Column("x")
+    c.asc_nulls_first.expr.getSortOrder.getNullOrdering.toString should include("NULLS_FIRST")
+    c.asc_nulls_last.expr.getSortOrder.getNullOrdering.toString should include("NULLS_LAST")
+    c.desc_nulls_first.expr.getSortOrder.getNullOrdering.toString should include("NULLS_FIRST")
+    c.desc_nulls_last.expr.getSortOrder.getNullOrdering.toString should include("NULLS_LAST")
+  }
+
+  test("new window functions") {
+    assertFn(functions.percent_rank(), "percent_rank", 0)
+    assertFn(functions.cume_dist(), "cume_dist", 0)
+    assertFn(functions.nth_value(Column("x"), 2), "nth_value", 2)
+  }
+
+  test("conditional / null functions") {
+    assertFn(functions.isnull(Column("x")), "isnull", 1)
+    assertFn(functions.isnan(Column("x")), "isnan", 1)
+    assertFn(functions.isnotnull(Column("x")), "isnotnull", 1)
+    assertFn(functions.assert_true(Column("x")), "assert_true", 1)
+    assertFn(functions.raise_error(Column("x")), "raise_error", 1)
+  }
+
+  test("new aggregate functions") {
+    assertFn(functions.any_value(Column("x")), "any_value", 1)
+    assertFn(functions.count_if(Column("x")), "count_if", 1)
+    assertFn(functions.product(Column("x")), "product", 1)
+    assertFn(functions.every(Column("x")), "every", 1)
+    assertFn(functions.some(Column("x")), "some", 1)
+    assertFn(functions.bool_and(Column("x")), "bool_and", 1)
+    assertFn(functions.bool_or(Column("x")), "bool_or", 1)
+    assertFn(functions.bit_and(Column("x")), "bit_and", 1)
+    assertFn(functions.bit_or(Column("x")), "bit_or", 1)
+    assertFn(functions.bit_xor(Column("x")), "bit_xor", 1)
+    assertFn(functions.first_value(Column("x")), "first_value", 1)
+    assertFn(functions.last_value(Column("x")), "last_value", 1)
+  }
+
+  test("new math functions") {
+    assertFn(functions.log1p(Column("x")), "log1p", 1)
+    assertFn(functions.expm1(Column("x")), "expm1", 1)
+    assertFn(functions.hypot(Column("a"), Column("b")), "hypot", 2)
+    assertFn(functions.pmod(Column("a"), Column("b")), "pmod", 2)
+    assertFn(functions.sign(Column("x")), "sign", 1)
+    assertFn(functions.e(), "e", 0)
+    assertFn(functions.pi(), "pi", 0)
+    assertFn(
+      functions.width_bucket(Column("v"), Column("lo"), Column("hi"), Column("n")),
+      "width_bucket",
+      4
+    )
+  }
+
+  test("new string functions") {
+    assertFn(functions.left(Column("x"), 3), "left", 2)
+    assertFn(functions.right(Column("x"), 3), "right", 2)
+    assertFn(functions.char_length(Column("x")), "char_length", 1)
+    assertFn(functions.bit_length(Column("x")), "bit_length", 1)
+    assertFn(functions.octet_length(Column("x")), "octet_length", 1)
+    assertFn(functions.contains(Column("a"), Column("b")), "contains", 2)
+    assertFn(functions.startswith(Column("a"), Column("b")), "startswith", 2)
+    assertFn(functions.endswith(Column("a"), Column("b")), "endswith", 2)
+    assertFn(functions.btrim(Column("x")), "btrim", 1)
+    assertFn(functions.position(Column("sub"), Column("str")), "position", 2)
+    assertFn(
+      functions.sentences(Column("s"), Column("l"), Column("c")),
+      "sentences",
+      3
+    )
+  }
+
+  test("new date/time functions") {
+    assertFn(
+      functions.make_date(Column("y"), Column("m"), Column("d")),
+      "make_date",
+      3
+    )
+    assertFn(
+      functions.make_timestamp(
+        Column("y"),
+        Column("m"),
+        Column("d"),
+        Column("h"),
+        Column("mi"),
+        Column("s")
+      ),
+      "make_timestamp",
+      6
+    )
+    assertFn(functions.date_part(Column("f"), Column("s")), "date_part", 2)
+    assertFn(functions.extract(Column("f"), Column("s")), "extract", 2)
+    assertFn(functions.timestamp_seconds(Column("x")), "timestamp_seconds", 1)
+    assertFn(functions.timestamp_millis(Column("x")), "timestamp_millis", 1)
+    assertFn(functions.timestamp_micros(Column("x")), "timestamp_micros", 1)
+    assertFn(functions.date_from_unix_date(Column("x")), "date_from_unix_date", 1)
+    assertFn(functions.current_timezone(), "current_timezone", 0)
+    assertFn(functions.now(), "now", 0)
+  }
+
+  test("new collection functions") {
+    assertFn(functions.array_append(Column("a"), Column("e")), "array_append", 2)
+    assertFn(functions.array_prepend(Column("a"), Column("e")), "array_prepend", 2)
+    assertFn(functions.array_compact(Column("a")), "array_compact", 1)
+    assertFn(
+      functions.array_insert(Column("a"), Column("p"), Column("v")),
+      "array_insert",
+      3
+    )
+    assertFn(functions.arrays_overlap(Column("a"), Column("b")), "arrays_overlap", 2)
+    assertFn(
+      functions.sequence(Column("s"), Column("e"), Column("st")),
+      "sequence",
+      3
+    )
+    assertFn(functions.array_size(Column("a")), "array_size", 1)
+    assertFn(functions.get(Column("a"), Column("i")), "get", 2)
+    assertFn(functions.map_contains_key(Column("m"), Column("k")), "map_contains_key", 2)
+    assertFn(
+      functions.str_to_map(Column("s"), Column("p"), Column("kv")),
+      "str_to_map",
+      3
+    )
+  }
+
+  test("csv functions") {
+    assertFn(functions.from_csv(Column("c"), "a INT"), "from_csv", 2)
+    assertFn(functions.to_csv(Column("s")), "to_csv", 1)
+    assertFn(functions.schema_of_csv("1,2,3"), "schema_of_csv", 1)
+  }
+
+  test("xml functions") {
+    assertFn(functions.xpath(Column("x"), Column("p")), "xpath", 2)
+    assertFn(functions.xpath_string(Column("x"), Column("p")), "xpath_string", 2)
+  }
+
+  test("bitwise / shift functions") {
+    assertFn(functions.shiftleft(Column("x"), 2), "shiftleft", 2)
+    assertFn(functions.shiftright(Column("x"), 2), "shiftright", 2)
+    assertFn(functions.shiftrightunsigned(Column("x"), 2), "shiftrightunsigned", 2)
+    assertFn(functions.bit_count(Column("x")), "bit_count", 1)
+    assertFn(functions.bit_get(Column("x"), Column("p")), "bit_get", 2)
+  }
+
+  test("new misc functions") {
+    assertFn(functions.typeof(Column("x")), "typeof", 1)
+    assertFn(functions.version(), "version", 0)
+    assertFn(functions.current_user(), "current_user", 0)
+    assertFn(functions.current_catalog(), "current_catalog", 0)
+    assertFn(functions.current_database(), "current_database", 0)
+    assertFn(functions.current_schema(), "current_schema", 0)
+    assertFn(functions.uuid(), "uuid", 0)
+    assertFn(functions.session_user(), "session_user", 0)
+    assertFn(functions.stack(Column.lit(2), Column("a"), Column("b")), "stack", 3)
+    assertFn(functions.inline(Column("x")), "inline", 1)
+    assertFn(functions.inline_outer(Column("x")), "inline_outer", 1)
+  }
+
+  test("try functions") {
+    assertFn(functions.try_add(Column("a"), Column("b")), "try_add", 2)
+    assertFn(functions.try_subtract(Column("a"), Column("b")), "try_subtract", 2)
+    assertFn(functions.try_multiply(Column("a"), Column("b")), "try_multiply", 2)
+    assertFn(functions.try_divide(Column("a"), Column("b")), "try_divide", 2)
+    assertFn(functions.try_avg(Column("x")), "try_avg", 1)
+    assertFn(functions.try_sum(Column("x")), "try_sum", 1)
+    assertFn(functions.try_to_number(Column("x"), Column("f")), "try_to_number", 2)
+    assertFn(functions.try_to_timestamp(Column("x")), "try_to_timestamp", 1)
+  }

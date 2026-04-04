@@ -76,7 +76,11 @@ final class ArtifactManager private[client] (
   def addArtifact(bytes: Array[Byte], target: String): Unit =
     val targetPath = Paths.get(target)
     val artifact =
-      Artifact.newFromExtension(targetPath.getFileName.toString, targetPath, Artifact.InMemory(bytes))
+      Artifact.newFromExtension(
+        targetPath.getFileName.toString,
+        targetPath,
+        Artifact.InMemory(bytes)
+      )
     addArtifacts(Seq(artifact))
 
   /** Upload all `.class` files under a directory, preserving the directory structure. */

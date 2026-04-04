@@ -215,7 +215,15 @@ final class Column private[sql] (private[sql] val expr: Expression):
   // ---------------------------------------------------------------------------
 
   def asc: Column = withSortDirection(ascending = true)
+  def asc_nulls_first: Column =
+    withSortDirection(ascending = true, nullsFirst = true)
+  def asc_nulls_last: Column =
+    withSortDirection(ascending = true, nullsFirst = false)
   def desc: Column = withSortDirection(ascending = false)
+  def desc_nulls_first: Column =
+    withSortDirection(ascending = false, nullsFirst = true)
+  def desc_nulls_last: Column =
+    withSortDirection(ascending = false, nullsFirst = false)
 
   /** Convert this column into a SortOrder proto for orderBy. */
   private[sql] def toSortOrder: Expression.SortOrder =
@@ -228,6 +236,9 @@ final class Column private[sql] (private[sql] val expr: Expression):
         .build()
 
   private def withSortDirection(ascending: Boolean): Column =
+    withSortDirection(ascending, nullsFirst = ascending)
+
+  private def withSortDirection(ascending: Boolean, nullsFirst: Boolean): Column =
     import Expression.SortOrder.SortDirection.*
     import Expression.SortOrder.NullOrdering.*
     Column(Expression.newBuilder().setSortOrder(
@@ -238,7 +249,7 @@ final class Column private[sql] (private[sql] val expr: Expression):
           else SORT_DIRECTION_DESCENDING
         )
         .setNullOrdering(
-          if ascending then SORT_NULLS_FIRST
+          if nullsFirst then SORT_NULLS_FIRST
           else SORT_NULLS_LAST
         )
         .build()

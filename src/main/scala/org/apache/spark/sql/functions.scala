@@ -21,6 +21,17 @@ object functions:
       .build())
 
   // ---------------------------------------------------------------------------
+  // Sort functions
+  // ---------------------------------------------------------------------------
+
+  def asc(colName: String): Column = col(colName).asc
+  def asc_nulls_first(colName: String): Column = col(colName).asc_nulls_first
+  def asc_nulls_last(colName: String): Column = col(colName).asc_nulls_last
+  def desc(colName: String): Column = col(colName).desc
+  def desc_nulls_first(colName: String): Column = col(colName).desc_nulls_first
+  def desc_nulls_last(colName: String): Column = col(colName).desc_nulls_last
+
+  // ---------------------------------------------------------------------------
   // Aggregate functions
   // ---------------------------------------------------------------------------
 
@@ -41,6 +52,18 @@ object functions:
     callFn("count", isDistinct = true, (col +: cols)*)
   def collect_list(col: Column): Column = callFn("collect_list", col)
   def collect_set(col: Column): Column = callFn("collect_set", col)
+  def any_value(col: Column): Column = callFn("any_value", col)
+  def count_if(col: Column): Column = callFn("count_if", col)
+  def product(col: Column): Column = callFn("product", col)
+  def every(col: Column): Column = callFn("every", col)
+  def some(col: Column): Column = callFn("some", col)
+  def bool_and(col: Column): Column = callFn("bool_and", col)
+  def bool_or(col: Column): Column = callFn("bool_or", col)
+  def bit_and(col: Column): Column = callFn("bit_and", col)
+  def bit_or(col: Column): Column = callFn("bit_or", col)
+  def bit_xor(col: Column): Column = callFn("bit_xor", col)
+  def first_value(col: Column): Column = callFn("first_value", col)
+  def last_value(col: Column): Column = callFn("last_value", col)
 
   // ---------------------------------------------------------------------------
   // Math functions
@@ -60,6 +83,16 @@ object functions:
   def least(cols: Column*): Column = callFn("least", cols*)
   def rand(seed: Long = 0L): Column = callFn("rand", Column.lit(seed))
   def randn(seed: Long = 0L): Column = callFn("randn", Column.lit(seed))
+  def log1p(col: Column): Column = callFn("log1p", col)
+  def expm1(col: Column): Column = callFn("expm1", col)
+  def hypot(l: Column, r: Column): Column = callFn("hypot", l, r)
+  def pmod(dividend: Column, divisor: Column): Column =
+    callFn("pmod", dividend, divisor)
+  def sign(col: Column): Column = callFn("sign", col)
+  def e(): Column = callFn("e")
+  def pi(): Column = callFn("pi")
+  def width_bucket(v: Column, min: Column, max: Column, numBuckets: Column): Column =
+    callFn("width_bucket", v, min, max, numBuckets)
 
   // ---------------------------------------------------------------------------
   // String functions
@@ -82,6 +115,23 @@ object functions:
     callFn("lpad", col, Column.lit(len), Column.lit(pad))
   def rpad(col: Column, len: Int, pad: String): Column =
     callFn("rpad", col, Column.lit(len), Column.lit(pad))
+  def left(col: Column, len: Int): Column = callFn("left", col, Column.lit(len))
+  def right(col: Column, len: Int): Column =
+    callFn("right", col, Column.lit(len))
+  def char_length(col: Column): Column = callFn("char_length", col)
+  def bit_length(col: Column): Column = callFn("bit_length", col)
+  def octet_length(col: Column): Column = callFn("octet_length", col)
+  def contains(left: Column, right: Column): Column =
+    callFn("contains", left, right)
+  def startswith(col: Column, prefix: Column): Column =
+    callFn("startswith", col, prefix)
+  def endswith(col: Column, suffix: Column): Column =
+    callFn("endswith", col, suffix)
+  def btrim(col: Column): Column = callFn("btrim", col)
+  def position(substr: Column, str: Column): Column =
+    callFn("position", substr, str)
+  def sentences(str: Column, lang: Column, country: Column): Column =
+    callFn("sentences", str, lang, country)
 
   // ---------------------------------------------------------------------------
   // Date / Time functions
@@ -107,10 +157,15 @@ object functions:
     callFn("date_format", col, Column.lit(fmt))
 
   // ---------------------------------------------------------------------------
-  // Null handling
+  // Null handling / Conditional
   // ---------------------------------------------------------------------------
 
   def coalesce(cols: Column*): Column = callFn("coalesce", cols*)
+  def isnull(col: Column): Column = callFn("isnull", col)
+  def isnan(col: Column): Column = callFn("isnan", col)
+  def isnotnull(col: Column): Column = callFn("isnotnull", col)
+  def assert_true(col: Column): Column = callFn("assert_true", col)
+  def raise_error(col: Column): Column = callFn("raise_error", col)
 
   // ---------------------------------------------------------------------------
   // Conditional
@@ -162,6 +217,23 @@ object functions:
   def shuffle(col: Column): Column = callFn("shuffle", col)
   def sort_array(col: Column, asc: Boolean = true): Column =
     callFn("sort_array", col, Column.lit(asc))
+  def array_append(col: Column, element: Column): Column =
+    callFn("array_append", col, element)
+  def array_prepend(col: Column, element: Column): Column =
+    callFn("array_prepend", col, element)
+  def array_compact(col: Column): Column = callFn("array_compact", col)
+  def array_insert(col: Column, pos: Column, value: Column): Column =
+    callFn("array_insert", col, pos, value)
+  def arrays_overlap(a1: Column, a2: Column): Column =
+    callFn("arrays_overlap", a1, a2)
+  def sequence(start: Column, stop: Column, step: Column): Column =
+    callFn("sequence", start, stop, step)
+  def array_size(col: Column): Column = callFn("array_size", col)
+  def get(col: Column, index: Column): Column = callFn("get", col, index)
+  def map_contains_key(col: Column, key: Column): Column =
+    callFn("map_contains_key", col, key)
+  def str_to_map(col: Column, pairDelim: Column, keyValueDelim: Column): Column =
+    callFn("str_to_map", col, pairDelim, keyValueDelim)
 
   // Map functions
   def map(cols: Column*): Column = callFn("map", cols*)
@@ -193,6 +265,24 @@ object functions:
 
   def schema_of_json(json: String): Column =
     callFn("schema_of_json", Column.lit(json))
+
+  // ---------------------------------------------------------------------------
+  // CSV functions
+  // ---------------------------------------------------------------------------
+
+  def from_csv(col: Column, schema: String): Column =
+    callFn("from_csv", col, Column.lit(schema))
+  def to_csv(col: Column): Column = callFn("to_csv", col)
+  def schema_of_csv(csv: String): Column =
+    callFn("schema_of_csv", Column.lit(csv))
+
+  // ---------------------------------------------------------------------------
+  // XML functions
+  // ---------------------------------------------------------------------------
+
+  def xpath(col: Column, path: Column): Column = callFn("xpath", col, path)
+  def xpath_string(col: Column, path: Column): Column =
+    callFn("xpath_string", col, path)
 
   // ---------------------------------------------------------------------------
   // Regex / String functions (extended)
@@ -271,6 +361,29 @@ object functions:
     callFn("date_trunc", Column.lit(format), timestamp)
   def trunc(date: Column, format: String): Column =
     callFn("trunc", date, Column.lit(format))
+  def make_date(year: Column, month: Column, day: Column): Column =
+    callFn("make_date", year, month, day)
+  def make_timestamp(
+      year: Column,
+      month: Column,
+      day: Column,
+      hours: Column,
+      mins: Column,
+      secs: Column
+  ): Column =
+    callFn("make_timestamp", year, month, day, hours, mins, secs)
+  def date_part(field: Column, source: Column): Column =
+    callFn("date_part", field, source)
+  def extract(field: Column, source: Column): Column =
+    callFn("extract", field, source)
+  def timestamp_seconds(col: Column): Column =
+    callFn("timestamp_seconds", col)
+  def timestamp_millis(col: Column): Column = callFn("timestamp_millis", col)
+  def timestamp_micros(col: Column): Column = callFn("timestamp_micros", col)
+  def date_from_unix_date(col: Column): Column =
+    callFn("date_from_unix_date", col)
+  def current_timezone(): Column = callFn("current_timezone")
+  def now(): Column = callFn("now")
 
   // ---------------------------------------------------------------------------
   // Math functions (extended)
@@ -299,6 +412,14 @@ object functions:
     callFn("conv", col, Column.lit(fromBase), Column.lit(toBase))
   def factorial(col: Column): Column = callFn("factorial", col)
   def log(base: Double, col: Column): Column = callFn("log", Column.lit(base), col)
+  def shiftleft(col: Column, numBits: Int): Column =
+    callFn("shiftleft", col, Column.lit(numBits))
+  def shiftright(col: Column, numBits: Int): Column =
+    callFn("shiftright", col, Column.lit(numBits))
+  def shiftrightunsigned(col: Column, numBits: Int): Column =
+    callFn("shiftrightunsigned", col, Column.lit(numBits))
+  def bit_count(col: Column): Column = callFn("bit_count", col)
+  def bit_get(col: Column, pos: Column): Column = callFn("bit_get", col, pos)
 
   // ---------------------------------------------------------------------------
   // Aggregate functions (extended)
@@ -323,6 +444,8 @@ object functions:
   def grouping_id(cols: Column*): Column = callFn("grouping_id", cols*)
   def percentile_approx(col: Column, percentage: Column, accuracy: Column): Column =
     callFn("percentile_approx", col, percentage, accuracy)
+  def try_avg(col: Column): Column = callFn("try_avg", col)
+  def try_sum(col: Column): Column = callFn("try_sum", col)
 
   // ---------------------------------------------------------------------------
   // Misc functions
@@ -346,6 +469,34 @@ object functions:
   def nullif(col1: Column, col2: Column): Column = callFn("nullif", col1, col2)
   def nvl(col1: Column, col2: Column): Column = callFn("nvl", col1, col2)
   def nvl2(col1: Column, col2: Column, col3: Column): Column = callFn("nvl2", col1, col2, col3)
+  def typeof(col: Column): Column = callFn("typeof", col)
+  def version(): Column = callFn("version")
+  def current_user(): Column = callFn("current_user")
+  def current_catalog(): Column = callFn("current_catalog")
+  def current_database(): Column = callFn("current_database")
+  def current_schema(): Column = callFn("current_schema")
+  def uuid(): Column = callFn("uuid")
+  def session_user(): Column = callFn("session_user")
+  def stack(n: Column, cols: Column*): Column =
+    callFn("stack", (n +: cols)*)
+  def inline(col: Column): Column = callFn("inline", col)
+  def inline_outer(col: Column): Column = callFn("inline_outer", col)
+
+  // ---------------------------------------------------------------------------
+  // Try functions
+  // ---------------------------------------------------------------------------
+
+  def try_add(left: Column, right: Column): Column =
+    callFn("try_add", left, right)
+  def try_subtract(left: Column, right: Column): Column =
+    callFn("try_subtract", left, right)
+  def try_multiply(left: Column, right: Column): Column =
+    callFn("try_multiply", left, right)
+  def try_divide(left: Column, right: Column): Column =
+    callFn("try_divide", left, right)
+  def try_to_number(col: Column, format: Column): Column =
+    callFn("try_to_number", col, format)
+  def try_to_timestamp(col: Column): Column = callFn("try_to_timestamp", col)
 
   /** Broadcast hint for a DataFrame — returns the same DataFrame with a broadcast hint. */
   def broadcast(df: DataFrame): DataFrame = df.hint("broadcast")
@@ -362,6 +513,10 @@ object functions:
   def lag(col: Column, offset: Int = 1): Column =
     callFn("lag", col, Column.lit(offset))
   def ntile(n: Int): Column = callFn("ntile", Column.lit(n))
+  def percent_rank(): Column = callFn("percent_rank")
+  def cume_dist(): Column = callFn("cume_dist")
+  def nth_value(col: Column, offset: Int): Column =
+    callFn("nth_value", col, Column.lit(offset))
 
   // ---------------------------------------------------------------------------
   // Helper

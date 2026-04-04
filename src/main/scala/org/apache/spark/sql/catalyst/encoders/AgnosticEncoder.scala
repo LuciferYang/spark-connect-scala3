@@ -9,10 +9,10 @@ import scala.reflect.ClassTag
   *
   * The server-side `SparkConnectPlanner` deserializes `UdfPacket` which contains `AgnosticEncoder`
   * instances. These stubs use `writeReplace` to substitute a [[EncoderSerializationProxy]] that
-  * carries only a type name. On the server side, the proxy's `readResolve` uses reflection to
-  * look up the real encoder singleton from the server's own `AgnosticEncoders` object (loaded by
-  * the parent classloader). This avoids all serialVersionUID and class-structure mismatches
-  * between our Scala 3 stubs and the server's Scala 2.13 classes.
+  * carries only a type name. On the server side, the proxy's `readResolve` uses reflection to look
+  * up the real encoder singleton from the server's own `AgnosticEncoders` object (loaded by the
+  * parent classloader). This avoids all serialVersionUID and class-structure mismatches between our
+  * Scala 3 stubs and the server's Scala 2.13 classes.
   */
 trait AgnosticEncoder[T] extends Serializable:
   def isPrimitive: Boolean
@@ -107,13 +107,13 @@ object AgnosticEncoders:
 
 /** Serialization proxy for [[AgnosticEncoder]] instances.
   *
-  * When a Scala 3 encoder stub is serialized, `writeReplace` substitutes this proxy. On the
-  * server side (Scala 2.13), `readResolve` uses reflection to look up the real encoder singleton
-  * from the server's own classes (loaded by the parent classloader). This completely avoids
-  * serialVersionUID and bytecode-layout mismatches between Scala 3 and Scala 2.13 classes.
+  * When a Scala 3 encoder stub is serialized, `writeReplace` substitutes this proxy. On the server
+  * side (Scala 2.13), `readResolve` uses reflection to look up the real encoder singleton from the
+  * server's own classes (loaded by the parent classloader). This completely avoids serialVersionUID
+  * and bytecode-layout mismatches between Scala 3 and Scala 2.13 classes.
   *
-  * In Scala 2.13, `case object PrimitiveIntEncoder` inside `object AgnosticEncoders` compiles to
-  * a class `AgnosticEncoders$PrimitiveIntEncoder$` with a static `MODULE$` field holding the
+  * In Scala 2.13, `case object PrimitiveIntEncoder` inside `object AgnosticEncoders` compiles to a
+  * class `AgnosticEncoders$PrimitiveIntEncoder$` with a static `MODULE$` field holding the
   * singleton. We use this knowledge to look up the encoder via reflection.
   */
 @SerialVersionUID(1L)
