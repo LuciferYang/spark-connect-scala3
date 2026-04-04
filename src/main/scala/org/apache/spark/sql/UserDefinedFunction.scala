@@ -1,11 +1,16 @@
 package org.apache.spark.sql
 
 import com.google.protobuf.ByteString
-import org.apache.spark.connect.proto.{Expression, CommonInlineUserDefinedFunction, ScalarScalaUDF}
+import org.apache.spark.connect.proto.{
+  Expression,
+  CommonInlineUserDefinedFunction,
+  ScalarScalaUDF
+}
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.*
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
-import org.apache.spark.sql.types.DataType
-
-import java.io.{ByteArrayOutputStream, ObjectOutputStream}
+import org.apache.spark.sql.connect.common.UdfPacket
+import org.apache.spark.sql.types.*
 
 /** A user-defined function that can be applied to Columns.
   *
@@ -67,17 +72,25 @@ final class UserDefinedFunction private[sql] (
     arguments.foreach(udfBuilder.addArguments)
     udfBuilder.build()
 
-  /** Serialize a function closure to bytes using Java serialization. */
+  /** Serialize a function closure wrapped in a UdfPacket. */
   private def serializeFunction(f: AnyRef): Array[Byte] =
-    val bos = ByteArrayOutputStream()
-    val oos = ObjectOutputStream(bos)
-    try
-      oos.writeObject(f)
-      oos.flush()
-      bos.toByteArray
-    finally
-      oos.close()
-      bos.close()
+    val inputEncs = inputTypes.map(encoderForType)
+    val outputEnc = encoderForType(returnType)
+    val packet = UdfPacket(f, inputEncs, outputEnc)
+    UdfPacket.serialize(packet)
+
+  /** Map a Spark DataType to the corresponding AgnosticEncoder for UdfPacket serialization. */
+  private def encoderForType(dt: DataType): AgnosticEncoder[?] = dt match
+    case IntegerType => PrimitiveIntEncoder
+    case LongType    => PrimitiveLongEncoder
+    case DoubleType  => PrimitiveDoubleEncoder
+    case FloatType   => PrimitiveFloatEncoder
+    case ShortType   => PrimitiveShortEncoder
+    case ByteType    => PrimitiveByteEncoder
+    case BooleanType => PrimitiveBooleanEncoder
+    case StringType  => StringEncoder
+    case BinaryType  => BinaryEncoder
+    case _           => StringEncoder // fallback
 
 object UserDefinedFunction:
   /** Create a UserDefinedFunction. Used by inline udf() factory methods. */

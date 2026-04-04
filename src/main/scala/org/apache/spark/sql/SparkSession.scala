@@ -1,8 +1,9 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.{Catalog as _, StorageLevel as _, *}
-import org.apache.spark.sql.connect.client.SparkConnectClient
+import org.apache.spark.sql.connect.client.{ClassFinder, SparkConnectClient}
 
+import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicLong
 
 /** Entry point for Spark Connect Scala 3 client.
@@ -134,6 +135,24 @@ final class SparkSession private (
 
   /** Access the UDF registration interface. */
   def udf: UDFRegistration = UDFRegistration(client)
+
+  // ---------------------------------------------------------------------------
+  // Artifact Management
+  // ---------------------------------------------------------------------------
+
+  /** Upload a JAR or class file from the local filesystem. */
+  def addArtifact(path: String): Unit = client.artifactManager.addArtifact(path)
+
+  /** Upload in-memory bytes as an artifact with the given target path. */
+  def addArtifact(bytes: Array[Byte], target: String): Unit =
+    client.artifactManager.addArtifact(bytes, target)
+
+  /** Upload all `.class` files under a directory. */
+  def addClassDir(base: Path): Unit = client.artifactManager.addClassDir(base)
+
+  /** Register a [[ClassFinder]] for automatic class upload before each execution. */
+  def registerClassFinder(finder: ClassFinder): Unit =
+    client.artifactManager.registerClassFinder(finder)
 
   // ---------------------------------------------------------------------------
   // Version

@@ -57,7 +57,7 @@ lazy val root = (project in file("."))
 
     // JVM options for Apache Arrow
     Test / javaOptions ++= Seq(
-      "--add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED"
+      "--add-opens=java.base/java.nio=ALL-UNNAMED"
     ),
     Test / fork := true,
 

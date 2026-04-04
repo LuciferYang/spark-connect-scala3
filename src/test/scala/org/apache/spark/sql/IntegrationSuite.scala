@@ -3,6 +3,8 @@ package org.apache.spark.sql
 import org.apache.spark.sql.functions.*
 import org.apache.spark.sql.types.*
 
+import java.nio.file.Paths
+
 /** Integration tests that require a running Spark Connect server at sc://localhost:15002.
   *
   * Start a Spark Connect server with: $SPARK_HOME/sbin/start-connect-server.sh
@@ -189,11 +191,33 @@ class IntegrationSuite extends org.scalatest.funsuite.AnyFunSuite:
 
   // ---------------------------------------------------------------------------
   // UDF (User-Defined Functions)
-  // Note: UDFs require ArtifactManager to upload class files to the server.
-  // These tests will work only after ArtifactManager is implemented.
+  // UDFs require ArtifactManager to upload class files to the server.
   // ---------------------------------------------------------------------------
 
+  /** Upload test class files so the server can deserialize UDF lambdas. */
+  private lazy val classFilesUploaded: Boolean =
+    // Upload test class directory
+    val testClassDir = Paths.get("target/scala-3.3.7/test-classes")
+    if testClassDir.toFile.isDirectory then spark.addClassDir(testClassDir)
+    // Upload main class directory (includes UdfPacket, AgnosticEncoder stubs, etc.)
+    val mainClassDir = Paths.get("target/scala-3.3.7/classes")
+    if mainClassDir.toFile.isDirectory then spark.addClassDir(mainClassDir)
+    // Upload scalatest/scalactic and Scala 3 library JARs — the server needs the full
+    // class hierarchy of the enclosing class (IntegrationSuite extends AnyFunSuite) and
+    // Scala 3 standard library classes (e.g., scala.CanEqual) to deserialize the lambda.
+    val cp = System.getProperty("java.class.path", "").split(java.io.File.pathSeparator)
+    cp.filter { entry =>
+      val name = entry.substring(entry.lastIndexOf(java.io.File.separatorChar) + 1)
+      name.endsWith(".jar") &&
+      (name.startsWith("scalatest") || name.startsWith("scalactic") ||
+        name.startsWith("scala3-library") || name.startsWith("scala-library"))
+    }.foreach { jar =>
+      spark.addArtifact(jar)
+    }
+    true
+
   test("UDF register and use in SQL") {
+    assert(classFilesUploaded)
     val addOne = udf((x: Int) => x + 1)
     spark.udf.register("add_one", addOne)
 
@@ -208,6 +232,7 @@ class IntegrationSuite extends org.scalatest.funsuite.AnyFunSuite:
   }
 
   test("UDF applied to columns directly") {
+    assert(classFilesUploaded)
     val doubler = udf((x: Int) => x * 2)
     val rows = Seq(Row(1), Row(2), Row(3))
     val schema = StructType(Seq(StructField("value", IntegerType)))
@@ -221,6 +246,7 @@ class IntegrationSuite extends org.scalatest.funsuite.AnyFunSuite:
   }
 
   test("UDF with multiple arguments") {
+    assert(classFilesUploaded)
     val concat = udf((a: String, b: String) => s"$a-$b")
     val rows = Seq(
       Row("hello", "world"),

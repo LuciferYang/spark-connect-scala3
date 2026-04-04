@@ -18,9 +18,13 @@ import scala.util.control.NonFatal
 final class SparkConnectClient private (
     private val channel: ManagedChannel,
     private val bstub: SparkConnectServiceGrpc.SparkConnectServiceBlockingStub,
+    private val asyncStub: SparkConnectServiceGrpc.SparkConnectServiceStub,
     val sessionId: String,
     val userId: String
 ):
+
+  /** Manages uploading artifacts (class files, JARs) to the server. */
+  val artifactManager: ArtifactManager = ArtifactManager(sessionId, userId, asyncStub)
 
   // ---------------------------------------------------------------------------
   // Execute
@@ -28,6 +32,7 @@ final class SparkConnectClient private (
 
   /** Execute a plan and return a lazy iterator of responses. */
   def execute(plan: Plan): Iterator[ExecutePlanResponse] =
+    artifactManager.uploadAllClassFileArtifacts()
     val request = ExecutePlanRequest.newBuilder()
       .setSessionId(sessionId)
       .setUserContext(UserContext.newBuilder().setUserId(userId).build())
@@ -42,6 +47,7 @@ final class SparkConnectClient private (
 
   /** Retrieve the schema of a plan without executing it. */
   def analyzeSchema(plan: Plan): AnalyzePlanResponse =
+    artifactManager.uploadAllClassFileArtifacts()
     val request = AnalyzePlanRequest.newBuilder()
       .setSessionId(sessionId)
       .setUserContext(UserContext.newBuilder().setUserId(userId).build())
@@ -185,17 +191,19 @@ object SparkConnectClient:
     val channel = channelBuilder.build()
 
     val baseStub = SparkConnectServiceGrpc.newBlockingStub(channel)
-    val stub = token match
+    val baseAsyncStub = SparkConnectServiceGrpc.newStub(channel)
+    val (stub, aStub) = token match
       case Some(t) =>
         val metadata = Metadata()
         metadata.put(
           Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER),
           s"Bearer $t"
         )
-        baseStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(metadata))
-      case None => baseStub
+        val interceptor = MetadataUtils.newAttachHeadersInterceptor(metadata)
+        (baseStub.withInterceptors(interceptor), baseAsyncStub.withInterceptors(interceptor))
+      case None => (baseStub, baseAsyncStub)
 
-    val client = SparkConnectClient(channel, stub, sessionId, userId)
+    val client = SparkConnectClient(channel, stub, aStub, sessionId, userId)
 
     configs.foreach((k, v) => client.setConfig(k, v))
     client
