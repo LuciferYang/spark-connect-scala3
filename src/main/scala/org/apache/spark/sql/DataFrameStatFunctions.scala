@@ -2,10 +2,8 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
 
-/**
- * Statistic functions for DataFrames.
- * Access via `df.stat`.
- */
+/** Statistic functions for DataFrames. Access via `df.stat`.
+  */
 final class DataFrameStatFunctions private[sql] (df: DataFrame):
 
   /** Computes a pair-wise frequency table (contingency table). */

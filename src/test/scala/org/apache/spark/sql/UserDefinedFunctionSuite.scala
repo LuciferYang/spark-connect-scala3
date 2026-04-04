@@ -16,13 +16,25 @@ class UserDefinedFunctionSuite extends AnyFunSuite with Matchers:
 
   test("toProto round-trip for primitive types") {
     val types = Seq(
-      BooleanType, ByteType, ShortType, IntegerType, LongType,
-      FloatType, DoubleType, StringType, BinaryType,
-      DateType, TimestampType, TimestampNTZType, NullType
+      BooleanType,
+      ByteType,
+      ShortType,
+      IntegerType,
+      LongType,
+      FloatType,
+      DoubleType,
+      StringType,
+      BinaryType,
+      DateType,
+      TimestampType,
+      TimestampNTZType,
+      NullType
     )
     for dt <- types do
-      assert(DataTypeProtoConverter.fromProto(DataTypeProtoConverter.toProto(dt)) == dt,
-        s"Round-trip failed for $dt")
+      assert(
+        DataTypeProtoConverter.fromProto(DataTypeProtoConverter.toProto(dt)) == dt,
+        s"Round-trip failed for $dt"
+      )
   }
 
   test("toProto round-trip for DecimalType") {

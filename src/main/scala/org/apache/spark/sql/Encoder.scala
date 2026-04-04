@@ -4,12 +4,11 @@ import org.apache.spark.sql.types.*
 import scala.compiletime.*
 import scala.deriving.Mirror
 
-/**
- * An Encoder provides serialization and deserialization between Scala types and Spark Rows.
- *
- * In Scala 3, Encoders are derived at compile time using `Mirror.ProductOf`,
- * eliminating the need for runtime reflection (`scala.reflect.runtime.universe`).
- */
+/** An Encoder provides serialization and deserialization between Scala types and Spark Rows.
+  *
+  * In Scala 3, Encoders are derived at compile time using `Mirror.ProductOf`, eliminating the need
+  * for runtime reflection (`scala.reflect.runtime.universe`).
+  */
 trait Encoder[T]:
   /** The Spark SQL schema for type T. */
   def schema: StructType
@@ -73,20 +72,20 @@ object Encoder:
   /** Map a Scala type to its corresponding Spark DataType. */
   inline def sparkTypeOf[T]: DataType =
     inline erasedValue[T] match
-      case _: Boolean => BooleanType
-      case _: Byte    => ByteType
-      case _: Short   => ShortType
-      case _: Int     => IntegerType
-      case _: Long    => LongType
-      case _: Float   => FloatType
-      case _: Double  => DoubleType
-      case _: String  => StringType
-      case _: BigDecimal => DecimalType.DEFAULT
-      case _: java.sql.Date => DateType
+      case _: Boolean            => BooleanType
+      case _: Byte               => ByteType
+      case _: Short              => ShortType
+      case _: Int                => IntegerType
+      case _: Long               => LongType
+      case _: Float              => FloatType
+      case _: Double             => DoubleType
+      case _: String             => StringType
+      case _: BigDecimal         => DecimalType.DEFAULT
+      case _: java.sql.Date      => DateType
       case _: java.sql.Timestamp => TimestampType
-      case _: Array[Byte] => BinaryType
-      case _: Option[t] => sparkTypeOf[t] // nullable wrapper
-      case _: Seq[t] => ArrayType(sparkTypeOf[t], containsNull = true)
+      case _: Array[Byte]        => BinaryType
+      case _: Option[t]          => sparkTypeOf[t] // nullable wrapper
+      case _: Seq[t]             => ArrayType(sparkTypeOf[t], containsNull = true)
       case _: Map[k, v] => MapType(sparkTypeOf[k], sparkTypeOf[v], valueContainsNull = true)
 
   /** Check if a type is Option[_] at compile time. */

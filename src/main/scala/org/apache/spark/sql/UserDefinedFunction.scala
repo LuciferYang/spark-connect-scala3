@@ -7,17 +7,16 @@ import org.apache.spark.sql.types.DataType
 
 import java.io.{ByteArrayOutputStream, ObjectOutputStream}
 
-/**
- * A user-defined function that can be applied to Columns.
- *
- * Created via `functions.udf(...)` factory methods. The UDF is serialized
- * and sent to the Spark Connect server for execution.
- *
- * {{{
- *   val addOne = udf((x: Int) => x + 1)
- *   df.select(addOne(col("age")))
- * }}}
- */
+/** A user-defined function that can be applied to Columns.
+  *
+  * Created via `functions.udf(...)` factory methods. The UDF is serialized and sent to the Spark
+  * Connect server for execution.
+  *
+  * {{{
+  *   val addOne = udf((x: Int) => x + 1)
+  *   df.select(addOne(col("age")))
+  * }}}
+  */
 final class UserDefinedFunction private[sql] (
     private[sql] val func: AnyRef,
     private[sql] val returnType: DataType,

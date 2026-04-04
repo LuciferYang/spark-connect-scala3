@@ -2,18 +2,17 @@ package org.apache.spark.sql
 
 import scala.reflect.ClassTag
 
-/**
- * A strongly-typed collection of domain-specific objects.
- *
- * Dataset[T] wraps a DataFrame and uses an Encoder[T] (derived at compile time
- * via Scala 3 Mirrors) to convert between Rows and typed objects.
- *
- * {{{
- *   case class Person(name: String, age: Int) derives Encoder
- *   val ds: Dataset[Person] = df.as[Person]
- *   val names: Dataset[String] = ds.map(_.name)
- * }}}
- */
+/** A strongly-typed collection of domain-specific objects.
+  *
+  * Dataset[T] wraps a DataFrame and uses an Encoder[T] (derived at compile time via Scala 3
+  * Mirrors) to convert between Rows and typed objects.
+  *
+  * {{{
+  *   case class Person(name: String, age: Int) derives Encoder
+  *   val ds: Dataset[Person] = df.as[Person]
+  *   val names: Dataset[String] = ds.map(_.name)
+  * }}}
+  */
 final class Dataset[T: ClassTag] private[sql] (
     private[sql] val df: DataFrame,
     private[sql] val encoder: Encoder[T]

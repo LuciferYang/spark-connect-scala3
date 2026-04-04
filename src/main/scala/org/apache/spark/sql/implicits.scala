@@ -1,24 +1,22 @@
 package org.apache.spark.sql
 
-/**
- * Scala 3 implicits for idiomatic Spark column references.
- *
- * Usage:
- * {{{
- *   import org.apache.spark.sql.implicits.*
- *
- *   val df = spark.range(10)
- *   df.select($"id", $"id" + 1)
- *   df.filter($"id" > 5)
- * }}}
- */
+/** Scala 3 implicits for idiomatic Spark column references.
+  *
+  * Usage:
+  * {{{
+  *   import org.apache.spark.sql.implicits.*
+  *
+  *   val df = spark.range(10)
+  *   df.select($"id", $"id" + 1)
+  *   df.filter($"id" > 5)
+  * }}}
+  */
 object implicits:
 
-  /**
-   * String interpolator for column references: `$"colName"`.
-   *
-   * In Scala 3 we use an extension on StringContext to provide the `$` interpolator.
-   */
+  /** String interpolator for column references: `$"colName"`.
+    *
+    * In Scala 3 we use an extension on StringContext to provide the `$` interpolator.
+    */
   extension (sc: StringContext)
     def $(args: Any*): Column =
       // The typical usage is $"colName" which gives sc.parts = Seq("colName")

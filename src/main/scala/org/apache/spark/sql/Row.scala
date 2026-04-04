@@ -39,7 +39,7 @@ final class Row private (private val values: IndexedSeq[Any]):
 
   override def equals(other: Any): Boolean = other match
     case that: Row => this.values == that.values
-    case _ => false
+    case _         => false
 
   override def hashCode(): Int = values.hashCode()
 

@@ -1,11 +1,10 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
-import org.apache.spark.connect.proto.{DataType as ProtoDataType}
+import org.apache.spark.connect.proto.DataType as ProtoDataType
 
-/**
- * Functions for handling missing data (null / NaN) in DataFrames.
- */
+/** Functions for handling missing data (null / NaN) in DataFrames.
+  */
 final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
 
   def drop(): DataFrame = drop("any")
@@ -17,7 +16,7 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
     cols.foreach(naDropBuilder.addCols)
     how.toLowerCase match
       case "all" => naDropBuilder.setMinNonNulls(1)
-      case _ => // 'any' or default — don't set minNonNulls
+      case _     => // 'any' or default — don't set minNonNulls
     df.withRelation(_.setDropNa(naDropBuilder.build()))
 
   def drop(minNonNulls: Int): DataFrame =
@@ -65,10 +64,10 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
     df.withRelation(_.setReplace(naReplaceBuilder.build()))
 
   private def toLiteral(value: Any): Expression.Literal = value match
-    case null       => Expression.Literal.newBuilder()
-                         .setNull(ProtoDataType.newBuilder()
-                           .setNull(ProtoDataType.NULL.getDefaultInstance).build())
-                         .build()
+    case null => Expression.Literal.newBuilder()
+        .setNull(ProtoDataType.newBuilder()
+          .setNull(ProtoDataType.NULL.getDefaultInstance).build())
+        .build()
     case v: Boolean => Expression.Literal.newBuilder().setBoolean(v).build()
     case v: Int     => Expression.Literal.newBuilder().setInteger(v).build()
     case v: Long    => Expression.Literal.newBuilder().setLong(v).build()

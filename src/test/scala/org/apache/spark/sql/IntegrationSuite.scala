@@ -3,14 +3,13 @@ package org.apache.spark.sql
 import org.apache.spark.sql.functions.*
 import org.apache.spark.sql.types.*
 
-/**
- * Integration tests that require a running Spark Connect server at sc://localhost:15002.
- *
- * Start a Spark Connect server with:
- *   ./sbin/start-connect-server.sh --packages org.apache.spark:spark-connect_2.13:4.1.1
- *
- * Run with: build/sbt 'testOnly *IntegrationSuite'
- */
+/** Integration tests that require a running Spark Connect server at sc://localhost:15002.
+  *
+  * Start a Spark Connect server with: ./sbin/start-connect-server.sh --packages
+  * org.apache.spark:spark-connect_2.13:4.1.1
+  *
+  * Run with: build/sbt 'testOnly *IntegrationSuite'
+  */
 class IntegrationSuite extends org.scalatest.funsuite.AnyFunSuite:
 
   lazy val spark: SparkSession =
@@ -75,7 +74,9 @@ class IntegrationSuite extends org.scalatest.funsuite.AnyFunSuite:
 
   test("groupBy and agg") {
     val rows = Seq(
-      Row("A", 10), Row("A", 20), Row("B", 30)
+      Row("A", 10),
+      Row("A", 20),
+      Row("B", 30)
     )
     val schema = StructType(Seq(
       StructField("group", StringType),

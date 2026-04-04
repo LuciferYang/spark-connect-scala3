@@ -2,14 +2,13 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
 
-/**
- * Reader for loading DataFrames from external storage.
- *
- * {{{
- *   val df = spark.read.format("parquet").load("/path")
- *   val df = spark.read.json("/data.json")
- * }}}
- */
+/** Reader for loading DataFrames from external storage.
+  *
+  * {{{
+  *   val df = spark.read.format("parquet").load("/path")
+  *   val df = spark.read.json("/data.json")
+  * }}}
+  */
 final class DataFrameReader private[sql] (private val session: SparkSession):
   private var source: String = "parquet"
   private var opts: Map[String, String] = Map.empty
@@ -38,15 +37,18 @@ final class DataFrameReader private[sql] (private val session: SparkSession):
   def load(paths: Seq[String]): DataFrame =
     val dsBuilder = Read.DataSource.newBuilder()
       .setFormat(source)
-    opts.foreach { (k, v) => dsBuilder.putOptions(k, v) }
+    opts.foreach((k, v) => dsBuilder.putOptions(k, v))
     userSchema.foreach(dsBuilder.setSchema)
     paths.foreach(dsBuilder.addPaths)
-    DataFrame(session, Relation.newBuilder()
-      .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
-      .setRead(Read.newBuilder()
-        .setDataSource(dsBuilder.build())
-        .build())
-      .build())
+    DataFrame(
+      session,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+        .setRead(Read.newBuilder()
+          .setDataSource(dsBuilder.build())
+          .build())
+        .build()
+    )
 
   def table(tableName: String): DataFrame = session.table(tableName)
 

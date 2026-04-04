@@ -3,29 +3,26 @@ package org.apache.spark.sql.examples
 import org.apache.spark.sql.{SparkSession, Row, functions as F}
 import org.apache.spark.sql.types.*
 
-/**
- * Quick-start example for the Scala 3 Spark Connect client.
- *
- * Prerequisites:
- *   1. Start a Spark Connect server (Spark 4.0+):
- *      {{{
- *        ./sbin/start-connect-server.sh --packages org.apache.spark:spark-connect_2.13:4.0.0
- *      }}}
- *      Or with an existing Spark installation:
- *      {{{
- *        $SPARK_HOME/sbin/start-connect-server.sh
- *      }}}
- *
- *   2. Run this example:
- *      {{{
- *        sbt "runMain org.apache.spark.sql.examples.QuickStart"
- *      }}}
- *
- *   3. Override the connection URL via SPARK_CONNECT_URL env var:
- *      {{{
- *        SPARK_CONNECT_URL=sc://remote-host:15002 sbt "runMain ..."
- *      }}}
- */
+/** Quick-start example for the Scala 3 Spark Connect client.
+  *
+  * Prerequisites:
+  *   1. Start a Spark Connect server (Spark 4.0+):
+  *      {{{
+  *        ./sbin/start-connect-server.sh --packages org.apache.spark:spark-connect_2.13:4.0.0
+  *      }}}
+  *      Or with an existing Spark installation:
+  *      {{{
+  *        $SPARK_HOME/sbin/start-connect-server.sh
+  *      }}}
+  *   2. Run this example:
+  *      {{{
+  *        sbt "runMain org.apache.spark.sql.examples.QuickStart"
+  *      }}}
+  *   3. Override the connection URL via SPARK_CONNECT_URL env var:
+  *      {{{
+  *        SPARK_CONNECT_URL=sc://remote-host:15002 sbt "runMain ..."
+  *      }}}
+  */
 @main def quickStart(): Unit =
   val url = sys.env.getOrElse("SPARK_CONNECT_URL", "sc://localhost:15002")
   println(s"Connecting to Spark Connect at: $url")

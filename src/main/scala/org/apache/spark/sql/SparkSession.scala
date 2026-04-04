@@ -5,16 +5,15 @@ import org.apache.spark.sql.connect.client.SparkConnectClient
 
 import java.util.concurrent.atomic.AtomicLong
 
-/**
- * Entry point for Spark Connect Scala 3 client.
- *
- * Use the Builder to create a session:
- * {{{
- *   val spark = SparkSession.builder()
- *     .remote("sc://localhost:15002")
- *     .build()
- * }}}
- */
+/** Entry point for Spark Connect Scala 3 client.
+  *
+  * Use the Builder to create a session:
+  * {{{
+  *   val spark = SparkSession.builder()
+  *     .remote("sc://localhost:15002")
+  *     .build()
+  * }}}
+  */
 final class SparkSession private (
     private[sql] val client: SparkConnectClient
 ):
@@ -29,38 +28,50 @@ final class SparkSession private (
   // ---------------------------------------------------------------------------
 
   def sql(query: String): DataFrame =
-    DataFrame(this, Relation.newBuilder()
-      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-      .setSql(SQL.newBuilder().setQuery(query).build())
-      .build())
+    DataFrame(
+      this,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+        .setSql(SQL.newBuilder().setQuery(query).build())
+        .build()
+    )
 
   // ---------------------------------------------------------------------------
   // Table / Range / Empty
   // ---------------------------------------------------------------------------
 
   def table(tableName: String): DataFrame =
-    DataFrame(this, Relation.newBuilder()
-      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-      .setRead(Read.newBuilder()
-        .setNamedTable(Read.NamedTable.newBuilder()
-          .setUnparsedIdentifier(tableName).build())
-        .build())
-      .build())
+    DataFrame(
+      this,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+        .setRead(Read.newBuilder()
+          .setNamedTable(Read.NamedTable.newBuilder()
+            .setUnparsedIdentifier(tableName).build())
+          .build())
+        .build()
+    )
 
   def range(end: Long): DataFrame = range(0, end, 1)
 
   def range(start: Long, end: Long, step: Long = 1): DataFrame =
-    DataFrame(this, Relation.newBuilder()
-      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-      .setRange(Range.newBuilder()
-        .setStart(start).setEnd(end).setStep(step).build())
-      .build())
+    DataFrame(
+      this,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+        .setRange(Range.newBuilder()
+          .setStart(start).setEnd(end).setStep(step).build())
+        .build()
+    )
 
   def emptyDataFrame: DataFrame =
-    DataFrame(this, Relation.newBuilder()
-      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-      .setLocalRelation(LocalRelation.getDefaultInstance)
-      .build())
+    DataFrame(
+      this,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+        .setLocalRelation(LocalRelation.getDefaultInstance)
+        .build()
+    )
 
   // ---------------------------------------------------------------------------
   // createDataFrame (Arrow IPC serialization)
@@ -69,13 +80,16 @@ final class SparkSession private (
   def createDataFrame(rows: Seq[Row], schema: types.StructType): DataFrame =
     val arrowData = ArrowSerializer.encodeRows(rows, schema)
     val schemaStr = schema.fields.map(f => s"${f.name} ${f.dataType.simpleString}").mkString(", ")
-    DataFrame(this, Relation.newBuilder()
-      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-      .setLocalRelation(LocalRelation.newBuilder()
-        .setData(com.google.protobuf.ByteString.copyFrom(arrowData))
-        .setSchema(schemaStr)
-        .build())
-      .build())
+    DataFrame(
+      this,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+        .setLocalRelation(LocalRelation.newBuilder()
+          .setData(com.google.protobuf.ByteString.copyFrom(arrowData))
+          .setSchema(schemaStr)
+          .build())
+        .build()
+    )
 
   // ---------------------------------------------------------------------------
   // createDataset (typed)

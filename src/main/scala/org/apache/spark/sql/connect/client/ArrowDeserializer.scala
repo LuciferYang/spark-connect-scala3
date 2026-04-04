@@ -37,17 +37,17 @@ object ArrowDeserializer:
   private def extractValue(vector: FieldVector, index: Int): Any =
     if vector.isNull(index) then return null
     vector match
-      case v: TinyIntVector      => v.get(index)
-      case v: SmallIntVector     => v.get(index)
-      case v: IntVector          => v.get(index)
-      case v: BigIntVector       => v.get(index)
-      case v: Float4Vector       => v.get(index)
-      case v: Float8Vector       => v.get(index)
-      case v: BitVector          => v.get(index) == 1
-      case v: VarCharVector      => v.getObject(index).toString
-      case v: VarBinaryVector    => v.getObject(index)
-      case v: DecimalVector      => v.getObject(index)
-      case v: Decimal256Vector   => v.getObject(index)
+      case v: TinyIntVector    => v.get(index)
+      case v: SmallIntVector   => v.get(index)
+      case v: IntVector        => v.get(index)
+      case v: BigIntVector     => v.get(index)
+      case v: Float4Vector     => v.get(index)
+      case v: Float8Vector     => v.get(index)
+      case v: BitVector        => v.get(index) == 1
+      case v: VarCharVector    => v.getObject(index).toString
+      case v: VarBinaryVector  => v.getObject(index)
+      case v: DecimalVector    => v.getObject(index)
+      case v: Decimal256Vector => v.getObject(index)
 
       case v: DateDayVector =>
         java.sql.Date(v.get(index).toLong * 86400000L)

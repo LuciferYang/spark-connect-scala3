@@ -3,16 +3,15 @@ package org.apache.spark.sql
 import org.apache.spark.connect.proto.{Command, Plan}
 import org.apache.spark.sql.connect.client.SparkConnectClient
 
-/**
- * Functions for registering user-defined functions (UDFs).
- *
- * Access via `spark.udf`.
- *
- * {{{
- *   spark.udf.register("addOne", udf((x: Int) => x + 1))
- *   spark.sql("SELECT addOne(age) FROM people")
- * }}}
- */
+/** Functions for registering user-defined functions (UDFs).
+  *
+  * Access via `spark.udf`.
+  *
+  * {{{
+  *   spark.udf.register("addOne", udf((x: Int) => x + 1))
+  *   spark.sql("SELECT addOne(age) FROM people")
+  * }}}
+  */
 final class UDFRegistration private[sql] (
     private val client: SparkConnectClient
 ):

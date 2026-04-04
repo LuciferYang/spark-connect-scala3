@@ -3,12 +3,11 @@ package org.apache.spark.sql
 import org.apache.spark.connect.proto.{Catalog as ProtoCatalog, *}
 import org.apache.spark.sql.connect.client.SparkConnectClient
 
-/**
- * Interface through which the user may create, drop, alter or query underlying
- * databases, tables, functions, etc.
- *
- * Access via `spark.catalog`.
- */
+/** Interface through which the user may create, drop, alter or query underlying databases, tables,
+  * functions, etc.
+  *
+  * Access via `spark.catalog`.
+  */
 final class Catalog private[sql] (private val session: SparkSession):
 
   private def client: SparkConnectClient = session.client
@@ -191,7 +190,10 @@ final class Catalog private[sql] (private val session: SparkSession):
 
   private def catalogDf(f: ProtoCatalog.Builder => ProtoCatalog.Builder): DataFrame =
     val catBuilder = ProtoCatalog.newBuilder()
-    DataFrame(session, Relation.newBuilder()
-      .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
-      .setCatalog(f(catBuilder).build())
-      .build())
+    DataFrame(
+      session,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+        .setCatalog(f(catBuilder).build())
+        .build()
+    )

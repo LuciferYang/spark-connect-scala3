@@ -2,10 +2,9 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
 
-/**
- * Returned by `DataFrame.groupBy`, `rollup`, or `cube`.
- * Use `.agg(...)` to specify aggregate expressions.
- */
+/** Returned by `DataFrame.groupBy`, `rollup`, or `cube`. Use `.agg(...)` to specify aggregate
+  * expressions.
+  */
 final class GroupedDataFrame private[sql] (
     private val df: DataFrame,
     private val groupingExprs: Seq[Column],
@@ -23,10 +22,13 @@ final class GroupedDataFrame private[sql] (
         case GroupedDataFrame.GroupType.Pivot   => Aggregate.GroupType.GROUP_TYPE_PIVOT)
     groupingExprs.foreach(c => aggBuilder.addGroupingExpressions(c.expr))
     allAggs.foreach(c => aggBuilder.addAggregateExpressions(c.expr))
-    DataFrame(df.session, Relation.newBuilder()
-      .setCommon(RelationCommon.newBuilder().setPlanId(df.session.nextPlanId()).build())
-      .setAggregate(aggBuilder.build())
-      .build())
+    DataFrame(
+      df.session,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(df.session.nextPlanId()).build())
+        .setAggregate(aggBuilder.build())
+        .build()
+    )
 
   def agg(exprs: Map[String, String]): DataFrame =
     val aggCols = exprs.map { (colName, funcName) =>

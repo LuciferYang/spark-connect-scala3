@@ -2,14 +2,13 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
 
-/**
- * Writer for saving DataFrames to external storage.
- *
- * {{{
- *   df.write.format("parquet").mode("overwrite").save("/path")
- *   df.write.saveAsTable("my_table")
- * }}}
- */
+/** Writer for saving DataFrames to external storage.
+  *
+  * {{{
+  *   df.write.format("parquet").mode("overwrite").save("/path")
+  *   df.write.saveAsTable("my_table")
+  * }}}
+  */
 final class DataFrameWriter private[sql] (private val df: DataFrame):
   private var source: String = "parquet"
   private var saveMode: String = "error"
@@ -65,7 +64,8 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
     writeBuilder.setTable(
       WriteOperation.SaveTable.newBuilder()
         .setTableName(tableName)
-        .build())
+        .build()
+    )
     executeCommand(Command.newBuilder()
       .setWriteOperation(writeBuilder.build())
       .build())
@@ -84,7 +84,7 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
       .setInput(df.relation)
       .setSource(source)
       .setMode(toProtoMode(saveMode))
-    opts.foreach { (k, v) => builder.putOptions(k, v) }
+    opts.foreach((k, v) => builder.putOptions(k, v))
     sortColNames.foreach(builder.addSortColumnNames)
     partitionCols.foreach(builder.addPartitioningColumns)
     if numBuckets > 0 then
@@ -101,8 +101,8 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
 
   private def toProtoMode(mode: String): WriteOperation.SaveMode =
     mode.toLowerCase match
-      case "overwrite"     => WriteOperation.SaveMode.SAVE_MODE_OVERWRITE
-      case "append"        => WriteOperation.SaveMode.SAVE_MODE_APPEND
-      case "ignore"        => WriteOperation.SaveMode.SAVE_MODE_IGNORE
+      case "overwrite"               => WriteOperation.SaveMode.SAVE_MODE_OVERWRITE
+      case "append"                  => WriteOperation.SaveMode.SAVE_MODE_APPEND
+      case "ignore"                  => WriteOperation.SaveMode.SAVE_MODE_IGNORE
       case "error" | "errorifexists" => WriteOperation.SaveMode.SAVE_MODE_ERROR_IF_EXISTS
-      case _               => WriteOperation.SaveMode.SAVE_MODE_ERROR_IF_EXISTS
+      case _                         => WriteOperation.SaveMode.SAVE_MODE_ERROR_IF_EXISTS

@@ -32,7 +32,11 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
   }
 
   test("MapType simpleString") {
-    MapType(StringType, IntegerType, valueContainsNull = true).simpleString shouldBe "map<string,integer>"
+    MapType(
+      StringType,
+      IntegerType,
+      valueContainsNull = true
+    ).simpleString shouldBe "map<string,integer>"
   }
 
   test("StructType basics") {

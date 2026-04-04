@@ -11,19 +11,19 @@ object DataTypeProtoConverter:
   def fromProto(proto: ProtoDataType): DataType =
     import ProtoDataType.KindCase
     proto.getKindCase match
-      case KindCase.BOOLEAN      => BooleanType
-      case KindCase.BYTE         => ByteType
-      case KindCase.SHORT        => ShortType
-      case KindCase.INTEGER      => IntegerType
-      case KindCase.LONG         => LongType
-      case KindCase.FLOAT        => FloatType
-      case KindCase.DOUBLE       => DoubleType
-      case KindCase.STRING       => StringType
-      case KindCase.BINARY       => BinaryType
-      case KindCase.DATE         => DateType
-      case KindCase.TIMESTAMP    => TimestampType
+      case KindCase.BOOLEAN       => BooleanType
+      case KindCase.BYTE          => ByteType
+      case KindCase.SHORT         => ShortType
+      case KindCase.INTEGER       => IntegerType
+      case KindCase.LONG          => LongType
+      case KindCase.FLOAT         => FloatType
+      case KindCase.DOUBLE        => DoubleType
+      case KindCase.STRING        => StringType
+      case KindCase.BINARY        => BinaryType
+      case KindCase.DATE          => DateType
+      case KindCase.TIMESTAMP     => TimestampType
       case KindCase.TIMESTAMP_NTZ => TimestampNTZType
-      case KindCase.NULL         => NullType
+      case KindCase.NULL          => NullType
 
       case KindCase.DECIMAL =>
         val d = proto.getDecimal
@@ -59,19 +59,33 @@ object DataTypeProtoConverter:
   /** Convert a Spark SQL DataType to its protobuf representation. */
   def toProto(dt: DataType): ProtoDataType =
     dt match
-      case BooleanType   => ProtoDataType.newBuilder().setBoolean(ProtoDataType.Boolean.getDefaultInstance).build()
-      case ByteType      => ProtoDataType.newBuilder().setByte(ProtoDataType.Byte.getDefaultInstance).build()
-      case ShortType     => ProtoDataType.newBuilder().setShort(ProtoDataType.Short.getDefaultInstance).build()
-      case IntegerType   => ProtoDataType.newBuilder().setInteger(ProtoDataType.Integer.getDefaultInstance).build()
-      case LongType      => ProtoDataType.newBuilder().setLong(ProtoDataType.Long.getDefaultInstance).build()
-      case FloatType     => ProtoDataType.newBuilder().setFloat(ProtoDataType.Float.getDefaultInstance).build()
-      case DoubleType    => ProtoDataType.newBuilder().setDouble(ProtoDataType.Double.getDefaultInstance).build()
-      case StringType    => ProtoDataType.newBuilder().setString(ProtoDataType.String.getDefaultInstance).build()
-      case BinaryType    => ProtoDataType.newBuilder().setBinary(ProtoDataType.Binary.getDefaultInstance).build()
-      case DateType      => ProtoDataType.newBuilder().setDate(ProtoDataType.Date.getDefaultInstance).build()
-      case TimestampType => ProtoDataType.newBuilder().setTimestamp(ProtoDataType.Timestamp.getDefaultInstance).build()
-      case TimestampNTZType => ProtoDataType.newBuilder().setTimestampNtz(ProtoDataType.TimestampNTZ.getDefaultInstance).build()
-      case NullType      => ProtoDataType.newBuilder().setNull(ProtoDataType.NULL.getDefaultInstance).build()
+      case BooleanType =>
+        ProtoDataType.newBuilder().setBoolean(ProtoDataType.Boolean.getDefaultInstance).build()
+      case ByteType =>
+        ProtoDataType.newBuilder().setByte(ProtoDataType.Byte.getDefaultInstance).build()
+      case ShortType =>
+        ProtoDataType.newBuilder().setShort(ProtoDataType.Short.getDefaultInstance).build()
+      case IntegerType =>
+        ProtoDataType.newBuilder().setInteger(ProtoDataType.Integer.getDefaultInstance).build()
+      case LongType =>
+        ProtoDataType.newBuilder().setLong(ProtoDataType.Long.getDefaultInstance).build()
+      case FloatType =>
+        ProtoDataType.newBuilder().setFloat(ProtoDataType.Float.getDefaultInstance).build()
+      case DoubleType =>
+        ProtoDataType.newBuilder().setDouble(ProtoDataType.Double.getDefaultInstance).build()
+      case StringType =>
+        ProtoDataType.newBuilder().setString(ProtoDataType.String.getDefaultInstance).build()
+      case BinaryType =>
+        ProtoDataType.newBuilder().setBinary(ProtoDataType.Binary.getDefaultInstance).build()
+      case DateType =>
+        ProtoDataType.newBuilder().setDate(ProtoDataType.Date.getDefaultInstance).build()
+      case TimestampType =>
+        ProtoDataType.newBuilder().setTimestamp(ProtoDataType.Timestamp.getDefaultInstance).build()
+      case TimestampNTZType => ProtoDataType.newBuilder().setTimestampNtz(
+          ProtoDataType.TimestampNTZ.getDefaultInstance
+        ).build()
+      case NullType =>
+        ProtoDataType.newBuilder().setNull(ProtoDataType.NULL.getDefaultInstance).build()
 
       case DecimalType(p, s) =>
         ProtoDataType.newBuilder().setDecimal(
@@ -109,4 +123,6 @@ object DataTypeProtoConverter:
         ProtoDataType.newBuilder().setStruct(structBuilder.build()).build()
 
       case _ =>
-        ProtoDataType.newBuilder().setString(ProtoDataType.String.getDefaultInstance).build() // fallback
+        ProtoDataType.newBuilder().setString(
+          ProtoDataType.String.getDefaultInstance
+        ).build() // fallback

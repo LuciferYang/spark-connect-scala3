@@ -4,12 +4,11 @@ import org.apache.spark.connect.proto.{Expression, DataType as ProtoDataType}
 
 import scala.jdk.CollectionConverters.*
 
-/**
- * A column expression in a DataFrame.
- *
- * Column objects are lazy — they build a protobuf Expression tree
- * that gets sent to the server only when an action is triggered.
- */
+/** A column expression in a DataFrame.
+  *
+  * Column objects are lazy — they build a protobuf Expression tree that gets sent to the server
+  * only when an action is triggered.
+  */
 final class Column private[sql] (private[sql] val expr: Expression):
 
   // ---------------------------------------------------------------------------
@@ -29,17 +28,17 @@ final class Column private[sql] (private[sql] val expr: Expression):
 
   def ===(other: Column): Column = fn("==", other)
   def =!=(other: Column): Column = fn("!=", other)
-  def >(other: Column): Column   = fn(">", other)
-  def >=(other: Column): Column  = fn(">=", other)
-  def <(other: Column): Column   = fn("<", other)
-  def <=(other: Column): Column  = fn("<=", other)
+  def >(other: Column): Column = fn(">", other)
+  def >=(other: Column): Column = fn(">=", other)
+  def <(other: Column): Column = fn("<", other)
+  def <=(other: Column): Column = fn("<=", other)
 
   def ===(v: Any): Column = ===(Column.lit(v))
   def =!=(v: Any): Column = =!=(Column.lit(v))
-  def >(v: Any): Column   = >(Column.lit(v))
-  def >=(v: Any): Column  = >=(Column.lit(v))
-  def <(v: Any): Column   = <(Column.lit(v))
-  def <=(v: Any): Column  = <=(Column.lit(v))
+  def >(v: Any): Column = >(Column.lit(v))
+  def >=(v: Any): Column = >=(Column.lit(v))
+  def <(v: Any): Column = <(Column.lit(v))
+  def <=(v: Any): Column = <=(Column.lit(v))
 
   // ---------------------------------------------------------------------------
   // Logical operators
@@ -53,26 +52,26 @@ final class Column private[sql] (private[sql] val expr: Expression):
   // Arithmetic operators
   // ---------------------------------------------------------------------------
 
-  def +(other: Column): Column  = fn("+", other)
-  def -(other: Column): Column  = fn("-", other)
-  def *(other: Column): Column  = fn("*", other)
-  def /(other: Column): Column  = fn("/", other)
-  def %(other: Column): Column  = fn("%", other)
+  def +(other: Column): Column = fn("+", other)
+  def -(other: Column): Column = fn("-", other)
+  def *(other: Column): Column = fn("*", other)
+  def /(other: Column): Column = fn("/", other)
+  def %(other: Column): Column = fn("%", other)
   def unary_- : Column = fn0("negative")
 
-  def plus(v: Any): Column  = this + Column.lit(v)
+  def plus(v: Any): Column = this + Column.lit(v)
   def minus(v: Any): Column = this - Column.lit(v)
   def multiply(v: Any): Column = this * Column.lit(v)
-  def divide(v: Any): Column   = this / Column.lit(v)
-  def mod(v: Any): Column     = this % Column.lit(v)
+  def divide(v: Any): Column = this / Column.lit(v)
+  def mod(v: Any): Column = this % Column.lit(v)
 
   // ---------------------------------------------------------------------------
   // Null / NaN checks
   // ---------------------------------------------------------------------------
 
-  def isNull: Column    = fn0("isnull")
+  def isNull: Column = fn0("isnull")
   def isNotNull: Column = fn0("isnotnull")
-  def isNaN: Column     = fn0("isnan")
+  def isNaN: Column = fn0("isnan")
 
   // ---------------------------------------------------------------------------
   // String operators
@@ -111,7 +110,7 @@ final class Column private[sql] (private[sql] val expr: Expression):
   def when(condition: Column, value: Any): Column =
     val v = value match
       case c: Column => c
-      case other => Column.lit(other)
+      case other     => Column.lit(other)
     if expr.hasUnresolvedFunction && expr.getUnresolvedFunction.getFunctionName == "when" then
       val uf = expr.getUnresolvedFunction
       val newUf = uf.toBuilder()
@@ -127,7 +126,7 @@ final class Column private[sql] (private[sql] val expr: Expression):
   def otherwise(value: Any): Column =
     val v = value match
       case c: Column => c
-      case other => Column.lit(other)
+      case other     => Column.lit(other)
     if expr.hasUnresolvedFunction && expr.getUnresolvedFunction.getFunctionName == "when" then
       val uf = expr.getUnresolvedFunction
       val newUf = uf.toBuilder()
@@ -215,7 +214,7 @@ final class Column private[sql] (private[sql] val expr: Expression):
   // Sort
   // ---------------------------------------------------------------------------
 
-  def asc: Column  = withSortDirection(ascending = true)
+  def asc: Column = withSortDirection(ascending = true)
   def desc: Column = withSortDirection(ascending = false)
 
   /** Convert this column into a SortOrder proto for orderBy. */
@@ -236,10 +235,12 @@ final class Column private[sql] (private[sql] val expr: Expression):
         .setChild(expr)
         .setDirection(
           if ascending then SORT_DIRECTION_ASCENDING
-          else SORT_DIRECTION_DESCENDING)
+          else SORT_DIRECTION_DESCENDING
+        )
         .setNullOrdering(
           if ascending then SORT_NULLS_FIRST
-          else SORT_NULLS_LAST)
+          else SORT_NULLS_LAST
+        )
         .build()
     ).build())
 
@@ -300,20 +301,20 @@ object Column:
   /** Create a literal Column. */
   def lit(value: Any): Column =
     val literal = value match
-      case null          => Expression.Literal.newBuilder()
-                              .setNull(ProtoDataType.newBuilder()
-                                .setNull(ProtoDataType.NULL.getDefaultInstance).build())
-                              .build()
-      case v: Boolean    => Expression.Literal.newBuilder().setBoolean(v).build()
-      case v: Byte       => Expression.Literal.newBuilder().setByte(v.toInt).build()
-      case v: Short      => Expression.Literal.newBuilder().setShort(v.toInt).build()
-      case v: Int        => Expression.Literal.newBuilder().setInteger(v).build()
-      case v: Long       => Expression.Literal.newBuilder().setLong(v).build()
-      case v: Float      => Expression.Literal.newBuilder().setFloat(v).build()
-      case v: Double     => Expression.Literal.newBuilder().setDouble(v).build()
-      case v: String     => Expression.Literal.newBuilder().setString(v).build()
-      case v: Column     => return v // pass through
-      case v             => Expression.Literal.newBuilder().setString(v.toString).build()
+      case null => Expression.Literal.newBuilder()
+          .setNull(ProtoDataType.newBuilder()
+            .setNull(ProtoDataType.NULL.getDefaultInstance).build())
+          .build()
+      case v: Boolean => Expression.Literal.newBuilder().setBoolean(v).build()
+      case v: Byte    => Expression.Literal.newBuilder().setByte(v.toInt).build()
+      case v: Short   => Expression.Literal.newBuilder().setShort(v.toInt).build()
+      case v: Int     => Expression.Literal.newBuilder().setInteger(v).build()
+      case v: Long    => Expression.Literal.newBuilder().setLong(v).build()
+      case v: Float   => Expression.Literal.newBuilder().setFloat(v).build()
+      case v: Double  => Expression.Literal.newBuilder().setDouble(v).build()
+      case v: String  => Expression.Literal.newBuilder().setString(v).build()
+      case v: Column  => return v // pass through
+      case v          => Expression.Literal.newBuilder().setString(v.toString).build()
 
     Column(Expression.newBuilder().setLiteral(literal).build())
 
@@ -330,22 +331,30 @@ final class WindowSpec private[sql] (
     WindowSpec(partitionExprs, cols.toSeq, frameSpec)
 
   def rowsBetween(start: Long, end: Long): WindowSpec =
-    WindowSpec(partitionExprs, orderExprs, Some(
-      Expression.Window.WindowFrame.newBuilder()
-        .setFrameType(Expression.Window.WindowFrame.FrameType.FRAME_TYPE_ROW)
-        .setLower(Window.toBoundary(start))
-        .setUpper(Window.toBoundary(end))
-        .build()
-    ))
+    WindowSpec(
+      partitionExprs,
+      orderExprs,
+      Some(
+        Expression.Window.WindowFrame.newBuilder()
+          .setFrameType(Expression.Window.WindowFrame.FrameType.FRAME_TYPE_ROW)
+          .setLower(Window.toBoundary(start))
+          .setUpper(Window.toBoundary(end))
+          .build()
+      )
+    )
 
   def rangeBetween(start: Long, end: Long): WindowSpec =
-    WindowSpec(partitionExprs, orderExprs, Some(
-      Expression.Window.WindowFrame.newBuilder()
-        .setFrameType(Expression.Window.WindowFrame.FrameType.FRAME_TYPE_RANGE)
-        .setLower(Window.toBoundary(start))
-        .setUpper(Window.toBoundary(end))
-        .build()
-    ))
+    WindowSpec(
+      partitionExprs,
+      orderExprs,
+      Some(
+        Expression.Window.WindowFrame.newBuilder()
+          .setFrameType(Expression.Window.WindowFrame.FrameType.FRAME_TYPE_RANGE)
+          .setLower(Window.toBoundary(start))
+          .setUpper(Window.toBoundary(end))
+          .build()
+      )
+    )
 
 object Window:
   /** Represents the value of `unboundedPreceding` for frame boundaries. */

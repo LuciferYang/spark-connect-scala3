@@ -1,19 +1,22 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.{StorageLevel as _, Catalog as _, *}
-import org.apache.spark.connect.proto.{StorageLevel as ProtoStorageLevel}
-import org.apache.spark.sql.connect.client.{ArrowDeserializer, DataTypeProtoConverter, SparkConnectClient}
+import org.apache.spark.connect.proto.StorageLevel as ProtoStorageLevel
+import org.apache.spark.sql.connect.client.{
+  ArrowDeserializer,
+  DataTypeProtoConverter,
+  SparkConnectClient
+}
 import org.apache.spark.sql.types.StructType
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
-/**
- * A distributed collection of rows organized into named columns.
- *
- * All transformation methods are lazy — they build a protobuf Relation tree.
- * Action methods (collect, show, count, …) send the plan to the server via gRPC.
- */
+/** A distributed collection of rows organized into named columns.
+  *
+  * All transformation methods are lazy — they build a protobuf Relation tree. Action methods
+  * (collect, show, count, …) send the plan to the server via gRPC.
+  */
 final class DataFrame private[sql] (
     private[sql] val session: SparkSession,
     private[sql] val relation: Relation
@@ -401,7 +404,7 @@ final class DataFrame private[sql] (
       if resp.hasSchema && resp.getSchema.hasSchema then
         DataTypeProtoConverter.fromProto(resp.getSchema.getSchema) match
           case st: StructType => Some(st)
-          case _ => None
+          case _              => None
       else None
     catch case _: Exception => None
 
@@ -430,14 +433,14 @@ final class DataFrame private[sql] (
 
   private def toJoinType(s: String): Join.JoinType =
     s.toLowerCase match
-      case "inner"                       => Join.JoinType.JOIN_TYPE_INNER
-      case "left" | "leftouter"          => Join.JoinType.JOIN_TYPE_LEFT_OUTER
-      case "right" | "rightouter"        => Join.JoinType.JOIN_TYPE_RIGHT_OUTER
+      case "inner"                        => Join.JoinType.JOIN_TYPE_INNER
+      case "left" | "leftouter"           => Join.JoinType.JOIN_TYPE_LEFT_OUTER
+      case "right" | "rightouter"         => Join.JoinType.JOIN_TYPE_RIGHT_OUTER
       case "full" | "outer" | "fullouter" => Join.JoinType.JOIN_TYPE_FULL_OUTER
-      case "cross"                       => Join.JoinType.JOIN_TYPE_CROSS
-      case "semi" | "leftsemi"           => Join.JoinType.JOIN_TYPE_LEFT_SEMI
-      case "anti" | "leftanti"           => Join.JoinType.JOIN_TYPE_LEFT_ANTI
-      case _                             => Join.JoinType.JOIN_TYPE_INNER
+      case "cross"                        => Join.JoinType.JOIN_TYPE_CROSS
+      case "semi" | "leftsemi"            => Join.JoinType.JOIN_TYPE_LEFT_SEMI
+      case "anti" | "leftanti"            => Join.JoinType.JOIN_TYPE_LEFT_ANTI
+      case _                              => Join.JoinType.JOIN_TYPE_INNER
 
   private def printTable(colNames: Seq[String], rows: Array[Row], truncate: Int): Unit =
     if colNames.isEmpty && rows.isEmpty then
@@ -457,7 +460,7 @@ final class DataFrame private[sql] (
     val widths = allRows.transpose.map(col => col.map(_.length).max)
     val sep = widths.map("-" * _).mkString("+", "+", "+")
     def fmtRow(row: Seq[String]): String =
-      row.zip(widths).map { (s, w) => s.padTo(w, ' ') }.mkString("|", "|", "|")
+      row.zip(widths).map((s, w) => s.padTo(w, ' ')).mkString("|", "|", "|")
 
     println(sep)
     println(fmtRow(allRows.head))

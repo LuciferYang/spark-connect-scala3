@@ -46,16 +46,16 @@ object functions:
   // Math functions
   // ---------------------------------------------------------------------------
 
-  def abs(col: Column): Column    = callFn("abs", col)
-  def sqrt(col: Column): Column   = callFn("sqrt", col)
+  def abs(col: Column): Column = callFn("abs", col)
+  def sqrt(col: Column): Column = callFn("sqrt", col)
   def pow(l: Column, r: Column): Column = callFn("power", l, r)
   def round(col: Column, scale: Int = 0): Column = callFn("round", col, Column.lit(scale))
-  def floor(col: Column): Column  = callFn("floor", col)
-  def ceil(col: Column): Column   = callFn("ceil", col)
-  def log(col: Column): Column    = callFn("ln", col)
-  def log10(col: Column): Column  = callFn("log10", col)
-  def log2(col: Column): Column   = callFn("log2", col)
-  def exp(col: Column): Column    = callFn("exp", col)
+  def floor(col: Column): Column = callFn("floor", col)
+  def ceil(col: Column): Column = callFn("ceil", col)
+  def log(col: Column): Column = callFn("ln", col)
+  def log10(col: Column): Column = callFn("log10", col)
+  def log2(col: Column): Column = callFn("log2", col)
+  def exp(col: Column): Column = callFn("exp", col)
   def greatest(cols: Column*): Column = callFn("greatest", cols*)
   def least(cols: Column*): Column = callFn("least", cols*)
   def rand(seed: Long = 0L): Column = callFn("rand", Column.lit(seed))
@@ -65,17 +65,17 @@ object functions:
   // String functions
   // ---------------------------------------------------------------------------
 
-  def concat(cols: Column*): Column   = callFn("concat", cols*)
+  def concat(cols: Column*): Column = callFn("concat", cols*)
   def concat_ws(sep: String, cols: Column*): Column =
     callFn("concat_ws", (Column.lit(sep) +: cols)*)
-  def upper(col: Column): Column      = callFn("upper", col)
-  def lower(col: Column): Column      = callFn("lower", col)
-  def trim(col: Column): Column       = callFn("trim", col)
-  def ltrim(col: Column): Column      = callFn("ltrim", col)
-  def rtrim(col: Column): Column      = callFn("rtrim", col)
+  def upper(col: Column): Column = callFn("upper", col)
+  def lower(col: Column): Column = callFn("lower", col)
+  def trim(col: Column): Column = callFn("trim", col)
+  def ltrim(col: Column): Column = callFn("ltrim", col)
+  def rtrim(col: Column): Column = callFn("rtrim", col)
   def substring(col: Column, pos: Int, len: Int): Column =
     callFn("substring", col, Column.lit(pos), Column.lit(len))
-  def length(col: Column): Column     = callFn("length", col)
+  def length(col: Column): Column = callFn("length", col)
   def replace(col: Column, search: Column, replacement: Column): Column =
     callFn("replace", col, search, replacement)
   def lpad(col: Column, len: Int, pad: String): Column =
@@ -87,12 +87,12 @@ object functions:
   // Date / Time functions
   // ---------------------------------------------------------------------------
 
-  def current_date(): Column      = callFn("current_date")
+  def current_date(): Column = callFn("current_date")
   def current_timestamp(): Column = callFn("current_timestamp")
-  def year(col: Column): Column   = callFn("year", col)
-  def month(col: Column): Column  = callFn("month", col)
+  def year(col: Column): Column = callFn("year", col)
+  def month(col: Column): Column = callFn("month", col)
   def dayofmonth(col: Column): Column = callFn("dayofmonth", col)
-  def hour(col: Column): Column   = callFn("hour", col)
+  def hour(col: Column): Column = callFn("hour", col)
   def minute(col: Column): Column = callFn("minute", col)
   def second(col: Column): Column = callFn("second", col)
   def date_add(start: Column, days: Int): Column =
@@ -119,23 +119,23 @@ object functions:
   def when(condition: Column, value: Any): Column =
     val v = value match
       case c: Column => c
-      case other => Column.lit(other)
+      case other     => Column.lit(other)
     callFn("when", condition, v)
 
   // ---------------------------------------------------------------------------
   // Collection functions
   // ---------------------------------------------------------------------------
 
-  def array(cols: Column*): Column     = callFn("array", cols*)
-  def struct(cols: Column*): Column    = callFn("struct", cols*)
-  def explode(col: Column): Column     = callFn("explode", col)
+  def array(cols: Column*): Column = callFn("array", cols*)
+  def struct(cols: Column*): Column = callFn("struct", cols*)
+  def explode(col: Column): Column = callFn("explode", col)
   def explode_outer(col: Column): Column = callFn("explode_outer", col)
-  def posexplode(col: Column): Column  = callFn("posexplode", col)
+  def posexplode(col: Column): Column = callFn("posexplode", col)
   def posexplode_outer(col: Column): Column = callFn("posexplode_outer", col)
-  def size(col: Column): Column        = callFn("size", col)
+  def size(col: Column): Column = callFn("size", col)
   def array_contains(col: Column, value: Any): Column =
     callFn("array_contains", col, Column.lit(value))
-  def array_sort(col: Column): Column  = callFn("array_sort", col)
+  def array_sort(col: Column): Column = callFn("array_sort", col)
   def array_distinct(col: Column): Column = callFn("array_distinct", col)
   def array_intersect(col1: Column, col2: Column): Column = callFn("array_intersect", col1, col2)
   def array_union(col1: Column, col2: Column): Column = callFn("array_union", col1, col2)
@@ -144,8 +144,8 @@ object functions:
     callFn("array_join", col, Column.lit(delimiter))
   def array_join(col: Column, delimiter: String, nullReplacement: String): Column =
     callFn("array_join", col, Column.lit(delimiter), Column.lit(nullReplacement))
-  def array_max(col: Column): Column   = callFn("array_max", col)
-  def array_min(col: Column): Column   = callFn("array_min", col)
+  def array_max(col: Column): Column = callFn("array_max", col)
+  def array_min(col: Column): Column = callFn("array_min", col)
   def array_position(col: Column, value: Any): Column =
     callFn("array_position", col, Column.lit(value))
   def array_remove(col: Column, element: Any): Column =
@@ -153,23 +153,23 @@ object functions:
   def array_repeat(col: Column, count: Int): Column =
     callFn("array_repeat", col, Column.lit(count))
   def arrays_zip(cols: Column*): Column = callFn("arrays_zip", cols*)
-  def flatten(col: Column): Column     = callFn("flatten", col)
+  def flatten(col: Column): Column = callFn("flatten", col)
   def element_at(col: Column, extraction: Any): Column =
     callFn("element_at", col, Column.lit(extraction))
   def slice(col: Column, start: Int, length: Int): Column =
     callFn("slice", col, Column.lit(start), Column.lit(length))
-  def reverse(col: Column): Column     = callFn("reverse", col)
-  def shuffle(col: Column): Column     = callFn("shuffle", col)
+  def reverse(col: Column): Column = callFn("reverse", col)
+  def shuffle(col: Column): Column = callFn("shuffle", col)
   def sort_array(col: Column, asc: Boolean = true): Column =
     callFn("sort_array", col, Column.lit(asc))
 
   // Map functions
-  def map(cols: Column*): Column       = callFn("map", cols*)
+  def map(cols: Column*): Column = callFn("map", cols*)
   def map_from_arrays(keys: Column, values: Column): Column =
     callFn("map_from_arrays", keys, values)
   def map_from_entries(col: Column): Column = callFn("map_from_entries", col)
-  def map_keys(col: Column): Column    = callFn("map_keys", col)
-  def map_values(col: Column): Column  = callFn("map_values", col)
+  def map_keys(col: Column): Column = callFn("map_keys", col)
+  def map_values(col: Column): Column = callFn("map_values", col)
   def map_entries(col: Column): Column = callFn("map_entries", col)
   def map_concat(cols: Column*): Column = callFn("map_concat", cols*)
   def map_filter(col: Column, f: Column): Column = callFn("map_filter", col, f)
@@ -213,12 +213,12 @@ object functions:
   def split(col: Column, pattern: String, limit: Int): Column =
     callFn("split", col, Column.lit(pattern), Column.lit(limit))
 
-  def initcap(col: Column): Column     = callFn("initcap", col)
-  def soundex(col: Column): Column     = callFn("soundex", col)
+  def initcap(col: Column): Column = callFn("initcap", col)
+  def soundex(col: Column): Column = callFn("soundex", col)
   def levenshtein(l: Column, r: Column): Column = callFn("levenshtein", l, r)
-  def ascii(col: Column): Column       = callFn("ascii", col)
-  def base64(col: Column): Column      = callFn("base64", col)
-  def unbase64(col: Column): Column    = callFn("unbase64", col)
+  def ascii(col: Column): Column = callFn("ascii", col)
+  def base64(col: Column): Column = callFn("base64", col)
+  def unbase64(col: Column): Column = callFn("unbase64", col)
   def decode(col: Column, charset: String): Column = callFn("decode", col, Column.lit(charset))
   def encode(col: Column, charset: String): Column = callFn("encode", col, Column.lit(charset))
   def format_number(col: Column, d: Int): Column = callFn("format_number", col, Column.lit(d))
@@ -238,11 +238,11 @@ object functions:
   // Date / Time functions (extended)
   // ---------------------------------------------------------------------------
 
-  def dayofweek(col: Column): Column   = callFn("dayofweek", col)
-  def dayofyear(col: Column): Column   = callFn("dayofyear", col)
-  def weekofyear(col: Column): Column  = callFn("weekofyear", col)
-  def quarter(col: Column): Column     = callFn("quarter", col)
-  def last_day(col: Column): Column    = callFn("last_day", col)
+  def dayofweek(col: Column): Column = callFn("dayofweek", col)
+  def dayofyear(col: Column): Column = callFn("dayofyear", col)
+  def weekofyear(col: Column): Column = callFn("weekofyear", col)
+  def quarter(col: Column): Column = callFn("quarter", col)
+  def last_day(col: Column): Column = callFn("last_day", col)
   def next_day(col: Column, dayOfWeek: String): Column =
     callFn("next_day", col, Column.lit(dayOfWeek))
   def months_between(end: Column, start: Column): Column =
@@ -255,7 +255,7 @@ object functions:
   def from_unixtime(ut: Column): Column = callFn("from_unixtime", ut)
   def from_unixtime(ut: Column, fmt: String): Column =
     callFn("from_unixtime", ut, Column.lit(fmt))
-  def unix_timestamp(): Column          = callFn("unix_timestamp")
+  def unix_timestamp(): Column = callFn("unix_timestamp")
   def unix_timestamp(col: Column): Column = callFn("unix_timestamp", col)
   def unix_timestamp(col: Column, fmt: String): Column =
     callFn("unix_timestamp", col, Column.lit(fmt))
@@ -276,25 +276,25 @@ object functions:
   // Math functions (extended)
   // ---------------------------------------------------------------------------
 
-  def sin(col: Column): Column    = callFn("sin", col)
-  def cos(col: Column): Column    = callFn("cos", col)
-  def tan(col: Column): Column    = callFn("tan", col)
-  def asin(col: Column): Column   = callFn("asin", col)
-  def acos(col: Column): Column   = callFn("acos", col)
-  def atan(col: Column): Column   = callFn("atan", col)
+  def sin(col: Column): Column = callFn("sin", col)
+  def cos(col: Column): Column = callFn("cos", col)
+  def tan(col: Column): Column = callFn("tan", col)
+  def asin(col: Column): Column = callFn("asin", col)
+  def acos(col: Column): Column = callFn("acos", col)
+  def atan(col: Column): Column = callFn("atan", col)
   def atan2(l: Column, r: Column): Column = callFn("atan2", l, r)
-  def sinh(col: Column): Column   = callFn("sinh", col)
-  def cosh(col: Column): Column   = callFn("cosh", col)
-  def tanh(col: Column): Column   = callFn("tanh", col)
-  def cbrt(col: Column): Column   = callFn("cbrt", col)
-  def rint(col: Column): Column   = callFn("rint", col)
+  def sinh(col: Column): Column = callFn("sinh", col)
+  def cosh(col: Column): Column = callFn("cosh", col)
+  def tanh(col: Column): Column = callFn("tanh", col)
+  def cbrt(col: Column): Column = callFn("cbrt", col)
+  def rint(col: Column): Column = callFn("rint", col)
   def signum(col: Column): Column = callFn("signum", col)
   def degrees(col: Column): Column = callFn("degrees", col)
   def radians(col: Column): Column = callFn("radians", col)
   def bround(col: Column, scale: Int = 0): Column = callFn("bround", col, Column.lit(scale))
-  def bin(col: Column): Column    = callFn("bin", col)
-  def hex(col: Column): Column    = callFn("hex", col)
-  def unhex(col: Column): Column  = callFn("unhex", col)
+  def bin(col: Column): Column = callFn("bin", col)
+  def hex(col: Column): Column = callFn("hex", col)
+  def unhex(col: Column): Column = callFn("unhex", col)
   def conv(col: Column, fromBase: Int, toBase: Int): Column =
     callFn("conv", col, Column.lit(fromBase), Column.lit(toBase))
   def factorial(col: Column): Column = callFn("factorial", col)
@@ -309,9 +309,9 @@ object functions:
   def approx_count_distinct(col: Column, rsd: Double): Column =
     callFn("approx_count_distinct", col, Column.lit(rsd))
   def variance(col: Column): Column = callFn("variance", col)
-  def var_pop(col: Column): Column  = callFn("var_pop", col)
+  def var_pop(col: Column): Column = callFn("var_pop", col)
   def var_samp(col: Column): Column = callFn("var_samp", col)
-  def stddev(col: Column): Column   = callFn("stddev", col)
+  def stddev(col: Column): Column = callFn("stddev", col)
   def stddev_pop(col: Column): Column = callFn("stddev_pop", col)
   def stddev_samp(col: Column): Column = callFn("stddev_samp", col)
   def skewness(col: Column): Column = callFn("skewness", col)
@@ -329,18 +329,18 @@ object functions:
   // ---------------------------------------------------------------------------
 
   def monotonically_increasing_id(): Column = callFn("monotonically_increasing_id")
-  def spark_partition_id(): Column          = callFn("spark_partition_id")
-  def input_file_name(): Column             = callFn("input_file_name")
-  def typedLit[T](value: T): Column        = Column.lit(value)
-  def negate(col: Column): Column           = callFn("negative", col)
-  def not(col: Column): Column              = callFn("not", col)
-  def bitwiseNOT(col: Column): Column       = callFn("~", col)
-  def hash(cols: Column*): Column           = callFn("hash", cols*)
-  def xxhash64(cols: Column*): Column       = callFn("xxhash64", cols*)
-  def md5(col: Column): Column              = callFn("md5", col)
-  def sha1(col: Column): Column             = callFn("sha1", col)
+  def spark_partition_id(): Column = callFn("spark_partition_id")
+  def input_file_name(): Column = callFn("input_file_name")
+  def typedLit[T](value: T): Column = Column.lit(value)
+  def negate(col: Column): Column = callFn("negative", col)
+  def not(col: Column): Column = callFn("not", col)
+  def bitwiseNOT(col: Column): Column = callFn("~", col)
+  def hash(cols: Column*): Column = callFn("hash", cols*)
+  def xxhash64(cols: Column*): Column = callFn("xxhash64", cols*)
+  def md5(col: Column): Column = callFn("md5", col)
+  def sha1(col: Column): Column = callFn("sha1", col)
   def sha2(col: Column, numBits: Int): Column = callFn("sha2", col, Column.lit(numBits))
-  def crc32(col: Column): Column            = callFn("crc32", col)
+  def crc32(col: Column): Column = callFn("crc32", col)
   def nanvl(col1: Column, col2: Column): Column = callFn("nanvl", col1, col2)
   def ifnull(col1: Column, col2: Column): Column = callFn("ifnull", col1, col2)
   def nullif(col1: Column, col2: Column): Column = callFn("nullif", col1, col2)
@@ -354,9 +354,9 @@ object functions:
   // Window functions
   // ---------------------------------------------------------------------------
 
-  def row_number(): Column  = callFn("row_number")
-  def rank(): Column        = callFn("rank")
-  def dense_rank(): Column  = callFn("dense_rank")
+  def row_number(): Column = callFn("row_number")
+  def rank(): Column = callFn("rank")
+  def dense_rank(): Column = callFn("dense_rank")
   def lead(col: Column, offset: Int = 1): Column =
     callFn("lead", col, Column.lit(offset))
   def lag(col: Column, offset: Int = 1): Column =
@@ -405,7 +405,9 @@ object functions:
       func = f,
       returnType = Encoder.sparkTypeOf[R],
       inputTypes = Seq(
-        Encoder.sparkTypeOf[T1], Encoder.sparkTypeOf[T2], Encoder.sparkTypeOf[T3]
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3]
       )
     )
 
@@ -415,8 +417,10 @@ object functions:
       func = f,
       returnType = Encoder.sparkTypeOf[R],
       inputTypes = Seq(
-        Encoder.sparkTypeOf[T1], Encoder.sparkTypeOf[T2],
-        Encoder.sparkTypeOf[T3], Encoder.sparkTypeOf[T4]
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4]
       )
     )
 
@@ -426,8 +430,10 @@ object functions:
       func = f,
       returnType = Encoder.sparkTypeOf[R],
       inputTypes = Seq(
-        Encoder.sparkTypeOf[T1], Encoder.sparkTypeOf[T2],
-        Encoder.sparkTypeOf[T3], Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
         Encoder.sparkTypeOf[T5]
       )
     )

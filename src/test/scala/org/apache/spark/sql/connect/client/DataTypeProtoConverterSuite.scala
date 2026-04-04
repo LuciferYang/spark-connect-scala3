@@ -1,6 +1,6 @@
 package org.apache.spark.sql.connect.client
 
-import org.apache.spark.connect.proto.{DataType as ProtoDataType}
+import org.apache.spark.connect.proto.DataType as ProtoDataType
 import org.apache.spark.sql.types.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -12,32 +12,60 @@ class DataTypeProtoConverterSuite extends AnyFunSuite with Matchers:
     result shouldBe dt
 
   test("primitive types round-trip") {
-    roundTrip(BooleanType,
-      ProtoDataType.newBuilder().setBoolean(ProtoDataType.Boolean.getDefaultInstance).build())
-    roundTrip(ByteType,
-      ProtoDataType.newBuilder().setByte(ProtoDataType.Byte.getDefaultInstance).build())
-    roundTrip(ShortType,
-      ProtoDataType.newBuilder().setShort(ProtoDataType.Short.getDefaultInstance).build())
-    roundTrip(IntegerType,
-      ProtoDataType.newBuilder().setInteger(ProtoDataType.Integer.getDefaultInstance).build())
-    roundTrip(LongType,
-      ProtoDataType.newBuilder().setLong(ProtoDataType.Long.getDefaultInstance).build())
-    roundTrip(FloatType,
-      ProtoDataType.newBuilder().setFloat(ProtoDataType.Float.getDefaultInstance).build())
-    roundTrip(DoubleType,
-      ProtoDataType.newBuilder().setDouble(ProtoDataType.Double.getDefaultInstance).build())
-    roundTrip(StringType,
-      ProtoDataType.newBuilder().setString(ProtoDataType.String.getDefaultInstance).build())
-    roundTrip(BinaryType,
-      ProtoDataType.newBuilder().setBinary(ProtoDataType.Binary.getDefaultInstance).build())
-    roundTrip(DateType,
-      ProtoDataType.newBuilder().setDate(ProtoDataType.Date.getDefaultInstance).build())
-    roundTrip(TimestampType,
-      ProtoDataType.newBuilder().setTimestamp(ProtoDataType.Timestamp.getDefaultInstance).build())
-    roundTrip(TimestampNTZType,
-      ProtoDataType.newBuilder().setTimestampNtz(ProtoDataType.TimestampNTZ.getDefaultInstance).build())
-    roundTrip(NullType,
-      ProtoDataType.newBuilder().setNull(ProtoDataType.NULL.getDefaultInstance).build())
+    roundTrip(
+      BooleanType,
+      ProtoDataType.newBuilder().setBoolean(ProtoDataType.Boolean.getDefaultInstance).build()
+    )
+    roundTrip(
+      ByteType,
+      ProtoDataType.newBuilder().setByte(ProtoDataType.Byte.getDefaultInstance).build()
+    )
+    roundTrip(
+      ShortType,
+      ProtoDataType.newBuilder().setShort(ProtoDataType.Short.getDefaultInstance).build()
+    )
+    roundTrip(
+      IntegerType,
+      ProtoDataType.newBuilder().setInteger(ProtoDataType.Integer.getDefaultInstance).build()
+    )
+    roundTrip(
+      LongType,
+      ProtoDataType.newBuilder().setLong(ProtoDataType.Long.getDefaultInstance).build()
+    )
+    roundTrip(
+      FloatType,
+      ProtoDataType.newBuilder().setFloat(ProtoDataType.Float.getDefaultInstance).build()
+    )
+    roundTrip(
+      DoubleType,
+      ProtoDataType.newBuilder().setDouble(ProtoDataType.Double.getDefaultInstance).build()
+    )
+    roundTrip(
+      StringType,
+      ProtoDataType.newBuilder().setString(ProtoDataType.String.getDefaultInstance).build()
+    )
+    roundTrip(
+      BinaryType,
+      ProtoDataType.newBuilder().setBinary(ProtoDataType.Binary.getDefaultInstance).build()
+    )
+    roundTrip(
+      DateType,
+      ProtoDataType.newBuilder().setDate(ProtoDataType.Date.getDefaultInstance).build()
+    )
+    roundTrip(
+      TimestampType,
+      ProtoDataType.newBuilder().setTimestamp(ProtoDataType.Timestamp.getDefaultInstance).build()
+    )
+    roundTrip(
+      TimestampNTZType,
+      ProtoDataType.newBuilder().setTimestampNtz(
+        ProtoDataType.TimestampNTZ.getDefaultInstance
+      ).build()
+    )
+    roundTrip(
+      NullType,
+      ProtoDataType.newBuilder().setNull(ProtoDataType.NULL.getDefaultInstance).build()
+    )
   }
 
   test("DecimalType") {
@@ -71,7 +99,11 @@ class DataTypeProtoConverterSuite extends AnyFunSuite with Matchers:
         .setValueContainsNull(true)
         .build()
     ).build()
-    DataTypeProtoConverter.fromProto(proto) shouldBe MapType(StringType, LongType, valueContainsNull = true)
+    DataTypeProtoConverter.fromProto(proto) shouldBe MapType(
+      StringType,
+      LongType,
+      valueContainsNull = true
+    )
   }
 
   test("StructType") {

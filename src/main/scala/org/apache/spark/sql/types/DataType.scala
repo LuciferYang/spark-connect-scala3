@@ -55,7 +55,8 @@ final case class ArrayType(elementType: DataType, containsNull: Boolean) extends
   def typeName = "array"
   override def simpleString = s"array<${elementType.simpleString}>"
 
-final case class MapType(keyType: DataType, valueType: DataType, valueContainsNull: Boolean) extends DataType:
+final case class MapType(keyType: DataType, valueType: DataType, valueContainsNull: Boolean)
+    extends DataType:
   def typeName = "map"
   override def simpleString = s"map<${keyType.simpleString},${valueType.simpleString}>"
 
