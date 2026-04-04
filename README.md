@@ -12,14 +12,30 @@ This project provides that Scala 3 client.
 
 - **SparkSession** — `builder().remote("sc://host:port").build()`
 - **DataFrame** — select, filter, groupBy, join, union, distinct, sort, limit, sample, and more
+- **Dataset[T]** — typed operations with compile-time `Encoder` derivation via `derives Encoder`
 - **Column** — arithmetic, comparison, logical, string, cast, alias, window, sort operators
-- **functions** — 60+ built-in SQL functions (aggregates, math, string, date/time, window, collection)
+- **functions** — 130+ built-in SQL functions (aggregates, math, string, date/time, window, collection, JSON)
 - **GroupedDataFrame** — groupBy / rollup / cube / pivot with agg, count, sum, avg, min, max
 - **DataFrameReader / Writer** — read and write Parquet, JSON, CSV, ORC, text, and tables
+- **DataStreamReader / Writer** — structured streaming read / write with trigger support
+- **StreamingQuery / Manager** — streaming query lifecycle management
+- **Catalog** — listDatabases, listTables, listColumns, listFunctions, existence checks, cache management
+- **UDF** — register and use JVM lambda UDFs (1–5 arguments)
 - **DataFrameNaFunctions** — drop / fill / replace null values
+- **DataFrameStatFunctions** — statistical functions (crosstab, freqItems, approxQuantile, etc.)
+- **Window** — window specifications with partitionBy, orderBy, rowsBetween, rangeBetween
 - **Row / StructType** — typed accessors and schema support
 - **Arrow IPC** — createDataFrame with client-side Arrow serialization; server responses deserialized via Arrow
 - **RuntimeConfig** — get / set Spark configuration at runtime
+
+## Compatibility
+
+Tested against these Spark Connect server versions:
+
+| Server Version | Status |
+|---------------|--------|
+| Spark 4.0.2 | Supported |
+| Spark 4.1.1 | Supported |
 
 ## Requirements
 
@@ -28,7 +44,7 @@ This project provides that Scala 3 client.
 | JDK | 17+ |
 | SBT | 1.10+ |
 | Scala | 3.3.7 LTS |
-| Spark Connect Server | 4.0+ |
+| Spark Connect Server | 4.0.2+ |
 
 ## Quick Start
 
@@ -44,66 +60,35 @@ $SPARK_HOME/sbin/start-connect-server.sh
 ```bash
 git clone https://github.com/LuciferYang/spark-connect-scala3.git
 cd spark-connect-scala3
-sbt compile
+build/sbt compile
 ```
 
 ### 3. Run the example
 
 ```bash
-sbt "runMain org.apache.spark.sql.examples.quickStart"
+build/sbt "runMain org.apache.spark.sql.examples.quickStart"
 ```
 
 Override the server URL:
 
 ```bash
 SPARK_CONNECT_URL=sc://remote-host:15002 \
-  sbt "runMain org.apache.spark.sql.examples.quickStart"
+  build/sbt "runMain org.apache.spark.sql.examples.quickStart"
 ```
 
-Expected output:
+### 4. Run unit tests
 
-```
-[1] Spark version: 4.0.2
-
-[2] SQL: SELECT 1 as one, 'hello' as greeting
-+---+--------+
-|one|greeting|
-+---+--------+
-|1  |hello   |
-+---+--------+
-
-[3] spark.range(10)
-+--+
-|id|
-+--+
-|0 |
-|1 |
-...
-
-[5] range(100).groupBy(id % 5).agg(count, sum)
-+-----+---+-----+
-|group|cnt|total|
-+-----+---+-----+
-|0    |20 |950  |
-|1    |20 |970  |
-...
-
-[6] createDataFrame with Arrow serialization
-+-----+---+-----+
-|name |age|score|
-+-----+---+-----+
-|Alice|30 |95.5 |
-|Bob  |25 |88.0 |
-|Carol|35 |92.3 |
-+-----+---+-----+
-Schema:
-root
- |-- name: string (nullable = true)
- |-- age: integer (nullable = true)
- |-- score: double (nullable = true)
+```bash
+build/sbt test
 ```
 
-### 4. Use in your own project
+### 5. Run integration tests (requires a running Spark Connect server)
+
+```bash
+build/sbt 'testOnly *IntegrationSuite'
+```
+
+### 6. Use in your own project
 
 ```scala
 // build.sbt
@@ -131,7 +116,7 @@ spark.stop()
 ```
 src/
 ├── main/
-│   ├── protobuf/spark/connect/    # Proto definitions (from Spark 4.0)
+│   ├── protobuf/spark/connect/         # Proto definitions (from Spark 4.0)
 │   │   ├── base.proto
 │   │   ├── relations.proto
 │   │   ├── expressions.proto
@@ -139,24 +124,52 @@ src/
 │   │   ├── types.proto
 │   │   └── ...
 │   └── scala/org/apache/spark/sql/
-│       ├── SparkSession.scala      # Entry point + Builder
-│       ├── DataFrame.scala         # Transformations + Actions
-│       ├── Column.scala            # Expression tree builder
-│       ├── functions.scala         # Built-in SQL functions
-│       ├── Row.scala               # Row with typed accessors
-│       ├── GroupedDataFrame.scala   # groupBy / rollup / cube / pivot
-│       ├── DataFrameReader.scala   # Read from external storage
-│       ├── DataFrameWriter.scala   # Write to external storage
-│       ├── DataFrameNaFunctions.scala  # Null handling
-│       ├── ArrowSerializer.scala   # Row → Arrow IPC encoding
-│       ├── types/DataType.scala    # Spark SQL type system
+│       ├── SparkSession.scala           # Entry point + Builder
+│       ├── DataFrame.scala              # Transformations + Actions
+│       ├── Dataset.scala                # Typed Dataset[T]
+│       ├── Column.scala                 # Expression tree builder
+│       ├── functions.scala              # 130+ built-in SQL functions
+│       ├── Row.scala                    # Row with typed accessors
+│       ├── Encoder.scala                # Compile-time encoder derivation
+│       ├── GroupedDataFrame.scala        # groupBy / rollup / cube / pivot
+│       ├── DataFrameReader.scala        # Batch read
+│       ├── DataFrameWriter.scala        # Batch write
+│       ├── DataStreamReader.scala       # Streaming read
+│       ├── DataStreamWriter.scala       # Streaming write + Trigger types
+│       ├── StreamingQuery.scala         # Query lifecycle management
+│       ├── StreamingQueryManager.scala  # Active query manager
+│       ├── Catalog.scala                # Database/table/function catalog
+│       ├── UserDefinedFunction.scala    # UDF support
+│       ├── UDFRegistration.scala        # UDF registration
+│       ├── DataFrameNaFunctions.scala   # Null handling
+│       ├── DataFrameStatFunctions.scala # Statistical functions
+│       ├── StorageLevel.scala           # Cache storage levels
+│       ├── ArrowSerializer.scala        # Row → Arrow IPC encoding
+│       ├── types/DataType.scala         # Spark SQL type system
 │       ├── connect/client/
 │       │   ├── SparkConnectClient.scala    # gRPC client
 │       │   ├── ArrowDeserializer.scala     # Arrow IPC → Row decoding
 │       │   └── DataTypeProtoConverter.scala # Proto ↔ DataType
 │       └── examples/
-│           └── QuickStart.scala    # End-to-end example
-└── test/                           # (coming soon)
+│           └── QuickStart.scala         # End-to-end example
+└── test/
+    └── scala/org/apache/spark/sql/
+        ├── ColumnSuite.scala
+        ├── FunctionsSuite.scala
+        ├── WindowSuite.scala
+        ├── RowSuite.scala
+        ├── EncoderSuite.scala
+        ├── StorageLevelSuite.scala
+        ├── DataStreamReaderSuite.scala
+        ├── DataStreamWriterSuite.scala
+        ├── StreamingQuerySuite.scala
+        ├── StreamingQueryManagerSuite.scala
+        ├── DataFrameStatFunctionsSuite.scala
+        ├── UserDefinedFunctionSuite.scala
+        ├── ImplicitsSuite.scala
+        ├── IntegrationSuite.scala       # Requires running server
+        └── connect/client/
+            └── DataTypeProtoConverterSuite.scala
 ```
 
 ## How It Works
@@ -180,35 +193,48 @@ src/
 
 | Library | Purpose |
 |---------|---------|
-| [ScalaPB](https://scalapb.github.io/) | Generates idiomatic Scala 3 case classes from `.proto` files |
 | [gRPC-Java](https://grpc.io/) | Transport layer for Spark Connect protocol |
+| [Protobuf-Java](https://protobuf.dev/) | Java protobuf code generation for proto definitions |
 | [Apache Arrow](https://arrow.apache.org/) | Data serialization/deserialization (IPC format) |
+| [ScalaTest](https://www.scalatest.org/) | Unit and integration testing |
 
 ## Supported API
 
 ### SparkSession
-`sql`, `table`, `range`, `emptyDataFrame`, `createDataFrame`, `read`, `conf`, `version`, `stop`
+`sql`, `table`, `range`, `emptyDataFrame`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `version`, `stop`
 
 ### DataFrame Transformations
-`select`, `selectExpr`, `filter`, `where`, `limit`, `offset`, `sort`, `orderBy`, `groupBy`, `rollup`, `cube`, `agg`, `join`, `crossJoin`, `withColumn`, `withColumnRenamed`, `drop`, `distinct`, `dropDuplicates`, `union`, `unionAll`, `unionByName`, `intersect`, `except`, `repartition`, `coalesce`, `sample`, `describe`, `summary`, `alias`, `na`
+`select`, `selectExpr`, `filter`, `where`, `limit`, `offset`, `sort`, `orderBy`, `groupBy`, `rollup`, `cube`, `agg`, `join`, `crossJoin`, `withColumn`, `withColumnRenamed`, `drop`, `distinct`, `dropDuplicates`, `union`, `unionAll`, `unionByName`, `intersect`, `intersectAll`, `except`, `exceptAll`, `repartition`, `coalesce`, `sample`, `describe`, `summary`, `alias`, `toDF`, `hint`, `broadcast`, `sortWithinPartitions`, `tail`, `transform`, `na`, `stat`, `cache`, `persist`, `unpersist`, `withWatermark`, `writeStream`
 
 ### DataFrame Actions
-`collect`, `count`, `first`, `head`, `take`, `show`, `printSchema`, `schema`, `columns`, `explain`, `isEmpty`
+`collect`, `count`, `first`, `head`, `take`, `show`, `printSchema`, `schema`, `columns`, `explain`, `isEmpty`, `createTempView`, `createOrReplaceTempView`, `createGlobalTempView`, `write`
+
+### Structured Streaming
+`readStream` (DataStreamReader), `writeStream` (DataStreamWriter), `StreamingQuery` (isActive, stop, awaitTermination, recentProgress, explain, exception), `StreamingQueryManager` (active, get, awaitAnyTermination, resetTerminated), `Trigger` (ProcessingTime, AvailableNow, Once, Continuous)
 
 ### Column Operators
-`===`, `=!=`, `>`, `>=`, `<`, `<=`, `&&`, `||`, `!`, `+`, `-`, `*`, `/`, `%`, `isNull`, `isNotNull`, `isNaN`, `contains`, `startsWith`, `endsWith`, `like`, `rlike`, `isin`, `between`, `substr`, `cast`, `alias`, `as`, `asc`, `desc`, `over`
+`===`, `=!=`, `>`, `>=`, `<`, `<=`, `&&`, `||`, `!`, `+`, `-`, `*`, `/`, `%`, `isNull`, `isNotNull`, `isNaN`, `contains`, `startsWith`, `endsWith`, `like`, `rlike`, `isin`, `between`, `substr`, `cast`, `alias`, `as`, `asc`, `desc`, `over`, `when`, `otherwise`, `getItem`, `getField`, `withField`, `dropFields`
 
 ### Functions
-Aggregates, math, string, date/time, null handling, conditional, collection, window — see [`functions.scala`](src/main/scala/org/apache/spark/sql/functions.scala) for the full list.
+130+ functions: aggregates, math, string, date/time, null handling, conditional, collection, map, JSON, regex, window — see [`functions.scala`](src/main/scala/org/apache/spark/sql/functions.scala) for the full list.
 
 ## Roadmap
 
-- [ ] Unit and integration tests
-- [ ] Catalog API (listDatabases, listTables, ...)
-- [ ] Streaming (structured streaming read/write)
-- [ ] Encoder / Dataset[T] with Scala 3 type class derivation
-- [ ] UDF registration
+- [x] SparkSession + gRPC client
+- [x] DataFrame / Dataset[T] API
+- [x] Column expressions + 130+ built-in functions
+- [x] DataFrameReader / Writer
+- [x] Catalog API
+- [x] Encoder derivation (Scala 3 `derives`)
+- [x] UDF support
+- [x] Structured Streaming
+- [x] Window functions
+- [x] Unit tests (150+ tests)
+- [x] Integration tests (Spark 4.0.2 / 4.1.1)
 - [ ] Publish to Maven Central
+- [ ] Error handling improvements (retry, exception conversion)
+- [ ] `foreach` / `foreachBatch` (requires ArtifactManager)
+- [ ] StreamingQueryListener
 
 ## License
 
