@@ -22,9 +22,9 @@ class StorageLevelSuite extends AnyFunSuite with Matchers:
 
   test("toProto conversion") {
     val proto = StorageLevel.MEMORY_AND_DISK.toProto
-    proto.useMemory shouldBe true
-    proto.useDisk shouldBe true
-    proto.useOffHeap shouldBe false
-    proto.deserialized shouldBe true
-    proto.replication shouldBe 1
+    proto.getUseMemory shouldBe true
+    proto.getUseDisk shouldBe true
+    proto.getUseOffHeap shouldBe false
+    proto.getDeserialized shouldBe true
+    proto.getReplication shouldBe 1
   }

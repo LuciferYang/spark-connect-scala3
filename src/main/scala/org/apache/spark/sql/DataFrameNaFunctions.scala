@@ -1,8 +1,7 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.expressions.Expression
-import org.apache.spark.connect.proto.expressions.Expression.ExprType
-import org.apache.spark.connect.proto.relations.*
+import org.apache.spark.connect.proto.*
+import org.apache.spark.connect.proto.{DataType as ProtoDataType}
 
 /**
  * Functions for handling missing data (null / NaN) in DataFrames.
@@ -14,33 +13,18 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
   def drop(how: String): DataFrame = drop(how, df.columns.toSeq)
 
   def drop(how: String, cols: Seq[String]): DataFrame =
-    // 'all' → set min_non_nulls 1; 'any' → unset (None)
-    val minNonNulls = how.toLowerCase match
-      case "all" => Some(1)
-      case "any" => None
-      case _     => None
-    DataFrame(df.session, Relation(
-      common = Some(RelationCommon(planId = Some(df.session.nextPlanId()))),
-      relType = Relation.RelType.DropNa(
-        NADrop(
-          input = Some(df.relation),
-          cols = cols,
-          minNonNulls = minNonNulls
-        )
-      )
-    ))
+    val naDropBuilder = NADrop.newBuilder().setInput(df.relation)
+    cols.foreach(naDropBuilder.addCols)
+    how.toLowerCase match
+      case "all" => naDropBuilder.setMinNonNulls(1)
+      case _ => // 'any' or default — don't set minNonNulls
+    df.withRelation(_.setDropNa(naDropBuilder.build()))
 
   def drop(minNonNulls: Int): DataFrame =
-    DataFrame(df.session, Relation(
-      common = Some(RelationCommon(planId = Some(df.session.nextPlanId()))),
-      relType = Relation.RelType.DropNa(
-        NADrop(
-          input = Some(df.relation),
-          cols = Seq.empty,
-          minNonNulls = Some(minNonNulls)
-        )
-      )
-    ))
+    val naDropBuilder = NADrop.newBuilder()
+      .setInput(df.relation)
+      .setMinNonNulls(minNonNulls)
+    df.withRelation(_.setDropNa(naDropBuilder.build()))
 
   def fill(value: Double): DataFrame =
     fill(value, df.columns.toSeq)
@@ -50,74 +34,45 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
 
   def fill(value: Double, cols: Seq[String]): DataFrame =
     val lit = toLiteral(value)
-    DataFrame(df.session, Relation(
-      common = Some(RelationCommon(planId = Some(df.session.nextPlanId()))),
-      relType = Relation.RelType.FillNa(
-        NAFill(
-          input = Some(df.relation),
-          cols = cols,
-          values = Seq(lit)
-        )
-      )
-    ))
+    val naFillBuilder = NAFill.newBuilder().setInput(df.relation).addValues(lit)
+    cols.foreach(naFillBuilder.addCols)
+    df.withRelation(_.setFillNa(naFillBuilder.build()))
 
   def fill(value: String, cols: Seq[String]): DataFrame =
     val lit = toLiteral(value)
-    DataFrame(df.session, Relation(
-      common = Some(RelationCommon(planId = Some(df.session.nextPlanId()))),
-      relType = Relation.RelType.FillNa(
-        NAFill(
-          input = Some(df.relation),
-          cols = cols,
-          values = Seq(lit)
-        )
-      )
-    ))
+    val naFillBuilder = NAFill.newBuilder().setInput(df.relation).addValues(lit)
+    cols.foreach(naFillBuilder.addCols)
+    df.withRelation(_.setFillNa(naFillBuilder.build()))
 
   def fill(valueMap: Map[String, Any]): DataFrame =
-    val cols = valueMap.keys.toSeq
-    val values = valueMap.values.map(v => toLiteral(v)).toSeq
-    DataFrame(df.session, Relation(
-      common = Some(RelationCommon(planId = Some(df.session.nextPlanId()))),
-      relType = Relation.RelType.FillNa(
-        NAFill(
-          input = Some(df.relation),
-          cols = cols,
-          values = values
-        )
-      )
-    ))
+    val naFillBuilder = NAFill.newBuilder().setInput(df.relation)
+    valueMap.keys.foreach(naFillBuilder.addCols)
+    valueMap.values.foreach(v => naFillBuilder.addValues(toLiteral(v)))
+    df.withRelation(_.setFillNa(naFillBuilder.build()))
 
   def replace[T](col: String, replacement: Map[T, T]): DataFrame =
-    val replacements = replacement.map { (old, nw) =>
-      NAReplace.Replacement(
-        oldValue = Some(toLiteral(old)),
-        newValue = Some(toLiteral(nw))
+    val naReplaceBuilder = NAReplace.newBuilder()
+      .setInput(df.relation)
+      .addCols(col)
+    replacement.foreach { (old, nw) =>
+      naReplaceBuilder.addReplacements(
+        NAReplace.Replacement.newBuilder()
+          .setOldValue(toLiteral(old))
+          .setNewValue(toLiteral(nw))
+          .build()
       )
-    }.toSeq
-    DataFrame(df.session, Relation(
-      common = Some(RelationCommon(planId = Some(df.session.nextPlanId()))),
-      relType = Relation.RelType.Replace(
-        NAReplace(
-          input = Some(df.relation),
-          cols = Seq(col),
-          replacements = replacements
-        )
-      )
-    ))
+    }
+    df.withRelation(_.setReplace(naReplaceBuilder.build()))
 
   private def toLiteral(value: Any): Expression.Literal = value match
-    case null       => Expression.Literal(literalType = Expression.Literal.LiteralType.Null(
-                         org.apache.spark.connect.proto.types.DataType(
-                           kind = org.apache.spark.connect.proto.types.DataType.Kind.Null(
-                             org.apache.spark.connect.proto.types.DataType.NULL()
-                           )
-                         )
-                       ))
-    case v: Boolean => Expression.Literal(literalType = Expression.Literal.LiteralType.Boolean(v))
-    case v: Int     => Expression.Literal(literalType = Expression.Literal.LiteralType.Integer(v))
-    case v: Long    => Expression.Literal(literalType = Expression.Literal.LiteralType.Long(v))
-    case v: Float   => Expression.Literal(literalType = Expression.Literal.LiteralType.Float(v))
-    case v: Double  => Expression.Literal(literalType = Expression.Literal.LiteralType.Double(v))
-    case v: String  => Expression.Literal(literalType = Expression.Literal.LiteralType.String(v))
-    case v          => Expression.Literal(literalType = Expression.Literal.LiteralType.String(v.toString))
+    case null       => Expression.Literal.newBuilder()
+                         .setNull(ProtoDataType.newBuilder()
+                           .setNull(ProtoDataType.NULL.getDefaultInstance).build())
+                         .build()
+    case v: Boolean => Expression.Literal.newBuilder().setBoolean(v).build()
+    case v: Int     => Expression.Literal.newBuilder().setInteger(v).build()
+    case v: Long    => Expression.Literal.newBuilder().setLong(v).build()
+    case v: Float   => Expression.Literal.newBuilder().setFloat(v).build()
+    case v: Double  => Expression.Literal.newBuilder().setDouble(v).build()
+    case v: String  => Expression.Literal.newBuilder().setString(v).build()
+    case v          => Expression.Literal.newBuilder().setString(v.toString).build()

@@ -1,7 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.expressions.Expression
-import org.apache.spark.connect.proto.relations.*
+import org.apache.spark.connect.proto.*
 
 /**
  * Statistic functions for DataFrames.
@@ -11,14 +10,14 @@ final class DataFrameStatFunctions private[sql] (df: DataFrame):
 
   /** Computes a pair-wise frequency table (contingency table). */
   def crosstab(col1: String, col2: String): DataFrame =
-    df.withRelation(Relation.RelType.Crosstab(
-      StatCrosstab(input = Some(df.relation), col1 = col1, col2 = col2)
+    df.withRelation(_.setCrosstab(
+      StatCrosstab.newBuilder().setInput(df.relation).setCol1(col1).setCol2(col2).build()
     ))
 
   /** Computes the sample covariance between two columns. */
   def cov(col1: String, col2: String): Double =
-    val result = df.withRelation(Relation.RelType.Cov(
-      StatCov(input = Some(df.relation), col1 = col1, col2 = col2)
+    val result = df.withRelation(_.setCov(
+      StatCov.newBuilder().setInput(df.relation).setCol1(col1).setCol2(col2).build()
     ))
     result.collect().head.getDouble(0)
 
@@ -28,8 +27,9 @@ final class DataFrameStatFunctions private[sql] (df: DataFrame):
 
   /** Computes correlation between two columns using the given method. */
   def corr(col1: String, col2: String, method: String): Double =
-    val result = df.withRelation(Relation.RelType.Corr(
-      StatCorr(input = Some(df.relation), col1 = col1, col2 = col2, method = Some(method))
+    val result = df.withRelation(_.setCorr(
+      StatCorr.newBuilder().setInput(df.relation)
+        .setCol1(col1).setCol2(col2).setMethod(method).build()
     ))
     result.collect().head.getDouble(0)
 
@@ -39,14 +39,12 @@ final class DataFrameStatFunctions private[sql] (df: DataFrame):
       probabilities: Array[Double],
       relativeError: Double
   ): Array[Array[Double]] =
-    val result = df.withRelation(Relation.RelType.ApproxQuantile(
-      StatApproxQuantile(
-        input = Some(df.relation),
-        cols = cols.toSeq,
-        probabilities = probabilities.toSeq,
-        relativeError = relativeError
-      )
-    ))
+    val aqBuilder = StatApproxQuantile.newBuilder()
+      .setInput(df.relation)
+      .setRelativeError(relativeError)
+    cols.foreach(aqBuilder.addCols)
+    probabilities.foreach(aqBuilder.addProbabilities)
+    val result = df.withRelation(_.setApproxQuantile(aqBuilder.build()))
     val rows = result.collect()
     rows.map { row =>
       (0 until row.size).map(row.getDouble).toArray
@@ -62,35 +60,34 @@ final class DataFrameStatFunctions private[sql] (df: DataFrame):
 
   /** Finds frequent items for the given columns using the given support threshold. */
   def freqItems(cols: Seq[String], support: Double): DataFrame =
-    df.withRelation(Relation.RelType.FreqItems(
-      StatFreqItems(input = Some(df.relation), cols = cols, support = Some(support))
-    ))
+    val fiBuilder = StatFreqItems.newBuilder().setInput(df.relation).setSupport(support)
+    cols.foreach(fiBuilder.addCols)
+    df.withRelation(_.setFreqItems(fiBuilder.build()))
 
   /** Finds frequent items for the given columns with default support of 1%. */
   def freqItems(cols: Seq[String]): DataFrame =
-    df.withRelation(Relation.RelType.FreqItems(
-      StatFreqItems(input = Some(df.relation), cols = cols)
-    ))
+    val fiBuilder = StatFreqItems.newBuilder().setInput(df.relation)
+    cols.foreach(fiBuilder.addCols)
+    df.withRelation(_.setFreqItems(fiBuilder.build()))
 
   /** Returns a stratified sample without replacement. */
   def sampleBy[T](col: Column, fractions: Map[T, Double], seed: Long): DataFrame =
-    val protoFractions = fractions.map { (stratum, fraction) =>
-      StatSampleBy.Fraction(
-        stratum = Some(Column.lit(stratum).expr.exprType match {
-          case Expression.ExprType.Literal(lit) => lit
-          case _ => throw IllegalArgumentException("sampleBy stratum must be a literal")
-        }),
-        fraction = fraction
+    val sbBuilder = StatSampleBy.newBuilder()
+      .setInput(df.relation)
+      .setCol(col.expr)
+      .setSeed(seed)
+    fractions.foreach { (stratum, fraction) =>
+      val litExpr = Column.lit(stratum).expr
+      if !litExpr.hasLiteral then
+        throw IllegalArgumentException("sampleBy stratum must be a literal")
+      sbBuilder.addFractions(
+        StatSampleBy.Fraction.newBuilder()
+          .setStratum(litExpr.getLiteral)
+          .setFraction(fraction)
+          .build()
       )
-    }.toSeq
-    df.withRelation(Relation.RelType.SampleBy(
-      StatSampleBy(
-        input = Some(df.relation),
-        col = Some(col.expr),
-        fractions = protoFractions,
-        seed = Some(seed)
-      )
-    ))
+    }
+    df.withRelation(_.setSampleBy(sbBuilder.build()))
 
   /** Returns a stratified sample without replacement using column name. */
   def sampleBy[T](col: String, fractions: Map[T, Double], seed: Long): DataFrame =

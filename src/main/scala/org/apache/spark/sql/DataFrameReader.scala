@@ -1,6 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.relations.*
+import org.apache.spark.connect.proto.*
 
 /**
  * Reader for loading DataFrames from external storage.
@@ -36,18 +36,17 @@ final class DataFrameReader private[sql] (private val session: SparkSession):
   def load(): DataFrame = load(Seq.empty)
 
   def load(paths: Seq[String]): DataFrame =
-    val dataSource = Read.DataSource(
-      format = Some(source),
-      options = opts,
-      schema = userSchema,
-      paths = paths
-    )
-    DataFrame(session, Relation(
-      common = Some(RelationCommon(planId = Some(session.nextPlanId()))),
-      relType = Relation.RelType.Read(Read(
-        readType = Read.ReadType.DataSource(dataSource)
-      ))
-    ))
+    val dsBuilder = Read.DataSource.newBuilder()
+      .setFormat(source)
+    opts.foreach { (k, v) => dsBuilder.putOptions(k, v) }
+    userSchema.foreach(dsBuilder.setSchema)
+    paths.foreach(dsBuilder.addPaths)
+    DataFrame(session, Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+      .setRead(Read.newBuilder()
+        .setDataSource(dsBuilder.build())
+        .build())
+      .build())
 
   def table(tableName: String): DataFrame = session.table(tableName)
 

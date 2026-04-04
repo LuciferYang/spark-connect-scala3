@@ -1,7 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.base.*
-import org.apache.spark.connect.proto.relations.*
+import org.apache.spark.connect.proto.{Catalog as _, StorageLevel as _, *}
 import org.apache.spark.sql.connect.client.SparkConnectClient
 
 import java.util.concurrent.atomic.AtomicLong
@@ -30,40 +29,38 @@ final class SparkSession private (
   // ---------------------------------------------------------------------------
 
   def sql(query: String): DataFrame =
-    DataFrame(this, Relation(
-      common = Some(RelationCommon(planId = Some(nextPlanId()))),
-      relType = Relation.RelType.Sql(SQL(query = query))
-    ))
+    DataFrame(this, Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+      .setSql(SQL.newBuilder().setQuery(query).build())
+      .build())
 
   // ---------------------------------------------------------------------------
   // Table / Range / Empty
   // ---------------------------------------------------------------------------
 
   def table(tableName: String): DataFrame =
-    DataFrame(this, Relation(
-      common = Some(RelationCommon(planId = Some(nextPlanId()))),
-      relType = Relation.RelType.Read(Read(
-        readType = Read.ReadType.NamedTable(
-          Read.NamedTable(unparsedIdentifier = tableName)
-        )
-      ))
-    ))
+    DataFrame(this, Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+      .setRead(Read.newBuilder()
+        .setNamedTable(Read.NamedTable.newBuilder()
+          .setUnparsedIdentifier(tableName).build())
+        .build())
+      .build())
 
   def range(end: Long): DataFrame = range(0, end, 1)
 
   def range(start: Long, end: Long, step: Long = 1): DataFrame =
-    DataFrame(this, Relation(
-      common = Some(RelationCommon(planId = Some(nextPlanId()))),
-      relType = Relation.RelType.Range(
-        Range(start = Some(start), end = end, step = step)
-      )
-    ))
+    DataFrame(this, Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+      .setRange(Range.newBuilder()
+        .setStart(start).setEnd(end).setStep(step).build())
+      .build())
 
   def emptyDataFrame: DataFrame =
-    DataFrame(this, Relation(
-      common = Some(RelationCommon(planId = Some(nextPlanId()))),
-      relType = Relation.RelType.LocalRelation(LocalRelation())
-    ))
+    DataFrame(this, Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+      .setLocalRelation(LocalRelation.getDefaultInstance)
+      .build())
 
   // ---------------------------------------------------------------------------
   // createDataFrame (Arrow IPC serialization)
@@ -72,15 +69,13 @@ final class SparkSession private (
   def createDataFrame(rows: Seq[Row], schema: types.StructType): DataFrame =
     val arrowData = ArrowSerializer.encodeRows(rows, schema)
     val schemaStr = schema.fields.map(f => s"${f.name} ${f.dataType.simpleString}").mkString(", ")
-    DataFrame(this, Relation(
-      common = Some(RelationCommon(planId = Some(nextPlanId()))),
-      relType = Relation.RelType.LocalRelation(
-        LocalRelation(
-          data = Some(com.google.protobuf.ByteString.copyFrom(arrowData)),
-          schema = Some(schemaStr)
-        )
-      )
-    ))
+    DataFrame(this, Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+      .setLocalRelation(LocalRelation.newBuilder()
+        .setData(com.google.protobuf.ByteString.copyFrom(arrowData))
+        .setSchema(schemaStr)
+        .build())
+      .build())
 
   // ---------------------------------------------------------------------------
   // createDataset (typed)

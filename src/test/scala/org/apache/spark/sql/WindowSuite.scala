@@ -1,8 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.expressions.Expression
-import org.apache.spark.connect.proto.expressions.Expression.ExprType
-import org.apache.spark.connect.proto.relations.Relation
+import org.apache.spark.connect.proto.Expression
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -28,13 +26,13 @@ class WindowSuite extends AnyFunSuite with Matchers:
       .rowsBetween(Window.unboundedPreceding, Window.currentRow)
     ws.frameSpec shouldBe defined
     val frame = ws.frameSpec.get
-    frame.frameType shouldBe Expression.Window.WindowFrame.FrameType.FRAME_TYPE_ROW
-    frame.lower shouldBe defined
-    frame.upper shouldBe defined
+    frame.getFrameType shouldBe Expression.Window.WindowFrame.FrameType.FRAME_TYPE_ROW
+    frame.hasLower shouldBe true
+    frame.hasUpper shouldBe true
     // lower = unboundedPreceding
-    frame.lower.get.boundary shouldBe a[Expression.Window.WindowFrame.FrameBoundary.Boundary.Unbounded]
+    frame.getLower.hasUnbounded shouldBe true
     // upper = currentRow
-    frame.upper.get.boundary shouldBe a[Expression.Window.WindowFrame.FrameBoundary.Boundary.CurrentRow]
+    frame.getUpper.hasCurrentRow shouldBe true
   }
 
   test("WindowSpec.rangeBetween creates RANGE frame") {
@@ -42,19 +40,19 @@ class WindowSuite extends AnyFunSuite with Matchers:
       .rangeBetween(-100, 100)
     ws.frameSpec shouldBe defined
     val frame = ws.frameSpec.get
-    frame.frameType shouldBe Expression.Window.WindowFrame.FrameType.FRAME_TYPE_RANGE
+    frame.getFrameType shouldBe Expression.Window.WindowFrame.FrameType.FRAME_TYPE_RANGE
     // lower = literal value
-    frame.lower.get.boundary shouldBe a[Expression.Window.WindowFrame.FrameBoundary.Boundary.Value]
-    frame.upper.get.boundary shouldBe a[Expression.Window.WindowFrame.FrameBoundary.Boundary.Value]
+    frame.getLower.hasValue shouldBe true
+    frame.getUpper.hasValue shouldBe true
   }
 
   test("Window.rowsBetween factory method") {
     val ws = Window.rowsBetween(Window.unboundedPreceding, Window.unboundedFollowing)
     ws.frameSpec shouldBe defined
     val frame = ws.frameSpec.get
-    frame.frameType shouldBe Expression.Window.WindowFrame.FrameType.FRAME_TYPE_ROW
-    frame.lower.get.boundary shouldBe a[Expression.Window.WindowFrame.FrameBoundary.Boundary.Unbounded]
-    frame.upper.get.boundary shouldBe a[Expression.Window.WindowFrame.FrameBoundary.Boundary.Unbounded]
+    frame.getFrameType shouldBe Expression.Window.WindowFrame.FrameType.FRAME_TYPE_ROW
+    frame.getLower.hasUnbounded shouldBe true
+    frame.getUpper.hasUnbounded shouldBe true
   }
 
   test("Window constants") {
@@ -68,12 +66,12 @@ class WindowSuite extends AnyFunSuite with Matchers:
       .orderBy(Column("salary"))
       .rowsBetween(-1, 1)
     val c = functions.row_number().over(ws)
-    c.expr.exprType shouldBe a[ExprType.Window]
-    val w = c.expr.exprType.asInstanceOf[ExprType.Window].value
-    w.partitionSpec should have size 1
-    w.orderSpec should have size 1
-    w.frameSpec shouldBe defined
-    w.frameSpec.get.frameType shouldBe Expression.Window.WindowFrame.FrameType.FRAME_TYPE_ROW
+    c.expr.hasWindow shouldBe true
+    val w = c.expr.getWindow
+    w.getPartitionSpecList should have size 1
+    w.getOrderSpecList should have size 1
+    w.hasFrameSpec shouldBe true
+    w.getFrameSpec.getFrameType shouldBe Expression.Window.WindowFrame.FrameType.FRAME_TYPE_ROW
   }
 
   test("WindowSpec chaining preserves frame through orderBy") {

@@ -1,103 +1,112 @@
 package org.apache.spark.sql.connect.client
 
-import org.apache.spark.connect.proto.types.{DataType as ProtoDataType}
+import org.apache.spark.connect.proto.DataType as ProtoDataType
 import org.apache.spark.sql.types.*
+
+import scala.jdk.CollectionConverters.*
 
 /** Converts between protobuf DataType and Spark SQL DataType. */
 object DataTypeProtoConverter:
 
   def fromProto(proto: ProtoDataType): DataType =
-    import ProtoDataType.Kind
-    proto.kind match
-      case Kind.Boolean(_)      => BooleanType
-      case Kind.Byte(_)         => ByteType
-      case Kind.Short(_)        => ShortType
-      case Kind.Integer(_)      => IntegerType
-      case Kind.Long(_)         => LongType
-      case Kind.Float(_)        => FloatType
-      case Kind.Double(_)       => DoubleType
-      case Kind.String(_)       => StringType
-      case Kind.Binary(_)       => BinaryType
-      case Kind.Date(_)         => DateType
-      case Kind.Timestamp(_)    => TimestampType
-      case Kind.TimestampNtz(_) => TimestampNTZType
-      case Kind.Null(_)         => NullType
+    import ProtoDataType.KindCase
+    proto.getKindCase match
+      case KindCase.BOOLEAN      => BooleanType
+      case KindCase.BYTE         => ByteType
+      case KindCase.SHORT        => ShortType
+      case KindCase.INTEGER      => IntegerType
+      case KindCase.LONG         => LongType
+      case KindCase.FLOAT        => FloatType
+      case KindCase.DOUBLE       => DoubleType
+      case KindCase.STRING       => StringType
+      case KindCase.BINARY       => BinaryType
+      case KindCase.DATE         => DateType
+      case KindCase.TIMESTAMP    => TimestampType
+      case KindCase.TIMESTAMP_NTZ => TimestampNTZType
+      case KindCase.NULL         => NullType
 
-      case Kind.Decimal(d) =>
+      case KindCase.DECIMAL =>
+        val d = proto.getDecimal
         DecimalType(
-          d.precision.getOrElse(10),
-          d.scale.getOrElse(0)
+          if d.hasPrecision then d.getPrecision else 10,
+          if d.hasScale then d.getScale else 0
         )
 
-      case Kind.Array(a) =>
+      case KindCase.ARRAY =>
+        val a = proto.getArray
         ArrayType(
-          fromProto(a.elementType.get),
-          a.containsNull
+          fromProto(a.getElementType),
+          a.getContainsNull
         )
 
-      case Kind.Map(m) =>
+      case KindCase.MAP =>
+        val m = proto.getMap
         MapType(
-          fromProto(m.keyType.get),
-          fromProto(m.valueType.get),
-          m.valueContainsNull
+          fromProto(m.getKeyType),
+          fromProto(m.getValueType),
+          m.getValueContainsNull
         )
 
-      case Kind.Struct(s) =>
-        StructType(s.fields.map { f =>
-          StructField(f.name, fromProto(f.dataType.get), f.nullable)
-        })
-
-      case Kind.Null(_)         => NullType
+      case KindCase.STRUCT =>
+        val s = proto.getStruct
+        StructType(s.getFieldsList.asScala.map { f =>
+          StructField(f.getName, fromProto(f.getDataType), f.getNullable)
+        }.toSeq)
 
       case _ =>
         StringType // fallback for unsupported types
 
   /** Convert a Spark SQL DataType to its protobuf representation. */
   def toProto(dt: DataType): ProtoDataType =
-    import ProtoDataType.Kind
     dt match
-      case BooleanType   => ProtoDataType(kind = Kind.Boolean(ProtoDataType.Boolean()))
-      case ByteType      => ProtoDataType(kind = Kind.Byte(ProtoDataType.Byte()))
-      case ShortType     => ProtoDataType(kind = Kind.Short(ProtoDataType.Short()))
-      case IntegerType   => ProtoDataType(kind = Kind.Integer(ProtoDataType.Integer()))
-      case LongType      => ProtoDataType(kind = Kind.Long(ProtoDataType.Long()))
-      case FloatType     => ProtoDataType(kind = Kind.Float(ProtoDataType.Float()))
-      case DoubleType    => ProtoDataType(kind = Kind.Double(ProtoDataType.Double()))
-      case StringType    => ProtoDataType(kind = Kind.String(ProtoDataType.String()))
-      case BinaryType    => ProtoDataType(kind = Kind.Binary(ProtoDataType.Binary()))
-      case DateType      => ProtoDataType(kind = Kind.Date(ProtoDataType.Date()))
-      case TimestampType => ProtoDataType(kind = Kind.Timestamp(ProtoDataType.Timestamp()))
-      case TimestampNTZType => ProtoDataType(kind = Kind.TimestampNtz(ProtoDataType.TimestampNTZ()))
-      case NullType      => ProtoDataType(kind = Kind.Null(ProtoDataType.NULL()))
+      case BooleanType   => ProtoDataType.newBuilder().setBoolean(ProtoDataType.Boolean.getDefaultInstance).build()
+      case ByteType      => ProtoDataType.newBuilder().setByte(ProtoDataType.Byte.getDefaultInstance).build()
+      case ShortType     => ProtoDataType.newBuilder().setShort(ProtoDataType.Short.getDefaultInstance).build()
+      case IntegerType   => ProtoDataType.newBuilder().setInteger(ProtoDataType.Integer.getDefaultInstance).build()
+      case LongType      => ProtoDataType.newBuilder().setLong(ProtoDataType.Long.getDefaultInstance).build()
+      case FloatType     => ProtoDataType.newBuilder().setFloat(ProtoDataType.Float.getDefaultInstance).build()
+      case DoubleType    => ProtoDataType.newBuilder().setDouble(ProtoDataType.Double.getDefaultInstance).build()
+      case StringType    => ProtoDataType.newBuilder().setString(ProtoDataType.String.getDefaultInstance).build()
+      case BinaryType    => ProtoDataType.newBuilder().setBinary(ProtoDataType.Binary.getDefaultInstance).build()
+      case DateType      => ProtoDataType.newBuilder().setDate(ProtoDataType.Date.getDefaultInstance).build()
+      case TimestampType => ProtoDataType.newBuilder().setTimestamp(ProtoDataType.Timestamp.getDefaultInstance).build()
+      case TimestampNTZType => ProtoDataType.newBuilder().setTimestampNtz(ProtoDataType.TimestampNTZ.getDefaultInstance).build()
+      case NullType      => ProtoDataType.newBuilder().setNull(ProtoDataType.NULL.getDefaultInstance).build()
 
       case DecimalType(p, s) =>
-        ProtoDataType(kind = Kind.Decimal(
-          ProtoDataType.Decimal(precision = Some(p), scale = Some(s))
-        ))
+        ProtoDataType.newBuilder().setDecimal(
+          ProtoDataType.Decimal.newBuilder().setPrecision(p).setScale(s).build()
+        ).build()
 
       case ArrayType(elementType, containsNull) =>
-        ProtoDataType(kind = Kind.Array(
-          ProtoDataType.Array(elementType = Some(toProto(elementType)), containsNull = containsNull)
-        ))
+        ProtoDataType.newBuilder().setArray(
+          ProtoDataType.Array.newBuilder()
+            .setElementType(toProto(elementType))
+            .setContainsNull(containsNull)
+            .build()
+        ).build()
 
       case MapType(keyType, valueType, valueContainsNull) =>
-        ProtoDataType(kind = Kind.Map(
-          ProtoDataType.Map(
-            keyType = Some(toProto(keyType)),
-            valueType = Some(toProto(valueType)),
-            valueContainsNull = valueContainsNull
-          )
-        ))
+        ProtoDataType.newBuilder().setMap(
+          ProtoDataType.Map.newBuilder()
+            .setKeyType(toProto(keyType))
+            .setValueType(toProto(valueType))
+            .setValueContainsNull(valueContainsNull)
+            .build()
+        ).build()
 
       case st: StructType =>
-        val protoFields = st.fields.map { f =>
-          ProtoDataType.StructField(
-            name = f.name,
-            dataType = Some(toProto(f.dataType)),
-            nullable = f.nullable
+        val structBuilder = ProtoDataType.Struct.newBuilder()
+        st.fields.foreach { f =>
+          structBuilder.addFields(
+            ProtoDataType.StructField.newBuilder()
+              .setName(f.name)
+              .setDataType(toProto(f.dataType))
+              .setNullable(f.nullable)
+              .build()
           )
         }
-        ProtoDataType(kind = Kind.Struct(ProtoDataType.Struct(fields = protoFields.toSeq)))
+        ProtoDataType.newBuilder().setStruct(structBuilder.build()).build()
 
       case _ =>
-        ProtoDataType(kind = Kind.String(ProtoDataType.String())) // fallback
+        ProtoDataType.newBuilder().setString(ProtoDataType.String.getDefaultInstance).build() // fallback

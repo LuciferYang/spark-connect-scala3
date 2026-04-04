@@ -1,7 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.expressions.Expression
-import org.apache.spark.connect.proto.expressions.Expression.ExprType
+import org.apache.spark.connect.proto.Expression
 
 /** Built-in Spark SQL functions. */
 object functions:
@@ -16,9 +15,10 @@ object functions:
   def lit(value: Any): Column = Column.lit(value)
 
   def expr(sqlExpr: String): Column =
-    Column(Expression(exprType = ExprType.ExpressionString(
-      Expression.ExpressionString(expression = sqlExpr)
-    )))
+    Column(Expression.newBuilder()
+      .setExpressionString(Expression.ExpressionString.newBuilder()
+        .setExpression(sqlExpr).build())
+      .build())
 
   // ---------------------------------------------------------------------------
   // Aggregate functions
@@ -121,9 +121,6 @@ object functions:
       case c: Column => c
       case other => Column.lit(other)
     callFn("when", condition, v)
-
-  /** Otherwise companion — use as `when(...).otherwise(...)`. */
-  // Note: `otherwise` is a method on Column, not in functions.
 
   // ---------------------------------------------------------------------------
   // Collection functions
@@ -374,13 +371,13 @@ object functions:
     callFn(name, isDistinct = false, cols*)
 
   private def callFn(name: String, isDistinct: Boolean, cols: Column*): Column =
-    Column(Expression(exprType = ExprType.UnresolvedFunction(
-      Expression.UnresolvedFunction(
-        functionName = name,
-        arguments = cols.map(_.expr).toSeq,
-        isDistinct = isDistinct
-      )
-    )))
+    val builder = Expression.UnresolvedFunction.newBuilder()
+      .setFunctionName(name)
+      .setIsDistinct(isDistinct)
+    cols.foreach(c => builder.addArguments(c.expr))
+    Column(Expression.newBuilder()
+      .setUnresolvedFunction(builder.build())
+      .build())
 
   // ---------------------------------------------------------------------------
   // User-Defined Functions (UDF)

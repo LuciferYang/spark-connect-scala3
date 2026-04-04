@@ -1,6 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.common.{StorageLevel as ProtoStorageLevel}
+import org.apache.spark.connect.proto.{StorageLevel as ProtoStorageLevel}
 
 /**
  * Flags for controlling the storage of an RDD/DataFrame.
@@ -14,13 +14,13 @@ final case class StorageLevel(
     replication: Int = 1
 ):
   private[sql] def toProto: ProtoStorageLevel =
-    ProtoStorageLevel(
-      useDisk = useDisk,
-      useMemory = useMemory,
-      useOffHeap = useOffHeap,
-      deserialized = deserialized,
-      replication = replication
-    )
+    ProtoStorageLevel.newBuilder()
+      .setUseDisk(useDisk)
+      .setUseMemory(useMemory)
+      .setUseOffHeap(useOffHeap)
+      .setDeserialized(deserialized)
+      .setReplication(replication)
+      .build()
 
 object StorageLevel:
   val NONE            = StorageLevel(false, false, false, false, 1)

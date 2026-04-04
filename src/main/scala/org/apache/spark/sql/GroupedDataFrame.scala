@@ -1,8 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.expressions.Expression
-import org.apache.spark.connect.proto.expressions.Expression.ExprType
-import org.apache.spark.connect.proto.relations.*
+import org.apache.spark.connect.proto.*
 
 /**
  * Returned by `DataFrame.groupBy`, `rollup`, or `cube`.
@@ -16,29 +14,28 @@ final class GroupedDataFrame private[sql] (
 
   def agg(aggExpr: Column, aggExprs: Column*): DataFrame =
     val allAggs = aggExpr +: aggExprs
-    val aggregate = Aggregate(
-      input = Some(df.relation),
-      groupType = groupType match
+    val aggBuilder = Aggregate.newBuilder()
+      .setInput(df.relation)
+      .setGroupType(groupType match
         case GroupedDataFrame.GroupType.GroupBy => Aggregate.GroupType.GROUP_TYPE_GROUPBY
         case GroupedDataFrame.GroupType.Rollup  => Aggregate.GroupType.GROUP_TYPE_ROLLUP
         case GroupedDataFrame.GroupType.Cube    => Aggregate.GroupType.GROUP_TYPE_CUBE
-        case GroupedDataFrame.GroupType.Pivot   => Aggregate.GroupType.GROUP_TYPE_PIVOT,
-      groupingExpressions = groupingExprs.map(_.expr).toSeq,
-      aggregateExpressions = allAggs.map(_.expr).toSeq
-    )
-    DataFrame(df.session, Relation(
-      common = Some(RelationCommon(planId = Some(df.session.nextPlanId()))),
-      relType = Relation.RelType.Aggregate(aggregate)
-    ))
+        case GroupedDataFrame.GroupType.Pivot   => Aggregate.GroupType.GROUP_TYPE_PIVOT)
+    groupingExprs.foreach(c => aggBuilder.addGroupingExpressions(c.expr))
+    allAggs.foreach(c => aggBuilder.addAggregateExpressions(c.expr))
+    DataFrame(df.session, Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(df.session.nextPlanId()).build())
+      .setAggregate(aggBuilder.build())
+      .build())
 
   def agg(exprs: Map[String, String]): DataFrame =
     val aggCols = exprs.map { (colName, funcName) =>
-      Column(Expression(exprType = ExprType.UnresolvedFunction(
-        Expression.UnresolvedFunction(
-          functionName = funcName,
-          arguments = Seq(Column(colName).expr)
-        )
-      ))).as(s"$funcName($colName)")
+      Column(Expression.newBuilder().setUnresolvedFunction(
+        Expression.UnresolvedFunction.newBuilder()
+          .setFunctionName(funcName)
+          .addArguments(Column(colName).expr)
+          .build()
+      ).build()).as(s"$funcName($colName)")
     }.toSeq
     if aggCols.isEmpty then
       df
@@ -71,12 +68,12 @@ final class GroupedDataFrame private[sql] (
 
   private def resolveColNames(colNames: Seq[String], funcName: String): Seq[Column] =
     colNames.map { name =>
-      Column(Expression(exprType = ExprType.UnresolvedFunction(
-        Expression.UnresolvedFunction(
-          functionName = funcName,
-          arguments = Seq(Column(name).expr)
-        )
-      ))).as(s"$funcName($name)")
+      Column(Expression.newBuilder().setUnresolvedFunction(
+        Expression.UnresolvedFunction.newBuilder()
+          .setFunctionName(funcName)
+          .addArguments(Column(name).expr)
+          .build()
+      ).build()).as(s"$funcName($name)")
     }
 
 object GroupedDataFrame:

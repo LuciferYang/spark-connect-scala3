@@ -1,8 +1,13 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.expressions.Expression
-import org.apache.spark.connect.proto.expressions.Expression.ExprType
-import org.apache.spark.connect.proto.relations.Relation
+import scala.jdk.CollectionConverters.*
+
+import org.apache.spark.connect.proto.Expression
+import org.apache.spark.connect.proto.StatApproxQuantile
+import org.apache.spark.connect.proto.StatCorr
+import org.apache.spark.connect.proto.StatCrosstab
+import org.apache.spark.connect.proto.StatFreqItems
+import org.apache.spark.connect.proto.StatSampleBy
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -28,47 +33,57 @@ class DataFrameStatFunctionsSuite extends AnyFunSuite with Matchers:
   }
 
   test("StatCrosstab proto construction") {
-    import org.apache.spark.connect.proto.relations.StatCrosstab
-    val proto = StatCrosstab(input = None, col1 = "a", col2 = "b")
-    proto.col1 shouldBe "a"
-    proto.col2 shouldBe "b"
+    val proto = StatCrosstab.newBuilder()
+      .setCol1("a")
+      .setCol2("b")
+      .build()
+    proto.getCol1 shouldBe "a"
+    proto.getCol2 shouldBe "b"
   }
 
   test("StatCorr proto construction") {
-    import org.apache.spark.connect.proto.relations.StatCorr
-    val proto = StatCorr(input = None, col1 = "x", col2 = "y", method = Some("pearson"))
-    proto.col1 shouldBe "x"
-    proto.col2 shouldBe "y"
-    proto.method shouldBe Some("pearson")
+    val proto = StatCorr.newBuilder()
+      .setCol1("x")
+      .setCol2("y")
+      .setMethod("pearson")
+      .build()
+    proto.getCol1 shouldBe "x"
+    proto.getCol2 shouldBe "y"
+    proto.getMethod shouldBe "pearson"
   }
 
   test("StatApproxQuantile proto construction") {
-    import org.apache.spark.connect.proto.relations.StatApproxQuantile
-    val proto = StatApproxQuantile(
-      input = None,
-      cols = Seq("a", "b"),
-      probabilities = Seq(0.25, 0.5, 0.75),
-      relativeError = 0.01
-    )
-    proto.cols shouldBe Seq("a", "b")
-    proto.probabilities shouldBe Seq(0.25, 0.5, 0.75)
-    proto.relativeError shouldBe 0.01
+    val proto = StatApproxQuantile.newBuilder()
+      .addCols("a")
+      .addCols("b")
+      .addProbabilities(0.25)
+      .addProbabilities(0.5)
+      .addProbabilities(0.75)
+      .setRelativeError(0.01)
+      .build()
+    proto.getColsList.asScala.toSeq shouldBe Seq("a", "b")
+    proto.getProbabilitiesList.asScala.toSeq.map(_.doubleValue) shouldBe Seq(0.25, 0.5, 0.75)
+    proto.getRelativeError shouldBe 0.01
   }
 
   test("StatFreqItems proto construction") {
-    import org.apache.spark.connect.proto.relations.StatFreqItems
-    val proto = StatFreqItems(input = None, cols = Seq("col1", "col2"), support = Some(0.05))
-    proto.cols shouldBe Seq("col1", "col2")
-    proto.support shouldBe Some(0.05)
+    val proto = StatFreqItems.newBuilder()
+      .addCols("col1")
+      .addCols("col2")
+      .setSupport(0.05)
+      .build()
+    proto.getColsList.asScala.toSeq shouldBe Seq("col1", "col2")
+    proto.getSupport shouldBe 0.05
   }
 
   test("StatSampleBy.Fraction proto construction") {
-    import org.apache.spark.connect.proto.relations.StatSampleBy
-    val lit = Column.lit("stratum_a").expr.exprType match {
-      case ExprType.Literal(l) => l
-      case _ => fail("Expected Literal")
-    }
-    val fraction = StatSampleBy.Fraction(stratum = Some(lit), fraction = 0.5)
-    fraction.fraction shouldBe 0.5
-    fraction.stratum shouldBe defined
+    val litExpr = Column.lit("stratum_a").expr
+    assert(litExpr.hasLiteral)
+    val lit = litExpr.getLiteral
+    val fraction = StatSampleBy.Fraction.newBuilder()
+      .setStratum(lit)
+      .setFraction(0.5)
+      .build()
+    fraction.getFraction shouldBe 0.5
+    fraction.hasStratum shouldBe true
   }

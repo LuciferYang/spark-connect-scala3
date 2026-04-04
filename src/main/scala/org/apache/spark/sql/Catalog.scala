@@ -1,7 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.catalog as cat
-import org.apache.spark.connect.proto.relations.{Relation, RelationCommon}
+import org.apache.spark.connect.proto.{Catalog as ProtoCatalog, *}
 import org.apache.spark.sql.connect.client.SparkConnectClient
 
 /**
@@ -19,21 +18,21 @@ final class Catalog private[sql] (private val session: SparkSession):
   // ---------------------------------------------------------------------------
 
   def currentDatabase: String =
-    catalogDf(cat.Catalog.CatType.CurrentDatabase(cat.CurrentDatabase()))
+    catalogDf(_.setCurrentDatabase(CurrentDatabase.getDefaultInstance))
       .collect().head.getString(0)
 
   def setCurrentDatabase(dbName: String): Unit =
-    catalogDf(cat.Catalog.CatType.SetCurrentDatabase(
-      cat.SetCurrentDatabase(dbName = dbName)
+    catalogDf(_.setSetCurrentDatabase(
+      SetCurrentDatabase.newBuilder().setDbName(dbName).build()
     )).collect()
 
   def currentCatalog: String =
-    catalogDf(cat.Catalog.CatType.CurrentCatalog(cat.CurrentCatalog()))
+    catalogDf(_.setCurrentCatalog(CurrentCatalog.getDefaultInstance))
       .collect().head.getString(0)
 
   def setCurrentCatalog(catalogName: String): Unit =
-    catalogDf(cat.Catalog.CatType.SetCurrentCatalog(
-      cat.SetCurrentCatalog(catalogName = catalogName)
+    catalogDf(_.setSetCurrentCatalog(
+      SetCurrentCatalog.newBuilder().setCatalogName(catalogName).build()
     )).collect()
 
   // ---------------------------------------------------------------------------
@@ -41,45 +40,45 @@ final class Catalog private[sql] (private val session: SparkSession):
   // ---------------------------------------------------------------------------
 
   def listDatabases(): DataFrame =
-    catalogDf(cat.Catalog.CatType.ListDatabases(cat.ListDatabases()))
+    catalogDf(_.setListDatabases(ListDatabases.getDefaultInstance))
 
   def listDatabases(pattern: String): DataFrame =
-    catalogDf(cat.Catalog.CatType.ListDatabases(
-      cat.ListDatabases(pattern = Some(pattern))
+    catalogDf(_.setListDatabases(
+      ListDatabases.newBuilder().setPattern(pattern).build()
     ))
 
   def listTables(): DataFrame =
-    catalogDf(cat.Catalog.CatType.ListTables(cat.ListTables()))
+    catalogDf(_.setListTables(ListTables.getDefaultInstance))
 
   def listTables(dbName: String): DataFrame =
-    catalogDf(cat.Catalog.CatType.ListTables(
-      cat.ListTables(dbName = Some(dbName))
+    catalogDf(_.setListTables(
+      ListTables.newBuilder().setDbName(dbName).build()
     ))
 
   def listColumns(tableName: String): DataFrame =
-    catalogDf(cat.Catalog.CatType.ListColumns(
-      cat.ListColumns(tableName = tableName)
+    catalogDf(_.setListColumns(
+      ListColumns.newBuilder().setTableName(tableName).build()
     ))
 
   def listColumns(tableName: String, dbName: String): DataFrame =
-    catalogDf(cat.Catalog.CatType.ListColumns(
-      cat.ListColumns(tableName = tableName, dbName = Some(dbName))
+    catalogDf(_.setListColumns(
+      ListColumns.newBuilder().setTableName(tableName).setDbName(dbName).build()
     ))
 
   def listFunctions(): DataFrame =
-    catalogDf(cat.Catalog.CatType.ListFunctions(cat.ListFunctions()))
+    catalogDf(_.setListFunctions(ListFunctions.getDefaultInstance))
 
   def listFunctions(dbName: String): DataFrame =
-    catalogDf(cat.Catalog.CatType.ListFunctions(
-      cat.ListFunctions(dbName = Some(dbName))
+    catalogDf(_.setListFunctions(
+      ListFunctions.newBuilder().setDbName(dbName).build()
     ))
 
   def listCatalogs(): DataFrame =
-    catalogDf(cat.Catalog.CatType.ListCatalogs(cat.ListCatalogs()))
+    catalogDf(_.setListCatalogs(ListCatalogs.getDefaultInstance))
 
   def listCatalogs(pattern: String): DataFrame =
-    catalogDf(cat.Catalog.CatType.ListCatalogs(
-      cat.ListCatalogs(pattern = Some(pattern))
+    catalogDf(_.setListCatalogs(
+      ListCatalogs.newBuilder().setPattern(pattern).build()
     ))
 
   // ---------------------------------------------------------------------------
@@ -87,23 +86,23 @@ final class Catalog private[sql] (private val session: SparkSession):
   // ---------------------------------------------------------------------------
 
   def getDatabase(dbName: String): DataFrame =
-    catalogDf(cat.Catalog.CatType.GetDatabase(
-      cat.GetDatabase(dbName = dbName)
+    catalogDf(_.setGetDatabase(
+      GetDatabase.newBuilder().setDbName(dbName).build()
     ))
 
   def getTable(tableName: String): DataFrame =
-    catalogDf(cat.Catalog.CatType.GetTable(
-      cat.GetTable(tableName = tableName)
+    catalogDf(_.setGetTable(
+      GetTable.newBuilder().setTableName(tableName).build()
     ))
 
   def getTable(tableName: String, dbName: String): DataFrame =
-    catalogDf(cat.Catalog.CatType.GetTable(
-      cat.GetTable(tableName = tableName, dbName = Some(dbName))
+    catalogDf(_.setGetTable(
+      GetTable.newBuilder().setTableName(tableName).setDbName(dbName).build()
     ))
 
   def getFunction(functionName: String): DataFrame =
-    catalogDf(cat.Catalog.CatType.GetFunction(
-      cat.GetFunction(functionName = functionName)
+    catalogDf(_.setGetFunction(
+      GetFunction.newBuilder().setFunctionName(functionName).build()
     ))
 
   // ---------------------------------------------------------------------------
@@ -111,28 +110,28 @@ final class Catalog private[sql] (private val session: SparkSession):
   // ---------------------------------------------------------------------------
 
   def databaseExists(dbName: String): Boolean =
-    catalogDf(cat.Catalog.CatType.DatabaseExists(
-      cat.DatabaseExists(dbName = dbName)
+    catalogDf(_.setDatabaseExists(
+      DatabaseExists.newBuilder().setDbName(dbName).build()
     )).collect().head.getBoolean(0)
 
   def tableExists(tableName: String): Boolean =
-    catalogDf(cat.Catalog.CatType.TableExists(
-      cat.TableExists(tableName = tableName)
+    catalogDf(_.setTableExists(
+      TableExists.newBuilder().setTableName(tableName).build()
     )).collect().head.getBoolean(0)
 
   def tableExists(tableName: String, dbName: String): Boolean =
-    catalogDf(cat.Catalog.CatType.TableExists(
-      cat.TableExists(tableName = tableName, dbName = Some(dbName))
+    catalogDf(_.setTableExists(
+      TableExists.newBuilder().setTableName(tableName).setDbName(dbName).build()
     )).collect().head.getBoolean(0)
 
   def functionExists(functionName: String): Boolean =
-    catalogDf(cat.Catalog.CatType.FunctionExists(
-      cat.FunctionExists(functionName = functionName)
+    catalogDf(_.setFunctionExists(
+      FunctionExists.newBuilder().setFunctionName(functionName).build()
     )).collect().head.getBoolean(0)
 
   def functionExists(functionName: String, dbName: String): Boolean =
-    catalogDf(cat.Catalog.CatType.FunctionExists(
-      cat.FunctionExists(functionName = functionName, dbName = Some(dbName))
+    catalogDf(_.setFunctionExists(
+      FunctionExists.newBuilder().setFunctionName(functionName).setDbName(dbName).build()
     )).collect().head.getBoolean(0)
 
   // ---------------------------------------------------------------------------
@@ -140,58 +139,59 @@ final class Catalog private[sql] (private val session: SparkSession):
   // ---------------------------------------------------------------------------
 
   def isCached(tableName: String): Boolean =
-    catalogDf(cat.Catalog.CatType.IsCached(
-      cat.IsCached(tableName = tableName)
+    catalogDf(_.setIsCached(
+      IsCached.newBuilder().setTableName(tableName).build()
     )).collect().head.getBoolean(0)
 
   def cacheTable(tableName: String): Unit =
-    catalogDf(cat.Catalog.CatType.CacheTable(
-      cat.CacheTable(tableName = tableName)
+    catalogDf(_.setCacheTable(
+      CacheTable.newBuilder().setTableName(tableName).build()
     )).collect()
 
   def uncacheTable(tableName: String): Unit =
-    catalogDf(cat.Catalog.CatType.UncacheTable(
-      cat.UncacheTable(tableName = tableName)
+    catalogDf(_.setUncacheTable(
+      UncacheTable.newBuilder().setTableName(tableName).build()
     )).collect()
 
   def clearCache(): Unit =
-    catalogDf(cat.Catalog.CatType.ClearCache(cat.ClearCache())).collect()
+    catalogDf(_.setClearCache(ClearCache.getDefaultInstance)).collect()
 
   // ---------------------------------------------------------------------------
   // Drop / Refresh
   // ---------------------------------------------------------------------------
 
   def dropTempView(viewName: String): Unit =
-    catalogDf(cat.Catalog.CatType.DropTempView(
-      cat.DropTempView(viewName = viewName)
+    catalogDf(_.setDropTempView(
+      DropTempView.newBuilder().setViewName(viewName).build()
     )).collect()
 
   def dropGlobalTempView(viewName: String): Unit =
-    catalogDf(cat.Catalog.CatType.DropGlobalTempView(
-      cat.DropGlobalTempView(viewName = viewName)
+    catalogDf(_.setDropGlobalTempView(
+      DropGlobalTempView.newBuilder().setViewName(viewName).build()
     )).collect()
 
   def refreshTable(tableName: String): Unit =
-    catalogDf(cat.Catalog.CatType.RefreshTable(
-      cat.RefreshTable(tableName = tableName)
+    catalogDf(_.setRefreshTable(
+      RefreshTable.newBuilder().setTableName(tableName).build()
     )).collect()
 
   def refreshByPath(path: String): Unit =
-    catalogDf(cat.Catalog.CatType.RefreshByPath(
-      cat.RefreshByPath(path = path)
+    catalogDf(_.setRefreshByPath(
+      RefreshByPath.newBuilder().setPath(path).build()
     )).collect()
 
   def recoverPartitions(tableName: String): Unit =
-    catalogDf(cat.Catalog.CatType.RecoverPartitions(
-      cat.RecoverPartitions(tableName = tableName)
+    catalogDf(_.setRecoverPartitions(
+      RecoverPartitions.newBuilder().setTableName(tableName).build()
     )).collect()
 
   // ---------------------------------------------------------------------------
   // Helper
   // ---------------------------------------------------------------------------
 
-  private def catalogDf(catType: cat.Catalog.CatType): DataFrame =
-    DataFrame(session, Relation(
-      common = Some(RelationCommon(planId = Some(session.nextPlanId()))),
-      relType = Relation.RelType.Catalog(cat.Catalog(catType = catType))
-    ))
+  private def catalogDf(f: ProtoCatalog.Builder => ProtoCatalog.Builder): DataFrame =
+    val catBuilder = ProtoCatalog.newBuilder()
+    DataFrame(session, Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+      .setCatalog(f(catBuilder).build())
+      .build())

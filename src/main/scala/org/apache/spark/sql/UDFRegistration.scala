@@ -1,6 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.commands.Command
+import org.apache.spark.connect.proto.{Command, Plan}
 import org.apache.spark.sql.connect.client.SparkConnectClient
 
 /**
@@ -21,8 +21,8 @@ final class UDFRegistration private[sql] (
   def register(name: String, udf: UserDefinedFunction): UserDefinedFunction =
     val named = udf.withName(name)
     val proto = named.toProto(functionName = name)
-    val command = Command(
-      commandType = Command.CommandType.RegisterFunction(proto)
-    )
+    val command = Command.newBuilder()
+      .setRegisterFunction(proto)
+      .build()
     client.executeCommand(command)
     named

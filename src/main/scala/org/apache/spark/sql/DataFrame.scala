@@ -1,15 +1,12 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.base.*
-import org.apache.spark.connect.proto.expressions.Expression
-import org.apache.spark.connect.proto.expressions.Expression.ExprType
-import org.apache.spark.connect.proto.relations.*
+import org.apache.spark.connect.proto.{StorageLevel as _, Catalog as _, *}
+import org.apache.spark.connect.proto.{StorageLevel as ProtoStorageLevel}
 import org.apache.spark.sql.connect.client.{ArrowDeserializer, DataTypeProtoConverter, SparkConnectClient}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.connect.proto.commands.{Command, CreateDataFrameViewCommand, CheckpointCommand}
-import org.apache.spark.connect.proto.common.StorageLevel as ProtoStorageLevel
 
 import scala.collection.mutable
+import scala.jdk.CollectionConverters.*
 
 /**
  * A distributed collection of rows organized into named columns.
@@ -28,9 +25,9 @@ final class DataFrame private[sql] (
   // ---------------------------------------------------------------------------
 
   def select(cols: Column*): DataFrame =
-    withRelation(Relation.RelType.Project(
-      Project(input = Some(relation), expressions = cols.map(_.expr).toSeq)
-    ))
+    val projBuilder = Project.newBuilder().setInput(relation)
+    cols.foreach(c => projBuilder.addExpressions(c.expr))
+    withRelation(_.setProject(projBuilder.build()))
 
   def select(colNames: String*)(using DummyImplicit): DataFrame =
     select(colNames.map(Column(_))*)
@@ -39,8 +36,8 @@ final class DataFrame private[sql] (
     select(exprs.map(e => functions.expr(e))*)
 
   def filter(condition: Column): DataFrame =
-    withRelation(Relation.RelType.Filter(
-      Filter(input = Some(relation), condition = Some(condition.expr))
+    withRelation(_.setFilter(
+      Filter.newBuilder().setInput(relation).setCondition(condition.expr).build()
     ))
 
   def where(condition: Column): DataFrame = filter(condition)
@@ -48,25 +45,21 @@ final class DataFrame private[sql] (
   def where(conditionExpr: String): DataFrame = filter(functions.expr(conditionExpr))
 
   def limit(n: Int): DataFrame =
-    withRelation(Relation.RelType.Limit(
-      Limit(input = Some(relation), limit = n)
+    withRelation(_.setLimit(
+      Limit.newBuilder().setInput(relation).setLimit(n).build()
     ))
 
   def offset(n: Int): DataFrame =
-    withRelation(Relation.RelType.Offset(
-      Offset(input = Some(relation), offset = n)
+    withRelation(_.setOffset(
+      Offset.newBuilder().setInput(relation).setOffset(n).build()
     ))
 
   def sort(cols: Column*): DataFrame = orderBy(cols*)
 
   def orderBy(cols: Column*): DataFrame =
-    withRelation(Relation.RelType.Sort(
-      Sort(
-        input = Some(relation),
-        order = cols.map(_.toSortOrder).toSeq,
-        isGlobal = Some(true)
-      )
-    ))
+    val sortBuilder = Sort.newBuilder().setInput(relation).setIsGlobal(true)
+    cols.foreach(c => sortBuilder.addOrder(c.toSortOrder))
+    withRelation(_.setSort(sortBuilder.build()))
 
   def groupBy(cols: Column*): GroupedDataFrame =
     GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.GroupBy)
@@ -84,73 +77,77 @@ final class DataFrame private[sql] (
     groupBy(Seq.empty[Column]*).agg(aggExpr, aggExprs*)
 
   def join(right: DataFrame, joinExpr: Column, joinType: String = "inner"): DataFrame =
-    withRelation(Relation.RelType.Join(
-      Join(
-        left = Some(relation),
-        right = Some(right.relation),
-        joinCondition = Some(joinExpr.expr),
-        joinType = toJoinType(joinType)
-      )
+    withRelation(_.setJoin(
+      Join.newBuilder()
+        .setLeft(relation)
+        .setRight(right.relation)
+        .setJoinCondition(joinExpr.expr)
+        .setJoinType(toJoinType(joinType))
+        .build()
     ))
 
   def join(right: DataFrame, usingColumns: Seq[String]): DataFrame =
-    withRelation(Relation.RelType.Join(
-      Join(
-        left = Some(relation),
-        right = Some(right.relation),
-        usingColumns = usingColumns,
-        joinType = Join.JoinType.JOIN_TYPE_INNER
-      )
-    ))
+    val joinBuilder = Join.newBuilder()
+      .setLeft(relation)
+      .setRight(right.relation)
+      .setJoinType(Join.JoinType.JOIN_TYPE_INNER)
+    usingColumns.foreach(joinBuilder.addUsingColumns)
+    withRelation(_.setJoin(joinBuilder.build()))
 
   def crossJoin(right: DataFrame): DataFrame =
-    withRelation(Relation.RelType.Join(
-      Join(
-        left = Some(relation),
-        right = Some(right.relation),
-        joinType = Join.JoinType.JOIN_TYPE_CROSS
-      )
+    withRelation(_.setJoin(
+      Join.newBuilder()
+        .setLeft(relation)
+        .setRight(right.relation)
+        .setJoinType(Join.JoinType.JOIN_TYPE_CROSS)
+        .build()
     ))
 
   def withColumn(name: String, col: Column): DataFrame =
-    withRelation(Relation.RelType.WithColumns(
-      WithColumns(
-        input = Some(relation),
-        aliases = Seq(Expression.Alias(expr = Some(col.expr), name = Seq(name)))
-      )
+    withRelation(_.setWithColumns(
+      WithColumns.newBuilder()
+        .setInput(relation)
+        .addAliases(Expression.Alias.newBuilder()
+          .setExpr(col.expr)
+          .addName(name)
+          .build())
+        .build()
     ))
 
   def withColumnRenamed(existing: String, newName: String): DataFrame =
-    withRelation(Relation.RelType.WithColumnsRenamed(
-      WithColumnsRenamed(
-        input = Some(relation),
-        renames = Seq(WithColumnsRenamed.Rename(colName = existing, newColName = newName))
-      )
+    withRelation(_.setWithColumnsRenamed(
+      WithColumnsRenamed.newBuilder()
+        .setInput(relation)
+        .addRenames(WithColumnsRenamed.Rename.newBuilder()
+          .setColName(existing)
+          .setNewColName(newName)
+          .build())
+        .build()
     ))
 
   def drop(colNames: String*): DataFrame =
-    withRelation(Relation.RelType.Drop(
-      Drop(
-        input = Some(relation),
-        columns = colNames.map { name =>
-          Expression(exprType = ExprType.UnresolvedAttribute(
-            Expression.UnresolvedAttribute(unparsedIdentifier = name)
-          ))
-        }.toSeq
+    val dropBuilder = Drop.newBuilder().setInput(relation)
+    colNames.foreach { name =>
+      dropBuilder.addColumns(
+        Expression.newBuilder().setUnresolvedAttribute(
+          Expression.UnresolvedAttribute.newBuilder()
+            .setUnparsedIdentifier(name).build()
+        ).build()
       )
-    ))
+    }
+    withRelation(_.setDrop(dropBuilder.build()))
 
   def distinct(): DataFrame = dropDuplicates()
 
   def dropDuplicates(): DataFrame =
-    withRelation(Relation.RelType.Deduplicate(
-      Deduplicate(input = Some(relation), allColumnsAsKeys = Some(true))
+    withRelation(_.setDeduplicate(
+      Deduplicate.newBuilder().setInput(relation).setAllColumnsAsKeys(true).build()
     ))
 
   def dropDuplicates(colNames: Seq[String]): DataFrame =
-    withRelation(Relation.RelType.Deduplicate(
-      Deduplicate(input = Some(relation), columnNames = colNames)
-    ))
+    val dedup = Deduplicate.newBuilder().setInput(relation)
+    colNames.foreach(dedup.addColumnNames)
+    withRelation(_.setDeduplicate(dedup.build()))
 
   def union(other: DataFrame): DataFrame =
     setOp(other, SetOperation.SetOpType.SET_OP_TYPE_UNION, byName = false)
@@ -167,56 +164,60 @@ final class DataFrame private[sql] (
     setOp(other, SetOperation.SetOpType.SET_OP_TYPE_EXCEPT, byName = false)
 
   def repartition(numPartitions: Int): DataFrame =
-    withRelation(Relation.RelType.Repartition(
-      Repartition(input = Some(relation), numPartitions = numPartitions, shuffle = Some(true))
+    withRelation(_.setRepartition(
+      Repartition.newBuilder()
+        .setInput(relation)
+        .setNumPartitions(numPartitions)
+        .setShuffle(true)
+        .build()
     ))
 
   def coalesce(numPartitions: Int): DataFrame =
-    withRelation(Relation.RelType.Repartition(
-      Repartition(input = Some(relation), numPartitions = numPartitions, shuffle = Some(false))
+    withRelation(_.setRepartition(
+      Repartition.newBuilder()
+        .setInput(relation)
+        .setNumPartitions(numPartitions)
+        .setShuffle(false)
+        .build()
     ))
 
   def sample(fraction: Double, withReplacement: Boolean = false, seed: Long = 0L): DataFrame =
-    withRelation(Relation.RelType.Sample(
-      Sample(
-        input = Some(relation),
-        lowerBound = 0.0,
-        upperBound = fraction,
-        withReplacement = Some(withReplacement),
-        seed = Some(seed)
-      )
+    withRelation(_.setSample(
+      Sample.newBuilder()
+        .setInput(relation)
+        .setLowerBound(0.0)
+        .setUpperBound(fraction)
+        .setWithReplacement(withReplacement)
+        .setSeed(seed)
+        .build()
     ))
 
   def describe(colNames: String*): DataFrame =
-    withRelation(Relation.RelType.Describe(
-      StatDescribe(input = Some(relation), cols = colNames.toSeq)
-    ))
+    val descBuilder = StatDescribe.newBuilder().setInput(relation)
+    colNames.foreach(descBuilder.addCols)
+    withRelation(_.setDescribe(descBuilder.build()))
 
   def summary(statistics: String*): DataFrame =
-    withRelation(Relation.RelType.Summary(
-      StatSummary(input = Some(relation), statistics = statistics.toSeq)
-    ))
+    val summaryBuilder = StatSummary.newBuilder().setInput(relation)
+    statistics.foreach(summaryBuilder.addStatistics)
+    withRelation(_.setSummary(summaryBuilder.build()))
 
   def alias(name: String): DataFrame =
-    withRelation(Relation.RelType.SubqueryAlias(
-      SubqueryAlias(input = Some(relation), alias = name)
+    withRelation(_.setSubqueryAlias(
+      SubqueryAlias.newBuilder().setInput(relation).setAlias(name).build()
     ))
 
   /** Rename all columns. Number of names must match number of columns. */
   def toDF(colNames: String*): DataFrame =
-    withRelation(Relation.RelType.ToDf(
-      ToDF(input = Some(relation), columnNames = colNames.toSeq)
-    ))
+    val toDfBuilder = ToDF.newBuilder().setInput(relation)
+    colNames.foreach(toDfBuilder.addColumnNames)
+    withRelation(_.setToDf(toDfBuilder.build()))
 
   /** Hint the optimizer (e.g., broadcast). */
   def hint(name: String, parameters: Any*): DataFrame =
-    withRelation(Relation.RelType.Hint(
-      Hint(
-        input = Some(relation),
-        name = name,
-        parameters = parameters.map(p => Column.lit(p).expr).toSeq
-      )
-    ))
+    val hintBuilder = Hint.newBuilder().setInput(relation).setName(name)
+    parameters.foreach(p => hintBuilder.addParameters(Column.lit(p).expr))
+    withRelation(_.setHint(hintBuilder.build()))
 
   /** Broadcast hint shorthand. */
   def broadcast: DataFrame = hint("broadcast")
@@ -229,34 +230,25 @@ final class DataFrame private[sql] (
 
   /** Sort within each partition. */
   def sortWithinPartitions(cols: Column*): DataFrame =
-    withRelation(Relation.RelType.Sort(
-      Sort(
-        input = Some(relation),
-        order = cols.map(_.toSortOrder).toSeq,
-        isGlobal = Some(false)
-      )
-    ))
+    val sortBuilder = Sort.newBuilder().setInput(relation).setIsGlobal(false)
+    cols.foreach(c => sortBuilder.addOrder(c.toSortOrder))
+    withRelation(_.setSort(sortBuilder.build()))
 
   def sortWithinPartitions(colNames: String*)(using DummyImplicit): DataFrame =
     sortWithinPartitions(colNames.map(Column(_))*)
 
   /** Return the last n rows. */
   def tail(n: Int): Array[Row] =
-    val plan = Plan(opType = Plan.OpType.Root(
-      Relation(
-        common = Some(RelationCommon(planId = Some(session.nextPlanId()))),
-        relType = Relation.RelType.Tail(
-          Tail(input = Some(relation), limit = n)
-        )
-      )
-    ))
+    val tailRel = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+      .setTail(Tail.newBuilder().setInput(relation).setLimit(n).build())
+      .build()
+    val plan = Plan.newBuilder().setRoot(tailRel).build()
     val responses = client.execute(plan)
     val rows = mutable.ArrayBuffer.empty[Row]
     responses.foreach { resp =>
-      resp.responseType match
-        case ExecutePlanResponse.ResponseType.ArrowBatch(batch) =>
-          rows ++= ArrowDeserializer.fromArrowBatch(batch.data.toByteArray)
-        case _ =>
+      if resp.hasArrowBatch then
+        rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
     }
     rows.toArray
 
@@ -268,22 +260,17 @@ final class DataFrame private[sql] (
     if cols.isEmpty then
       repartition(numPartitions)
     else
-      withRelation(Relation.RelType.RepartitionByExpression(
-        RepartitionByExpression(
-          input = Some(relation),
-          partitionExprs = cols.map(_.expr).toSeq,
-          numPartitions = Some(numPartitions)
-        )
-      ))
+      val builder = RepartitionByExpression.newBuilder()
+        .setInput(relation)
+        .setNumPartitions(numPartitions)
+      cols.foreach(c => builder.addPartitionExprs(c.expr))
+      withRelation(_.setRepartitionByExpression(builder.build()))
 
   /** Repartition by columns with default partition count. */
   def repartition(cols: Column*)(using DummyImplicit): DataFrame =
-    withRelation(Relation.RelType.RepartitionByExpression(
-      RepartitionByExpression(
-        input = Some(relation),
-        partitionExprs = cols.map(_.expr).toSeq
-      )
-    ))
+    val builder = RepartitionByExpression.newBuilder().setInput(relation)
+    cols.foreach(c => builder.addPartitionExprs(c.expr))
+    withRelation(_.setRepartitionByExpression(builder.build()))
 
   /** Cache this DataFrame with the default storage level (MEMORY_AND_DISK). */
   def cache(): DataFrame = persist()
@@ -293,14 +280,14 @@ final class DataFrame private[sql] (
 
   /** Persist this DataFrame with the given storage level. */
   def persist(storageLevel: StorageLevel): DataFrame =
-    val cmd = Command(commandType = Command.CommandType.CheckpointCommand(
-      CheckpointCommand(
-        relation = Some(relation),
-        local = true,
-        eager = true,
-        storageLevel = Some(storageLevel.toProto)
-      )
-    ))
+    val cmd = Command.newBuilder()
+      .setCheckpointCommand(CheckpointCommand.newBuilder()
+        .setRelation(relation)
+        .setLocal(true)
+        .setEager(true)
+        .setStorageLevel(storageLevel.toProto)
+        .build())
+      .build()
     client.executeCommand(cmd)
     this
 
@@ -319,14 +306,12 @@ final class DataFrame private[sql] (
   // ---------------------------------------------------------------------------
 
   def collect(): Array[Row] =
-    val plan = Plan(opType = Plan.OpType.Root(relation))
+    val plan = Plan.newBuilder().setRoot(relation).build()
     val responses = client.execute(plan)
     val rows = mutable.ArrayBuffer.empty[Row]
     responses.foreach { resp =>
-      resp.responseType match
-        case ExecutePlanResponse.ResponseType.ArrowBatch(batch) =>
-          rows ++= ArrowDeserializer.fromArrowBatch(batch.data.toByteArray)
-        case _ => // skip metrics, schema, etc.
+      if resp.hasArrowBatch then
+        rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
     }
     rows.toArray
 
@@ -359,7 +344,7 @@ final class DataFrame private[sql] (
   def columns: Array[String] = schema.fieldNames
 
   def explain(extended: Boolean = false): Unit =
-    val plan = Plan(opType = Plan.OpType.Root(relation))
+    val plan = Plan.newBuilder().setRoot(relation).build()
     val mode =
       if extended then AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_EXTENDED
       else AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
@@ -385,14 +370,14 @@ final class DataFrame private[sql] (
     createViewCommand(viewName, isGlobal = true, replace = true)
 
   private def createViewCommand(viewName: String, isGlobal: Boolean, replace: Boolean): Unit =
-    val cmd = Command(commandType = Command.CommandType.CreateDataframeView(
-      CreateDataFrameViewCommand(
-        input = Some(relation),
-        name = viewName,
-        isGlobal = isGlobal,
-        replace = replace
-      )
-    ))
+    val cmd = Command.newBuilder()
+      .setCreateDataframeView(CreateDataFrameViewCommand.newBuilder()
+        .setInput(relation)
+        .setName(viewName)
+        .setIsGlobal(isGlobal)
+        .setReplace(replace)
+        .build())
+      .build()
     client.executeCommand(cmd)
 
   // ---------------------------------------------------------------------------
@@ -411,21 +396,19 @@ final class DataFrame private[sql] (
   /** Resolve schema from the server. */
   private def schemaInternal(): Option[StructType] =
     try
-      val plan = Plan(opType = Plan.OpType.Root(relation))
+      val plan = Plan.newBuilder().setRoot(relation).build()
       val resp = client.analyzeSchema(plan)
-      resp.result match
-        case AnalyzePlanResponse.Result.Schema(s) =>
-          s.schema.map(DataTypeProtoConverter.fromProto(_)).collect {
-            case st: StructType => st
-          }
-        case _ => None
+      if resp.hasSchema && resp.getSchema.hasSchema then
+        DataTypeProtoConverter.fromProto(resp.getSchema.getSchema) match
+          case st: StructType => Some(st)
+          case _ => None
+      else None
     catch case _: Exception => None
 
-  private[sql] def withRelation(relType: Relation.RelType): DataFrame =
-    DataFrame(session, Relation(
-      common = Some(RelationCommon(planId = Some(session.nextPlanId()))),
-      relType = relType
-    ))
+  private[sql] def withRelation(f: Relation.Builder => Relation.Builder): DataFrame =
+    val builder = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+    DataFrame(session, f(builder).build())
 
   private def setOp(
       other: DataFrame,
@@ -434,15 +417,15 @@ final class DataFrame private[sql] (
       allowMissingColumns: Boolean = false,
       isAll: Boolean = false
   ): DataFrame =
-    withRelation(Relation.RelType.SetOp(
-      SetOperation(
-        leftInput = Some(relation),
-        rightInput = Some(other.relation),
-        setOpType = opType,
-        isAll = Some(isAll),
-        byName = Some(byName),
-        allowMissingColumns = Some(allowMissingColumns)
-      )
+    withRelation(_.setSetOp(
+      SetOperation.newBuilder()
+        .setLeftInput(relation)
+        .setRightInput(other.relation)
+        .setSetOpType(opType)
+        .setIsAll(isAll)
+        .setByName(byName)
+        .setAllowMissingColumns(allowMissingColumns)
+        .build()
     ))
 
   private def toJoinType(s: String): Join.JoinType =

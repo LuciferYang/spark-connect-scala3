@@ -2,8 +2,7 @@ package org.apache.spark.sql.connect.client
 
 import io.grpc.{ManagedChannel, ManagedChannelBuilder, Metadata, Status, StatusRuntimeException}
 import io.grpc.stub.MetadataUtils
-import org.apache.spark.connect.proto.base.*
-import org.apache.spark.connect.proto.commands.Command
+import org.apache.spark.connect.proto.*
 
 import java.net.URI
 import java.util.UUID
@@ -30,13 +29,13 @@ final class SparkConnectClient private (
 
   /** Execute a plan and return a lazy iterator of responses. */
   def execute(plan: Plan): Iterator[ExecutePlanResponse] =
-    val request = ExecutePlanRequest(
-      sessionId = sessionId,
-      userContext = Some(UserContext(userId = userId)),
-      plan = Some(plan),
-      operationId = Some(UUID.randomUUID().toString)
-    )
-    retryOnUnavailable { bstub.executePlan(request) }
+    val request = ExecutePlanRequest.newBuilder()
+      .setSessionId(sessionId)
+      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setPlan(plan)
+      .setOperationId(UUID.randomUUID().toString)
+      .build()
+    retryOnUnavailable { bstub.executePlan(request).asScala }
 
   // ---------------------------------------------------------------------------
   // Analyze
@@ -44,13 +43,11 @@ final class SparkConnectClient private (
 
   /** Retrieve the schema of a plan without executing it. */
   def analyzeSchema(plan: Plan): AnalyzePlanResponse =
-    val request = AnalyzePlanRequest(
-      sessionId = sessionId,
-      userContext = Some(UserContext(userId = userId)),
-      analyze = AnalyzePlanRequest.Analyze.Schema(
-        AnalyzePlanRequest.Schema(plan = Some(plan))
-      )
-    )
+    val request = AnalyzePlanRequest.newBuilder()
+      .setSessionId(sessionId)
+      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setSchema(AnalyzePlanRequest.Schema.newBuilder().setPlan(plan).build())
+      .build()
     retryOnUnavailable { bstub.analyzePlan(request) }
 
   /** Retrieve the explain string for a plan without executing it. */
@@ -59,57 +56,52 @@ final class SparkConnectClient private (
       mode: AnalyzePlanRequest.Explain.ExplainMode =
         AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
   ): String =
-    val request = AnalyzePlanRequest(
-      sessionId = sessionId,
-      userContext = Some(UserContext(userId = userId)),
-      analyze = AnalyzePlanRequest.Analyze.Explain(
-        AnalyzePlanRequest.Explain(plan = Some(plan), explainMode = mode)
-      )
-    )
+    val request = AnalyzePlanRequest.newBuilder()
+      .setSessionId(sessionId)
+      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setExplain(AnalyzePlanRequest.Explain.newBuilder().setPlan(plan).setExplainMode(mode).build())
+      .build()
     val resp = retryOnUnavailable { bstub.analyzePlan(request) }
-    resp.result match
-      case AnalyzePlanResponse.Result.Explain(e) => e.explainString
-      case _ => "(no explain output)"
+    if resp.hasExplain then resp.getExplain.getExplainString
+    else "(no explain output)"
 
   /** Retrieve the Spark version from the server. */
   def version(): String =
-    val request = AnalyzePlanRequest(
-      sessionId = sessionId,
-      userContext = Some(UserContext(userId = userId)),
-      analyze = AnalyzePlanRequest.Analyze.SparkVersion(
-        AnalyzePlanRequest.SparkVersion()
-      )
-    )
+    val request = AnalyzePlanRequest.newBuilder()
+      .setSessionId(sessionId)
+      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setSparkVersion(AnalyzePlanRequest.SparkVersion.getDefaultInstance)
+      .build()
     val resp = retryOnUnavailable { bstub.analyzePlan(request) }
-    resp.result match
-      case AnalyzePlanResponse.Result.SparkVersion(v) => v.version
-      case _ => "unknown"
+    if resp.hasSparkVersion then resp.getSparkVersion.getVersion
+    else "unknown"
 
   // ---------------------------------------------------------------------------
   // Config
   // ---------------------------------------------------------------------------
 
   def getConfig(key: String): String =
-    val request = ConfigRequest(
-      sessionId = sessionId,
-      userContext = Some(UserContext(userId = userId)),
-      operation = Some(ConfigRequest.Operation(
-        opType = ConfigRequest.Operation.OpType.Get(ConfigRequest.Get(keys = Seq(key)))
-      ))
-    )
+    val request = ConfigRequest.newBuilder()
+      .setSessionId(sessionId)
+      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setOperation(ConfigRequest.Operation.newBuilder()
+        .setGet(ConfigRequest.Get.newBuilder().addKeys(key).build())
+        .build())
+      .build()
     val resp = retryOnUnavailable { bstub.config(request) }
-    resp.pairs.headOption.flatMap(_.value).getOrElse("")
+    val pairs = resp.getPairsList.asScala
+    pairs.headOption.map(_.getValue).getOrElse("")
 
   def setConfig(key: String, value: String): Unit =
-    val request = ConfigRequest(
-      sessionId = sessionId,
-      userContext = Some(UserContext(userId = userId)),
-      operation = Some(ConfigRequest.Operation(
-        opType = ConfigRequest.Operation.OpType.Set(
-          ConfigRequest.Set(pairs = Seq(KeyValue(key = key, value = Some(value))))
-        )
-      ))
-    )
+    val request = ConfigRequest.newBuilder()
+      .setSessionId(sessionId)
+      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setOperation(ConfigRequest.Operation.newBuilder()
+        .setSet(ConfigRequest.Set.newBuilder()
+          .addPairs(KeyValue.newBuilder().setKey(key).setValue(value).build())
+          .build())
+        .build())
+      .build()
     retryOnUnavailable { bstub.config(request) }
 
   // ---------------------------------------------------------------------------
@@ -118,7 +110,7 @@ final class SparkConnectClient private (
 
   /** Execute a command (write, create view, etc.) and consume all responses. */
   def executeCommand(command: Command): Unit =
-    val plan = Plan(opType = Plan.OpType.Command(command))
+    val plan = Plan.newBuilder().setCommand(command).build()
     val responses = execute(plan)
     responses.foreach(_ => ()) // drain iterator
 
@@ -127,11 +119,11 @@ final class SparkConnectClient private (
   // ---------------------------------------------------------------------------
 
   def interrupt(): Unit =
-    val request = InterruptRequest(
-      sessionId = sessionId,
-      userContext = Some(UserContext(userId = userId)),
-      interruptType = InterruptRequest.InterruptType.INTERRUPT_TYPE_ALL
-    )
+    val request = InterruptRequest.newBuilder()
+      .setSessionId(sessionId)
+      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setInterruptType(InterruptRequest.InterruptType.INTERRUPT_TYPE_ALL)
+      .build()
     try retryOnUnavailable { bstub.interrupt(request) }
     catch case NonFatal(_) => () // best-effort
 
@@ -190,7 +182,7 @@ object SparkConnectClient:
 
     val channel = channelBuilder.build()
 
-    val baseStub = SparkConnectServiceGrpc.blockingStub(channel)
+    val baseStub = SparkConnectServiceGrpc.newBlockingStub(channel)
     val stub = token match
       case Some(t) =>
         val metadata = Metadata()

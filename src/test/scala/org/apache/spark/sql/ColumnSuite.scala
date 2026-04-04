@@ -1,38 +1,38 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.expressions.Expression
-import org.apache.spark.connect.proto.expressions.Expression.ExprType
+import org.apache.spark.connect.proto.Expression
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+
+import scala.jdk.CollectionConverters.*
 
 class ColumnSuite extends AnyFunSuite with Matchers:
 
   test("Column from name creates UnresolvedAttribute") {
     val c = Column("id")
-    c.expr.exprType shouldBe a[ExprType.UnresolvedAttribute]
-    c.expr.exprType.asInstanceOf[ExprType.UnresolvedAttribute]
-      .value.unparsedIdentifier shouldBe "id"
+    c.expr.hasUnresolvedAttribute shouldBe true
+    c.expr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "id"
   }
 
   test("Column.lit creates Literal for primitives") {
     val intCol = Column.lit(42)
-    intCol.expr.exprType shouldBe a[ExprType.Literal]
-    val lit = intCol.expr.exprType.asInstanceOf[ExprType.Literal].value
-    lit.literalType shouldBe a[Expression.Literal.LiteralType.Integer]
+    intCol.expr.hasLiteral shouldBe true
+    val lit = intCol.expr.getLiteral
+    lit.hasInteger shouldBe true
 
     val strCol = Column.lit("hello")
-    val slit = strCol.expr.exprType.asInstanceOf[ExprType.Literal].value
-    slit.literalType shouldBe a[Expression.Literal.LiteralType.String]
+    val slit = strCol.expr.getLiteral
+    slit.hasString shouldBe true
 
     val boolCol = Column.lit(true)
-    val blit = boolCol.expr.exprType.asInstanceOf[ExprType.Literal].value
-    blit.literalType shouldBe a[Expression.Literal.LiteralType.Boolean]
+    val blit = boolCol.expr.getLiteral
+    blit.hasBoolean shouldBe true
   }
 
   test("Column.lit(null) creates Null literal") {
     val c = Column.lit(null)
-    val lit = c.expr.exprType.asInstanceOf[ExprType.Literal].value
-    lit.literalType shouldBe a[Expression.Literal.LiteralType.Null]
+    val lit = c.expr.getLiteral
+    lit.hasNull shouldBe true
   }
 
   test("Column.lit passes through Column") {
@@ -42,87 +42,87 @@ class ColumnSuite extends AnyFunSuite with Matchers:
 
   test("comparison operators create UnresolvedFunction") {
     val c = Column("a") === Column("b")
-    c.expr.exprType shouldBe a[ExprType.UnresolvedFunction]
-    val fn = c.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value
-    fn.functionName shouldBe "=="
-    fn.arguments should have size 2
+    c.expr.hasUnresolvedFunction shouldBe true
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "=="
+    fn.getArgumentsList should have size 2
   }
 
   test("arithmetic operators") {
     val c = Column("x") + Column("y")
-    val fn = c.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value
-    fn.functionName shouldBe "+"
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "+"
   }
 
   test("logical operators") {
     val c = Column("a") && Column("b")
-    val fn = c.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value
-    fn.functionName shouldBe "and"
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "and"
   }
 
   test("unary not") {
     val c = !Column("flag")
-    val fn = c.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value
-    fn.functionName shouldBe "not"
-    fn.arguments should have size 1
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "not"
+    fn.getArgumentsList should have size 1
   }
 
   test("cast creates Cast expression") {
     val c = Column("x").cast("string")
-    c.expr.exprType shouldBe a[ExprType.Cast]
+    c.expr.hasCast shouldBe true
   }
 
   test("alias creates Alias expression") {
     val c = Column("x").as("renamed")
-    c.expr.exprType shouldBe a[ExprType.Alias]
-    val alias = c.expr.exprType.asInstanceOf[ExprType.Alias].value
-    alias.name shouldBe Seq("renamed")
+    c.expr.hasAlias shouldBe true
+    val alias = c.expr.getAlias
+    alias.getNameList.asScala.toSeq shouldBe Seq("renamed")
   }
 
   test("asc / desc create SortOrder") {
     val asc = Column("x").asc
-    asc.expr.exprType shouldBe a[ExprType.SortOrder]
-    val so = asc.expr.exprType.asInstanceOf[ExprType.SortOrder].value
-    so.direction shouldBe Expression.SortOrder.SortDirection.SORT_DIRECTION_ASCENDING
+    asc.expr.hasSortOrder shouldBe true
+    val so = asc.expr.getSortOrder
+    so.getDirection shouldBe Expression.SortOrder.SortDirection.SORT_DIRECTION_ASCENDING
 
     val desc = Column("x").desc
-    val dso = desc.expr.exprType.asInstanceOf[ExprType.SortOrder].value
-    dso.direction shouldBe Expression.SortOrder.SortDirection.SORT_DIRECTION_DESCENDING
+    val dso = desc.expr.getSortOrder
+    dso.getDirection shouldBe Expression.SortOrder.SortDirection.SORT_DIRECTION_DESCENDING
   }
 
   test("isNull / isNotNull / isNaN") {
     val c1 = Column("x").isNull
-    c1.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value.functionName shouldBe "isnull"
+    c1.expr.getUnresolvedFunction.getFunctionName shouldBe "isnull"
 
     val c2 = Column("x").isNotNull
-    c2.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value.functionName shouldBe "isnotnull"
+    c2.expr.getUnresolvedFunction.getFunctionName shouldBe "isnotnull"
 
     val c3 = Column("x").isNaN
-    c3.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value.functionName shouldBe "isnan"
+    c3.expr.getUnresolvedFunction.getFunctionName shouldBe "isnan"
   }
 
   test("isin creates 'in' function") {
     val c = Column("x").isin(1, 2, 3)
-    val fn = c.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value
-    fn.functionName shouldBe "in"
-    fn.arguments should have size 4 // column + 3 literals
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "in"
+    fn.getArgumentsList should have size 4 // column + 3 literals
   }
 
   test("like / rlike") {
     val c = Column("name").like("%test%")
-    c.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value.functionName shouldBe "like"
+    c.expr.getUnresolvedFunction.getFunctionName shouldBe "like"
 
     val c2 = Column("name").rlike("^test.*")
-    c2.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value.functionName shouldBe "rlike"
+    c2.expr.getUnresolvedFunction.getFunctionName shouldBe "rlike"
   }
 
   test("contains / startsWith / endsWith") {
-    Column("x").contains("a").expr.exprType
-      .asInstanceOf[ExprType.UnresolvedFunction].value.functionName shouldBe "contains"
-    Column("x").startsWith("a").expr.exprType
-      .asInstanceOf[ExprType.UnresolvedFunction].value.functionName shouldBe "startswith"
-    Column("x").endsWith("a").expr.exprType
-      .asInstanceOf[ExprType.UnresolvedFunction].value.functionName shouldBe "endswith"
+    Column("x").contains("a").expr
+      .getUnresolvedFunction.getFunctionName shouldBe "contains"
+    Column("x").startsWith("a").expr
+      .getUnresolvedFunction.getFunctionName shouldBe "startswith"
+    Column("x").endsWith("a").expr
+      .getUnresolvedFunction.getFunctionName shouldBe "endswith"
   }
 
   // ----- Phase 2 tests -----
@@ -131,10 +131,10 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     val c = functions.when(Column("x") > 0, "positive")
       .when(Column("x") === 0, "zero")
       .otherwise("negative")
-    val fn = c.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value
-    fn.functionName shouldBe "when"
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "when"
     // when(cond1, val1, cond2, val2, defaultVal) = 5 args
-    fn.arguments should have size 5
+    fn.getArgumentsList should have size 5
   }
 
   test("when without prior when throws") {
@@ -151,35 +151,35 @@ class ColumnSuite extends AnyFunSuite with Matchers:
 
   test("getItem creates UnresolvedExtractValue") {
     val c = Column("m").getItem("key")
-    c.expr.exprType shouldBe a[ExprType.UnresolvedExtractValue]
-    val ev = c.expr.exprType.asInstanceOf[ExprType.UnresolvedExtractValue].value
-    ev.child.get.exprType shouldBe a[ExprType.UnresolvedAttribute]
-    ev.extraction.get.exprType shouldBe a[ExprType.Literal]
+    c.expr.hasUnresolvedExtractValue shouldBe true
+    val ev = c.expr.getUnresolvedExtractValue
+    ev.getChild.hasUnresolvedAttribute shouldBe true
+    ev.getExtraction.hasLiteral shouldBe true
   }
 
   test("getField creates UnresolvedExtractValue") {
     val c = Column("struct_col").getField("name")
-    c.expr.exprType shouldBe a[ExprType.UnresolvedExtractValue]
+    c.expr.hasUnresolvedExtractValue shouldBe true
   }
 
   test("apply is same as getItem") {
     val c = Column("arr")(0)
-    c.expr.exprType shouldBe a[ExprType.UnresolvedExtractValue]
+    c.expr.hasUnresolvedExtractValue shouldBe true
   }
 
   test("withField creates UpdateFields") {
     val c = Column("s").withField("new_field", Column.lit(42))
-    c.expr.exprType shouldBe a[ExprType.UpdateFields]
-    val uf = c.expr.exprType.asInstanceOf[ExprType.UpdateFields].value
-    uf.fieldName shouldBe "new_field"
-    uf.valueExpression shouldBe defined
+    c.expr.hasUpdateFields shouldBe true
+    val uf = c.expr.getUpdateFields
+    uf.getFieldName shouldBe "new_field"
+    uf.hasValueExpression shouldBe true
   }
 
   test("dropFields creates UpdateFields chain") {
     val c = Column("s").dropFields("a", "b")
-    c.expr.exprType shouldBe a[ExprType.UpdateFields]
-    val uf = c.expr.exprType.asInstanceOf[ExprType.UpdateFields].value
-    uf.fieldName shouldBe "b"
+    c.expr.hasUpdateFields shouldBe true
+    val uf = c.expr.getUpdateFields
+    uf.getFieldName shouldBe "b"
     // Inner should also be UpdateFields
-    uf.structExpression.get.exprType shouldBe a[ExprType.UpdateFields]
+    uf.getStructExpression.hasUpdateFields shouldBe true
   }

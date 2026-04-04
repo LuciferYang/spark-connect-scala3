@@ -1,12 +1,7 @@
 package org.apache.spark.sql
 
 import com.google.protobuf.ByteString
-import org.apache.spark.connect.proto.expressions.{
-  CommonInlineUserDefinedFunction,
-  Expression,
-  ScalarScalaUDF
-}
-import org.apache.spark.connect.proto.expressions.Expression.ExprType
+import org.apache.spark.connect.proto.{Expression, CommonInlineUserDefinedFunction, ScalarScalaUDF}
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.types.DataType
 
@@ -53,7 +48,7 @@ final class UserDefinedFunction private[sql] (
       arguments = cols.map(_.expr).toSeq,
       functionName = _name.getOrElse("")
     )
-    Column(Expression(exprType = ExprType.CommonInlineUserDefinedFunction(proto)))
+    Column(Expression.newBuilder().setCommonInlineUserDefinedFunction(proto).build())
 
   /** Build the proto message for this UDF. */
   private[sql] def toProto(
@@ -61,18 +56,17 @@ final class UserDefinedFunction private[sql] (
       functionName: String = _name.getOrElse("")
   ): CommonInlineUserDefinedFunction =
     val payload = serializeFunction(func)
-    val scalaUdf = ScalarScalaUDF(
-      payload = ByteString.copyFrom(payload),
-      inputTypes = inputTypes.map(DataTypeProtoConverter.toProto),
-      outputType = Some(DataTypeProtoConverter.toProto(returnType)),
-      nullable = _nullable
-    )
-    CommonInlineUserDefinedFunction(
-      functionName = functionName,
-      deterministic = _deterministic,
-      arguments = arguments,
-      function = CommonInlineUserDefinedFunction.Function.ScalarScalaUdf(scalaUdf)
-    )
+    val scalaUdfBuilder = ScalarScalaUDF.newBuilder()
+      .setPayload(ByteString.copyFrom(payload))
+      .setOutputType(DataTypeProtoConverter.toProto(returnType))
+      .setNullable(_nullable)
+    inputTypes.foreach(dt => scalaUdfBuilder.addInputTypes(DataTypeProtoConverter.toProto(dt)))
+    val udfBuilder = CommonInlineUserDefinedFunction.newBuilder()
+      .setFunctionName(functionName)
+      .setDeterministic(_deterministic)
+      .setScalarScalaUdf(scalaUdfBuilder.build())
+    arguments.foreach(udfBuilder.addArguments)
+    udfBuilder.build()
 
   /** Serialize a function closure to bytes using Java serialization. */
   private def serializeFunction(f: AnyRef): Array[Byte] =

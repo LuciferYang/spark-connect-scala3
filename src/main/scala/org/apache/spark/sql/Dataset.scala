@@ -1,6 +1,5 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.relations.*
 import scala.reflect.ClassTag
 
 /**

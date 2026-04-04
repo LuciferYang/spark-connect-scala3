@@ -1,12 +1,8 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.expressions.{
-  CommonInlineUserDefinedFunction,
-  Expression,
-  ScalarScalaUDF
-}
-import org.apache.spark.connect.proto.expressions.Expression.ExprType
-import org.apache.spark.connect.proto.types.{DataType => ProtoDataType}
+import scala.jdk.CollectionConverters.*
+
+import org.apache.spark.connect.proto.{Expression, CommonInlineUserDefinedFunction, ScalarScalaUDF}
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.types.*
 import org.scalatest.funsuite.AnyFunSuite
@@ -119,62 +115,52 @@ class UserDefinedFunctionSuite extends AnyFunSuite with Matchers:
     val col1 = Column("age")
     val result = f(col1)
 
-    result.expr.exprType shouldBe a[ExprType.CommonInlineUserDefinedFunction]
+    result.expr.hasCommonInlineUserDefinedFunction shouldBe true
 
-    val udfExpr = result.expr.exprType.asInstanceOf[ExprType.CommonInlineUserDefinedFunction].value
-    udfExpr.functionName shouldBe "inc"
-    udfExpr.deterministic shouldBe true
-    udfExpr.arguments should have size 1
-    udfExpr.function shouldBe a[CommonInlineUserDefinedFunction.Function.ScalarScalaUdf]
+    val udfExpr = result.expr.getCommonInlineUserDefinedFunction
+    udfExpr.getFunctionName shouldBe "inc"
+    udfExpr.getDeterministic shouldBe true
+    udfExpr.getArgumentsList should have size 1
+    udfExpr.hasScalarScalaUdf shouldBe true
 
-    val scalaUdf = udfExpr.function.asInstanceOf[
-      CommonInlineUserDefinedFunction.Function.ScalarScalaUdf
-    ].value
-    scalaUdf.nullable shouldBe true
-    scalaUdf.payload should not be empty
-    scalaUdf.inputTypes should have size 1
-    scalaUdf.outputType should not be empty
+    val scalaUdf = udfExpr.getScalarScalaUdf
+    scalaUdf.getNullable shouldBe true
+    scalaUdf.getPayload.size() should be > 0
+    scalaUdf.getInputTypesList should have size 1
+    scalaUdf.hasOutputType shouldBe true
   }
 
   test("UDF apply with multiple arguments") {
     val f = functions.udf((a: Int, b: String) => s"$a-$b")
     val result = f(Column("id"), Column("name"))
 
-    val udfExpr = result.expr.exprType.asInstanceOf[ExprType.CommonInlineUserDefinedFunction].value
-    udfExpr.arguments should have size 2
+    val udfExpr = result.expr.getCommonInlineUserDefinedFunction
+    udfExpr.getArgumentsList should have size 2
 
-    val scalaUdf = udfExpr.function.asInstanceOf[
-      CommonInlineUserDefinedFunction.Function.ScalarScalaUdf
-    ].value
-    scalaUdf.inputTypes should have size 2
+    val scalaUdf = udfExpr.getScalarScalaUdf
+    scalaUdf.getInputTypesList should have size 2
   }
 
   test("UDF serialization produces non-empty payload") {
     val f = functions.udf((x: Int) => x * 2)
     val proto = f.toProto(functionName = "test")
-    val scalaUdf = proto.function.asInstanceOf[
-      CommonInlineUserDefinedFunction.Function.ScalarScalaUdf
-    ].value
-    scalaUdf.payload.size() should be > 0
+    val scalaUdf = proto.getScalarScalaUdf
+    scalaUdf.getPayload.size() should be > 0
   }
 
   test("UDF output type is correct in proto") {
     val f = functions.udf((x: String) => x.length.toLong)
     val proto = f.toProto(functionName = "strlen")
-    val scalaUdf = proto.function.asInstanceOf[
-      CommonInlineUserDefinedFunction.Function.ScalarScalaUdf
-    ].value
-    val outputType = DataTypeProtoConverter.fromProto(scalaUdf.outputType.get)
+    val scalaUdf = proto.getScalarScalaUdf
+    val outputType = DataTypeProtoConverter.fromProto(scalaUdf.getOutputType)
     assert(outputType == LongType)
   }
 
   test("UDF input types are correct in proto") {
     val f = functions.udf((a: Double, b: Long) => a + b)
     val proto = f.toProto(functionName = "add")
-    val scalaUdf = proto.function.asInstanceOf[
-      CommonInlineUserDefinedFunction.Function.ScalarScalaUdf
-    ].value
-    val inputTypes = scalaUdf.inputTypes.map(DataTypeProtoConverter.fromProto)
+    val scalaUdf = proto.getScalarScalaUdf
+    val inputTypes = scalaUdf.getInputTypesList.asScala.toSeq.map(DataTypeProtoConverter.fromProto)
     assert(inputTypes == Seq(DoubleType, LongType))
   }
 

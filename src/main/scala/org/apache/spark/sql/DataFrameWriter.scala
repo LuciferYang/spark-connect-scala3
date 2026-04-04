@@ -1,7 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.base.*
-import org.apache.spark.connect.proto.commands.*
+import org.apache.spark.connect.proto.*
 
 /**
  * Writer for saving DataFrames to external storage.
@@ -50,59 +49,26 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
     this
 
   def save(path: String): Unit =
-    val writeOp = WriteOperation(
-      input = Some(df.relation),
-      source = Some(source),
-      mode = toProtoMode(saveMode),
-      saveType = WriteOperation.SaveType.Path(path),
-      options = opts,
-      sortColumnNames = sortColNames,
-      partitioningColumns = partitionCols,
-      bucketBy = if numBuckets > 0 then
-        Some(WriteOperation.BucketBy(
-          bucketColumnNames = bucketColNames,
-          numBuckets = numBuckets
-        ))
-      else None
-    )
-    executeCommand(Command(commandType = Command.CommandType.WriteOperation(writeOp)))
+    val writeBuilder = buildWriteOp()
+    writeBuilder.setPath(path)
+    executeCommand(Command.newBuilder()
+      .setWriteOperation(writeBuilder.build())
+      .build())
 
   def save(): Unit =
-    val writeOp = WriteOperation(
-      input = Some(df.relation),
-      source = Some(source),
-      mode = toProtoMode(saveMode),
-      options = opts,
-      sortColumnNames = sortColNames,
-      partitioningColumns = partitionCols,
-      bucketBy = if numBuckets > 0 then
-        Some(WriteOperation.BucketBy(
-          bucketColumnNames = bucketColNames,
-          numBuckets = numBuckets
-        ))
-      else None
-    )
-    executeCommand(Command(commandType = Command.CommandType.WriteOperation(writeOp)))
+    executeCommand(Command.newBuilder()
+      .setWriteOperation(buildWriteOp().build())
+      .build())
 
   def saveAsTable(tableName: String): Unit =
-    val writeOp = WriteOperation(
-      input = Some(df.relation),
-      source = Some(source),
-      mode = toProtoMode(saveMode),
-      saveType = WriteOperation.SaveType.Table(
-        WriteOperation.SaveTable(tableName = tableName)
-      ),
-      options = opts,
-      sortColumnNames = sortColNames,
-      partitioningColumns = partitionCols,
-      bucketBy = if numBuckets > 0 then
-        Some(WriteOperation.BucketBy(
-          bucketColumnNames = bucketColNames,
-          numBuckets = numBuckets
-        ))
-      else None
-    )
-    executeCommand(Command(commandType = Command.CommandType.WriteOperation(writeOp)))
+    val writeBuilder = buildWriteOp()
+    writeBuilder.setTable(
+      WriteOperation.SaveTable.newBuilder()
+        .setTableName(tableName)
+        .build())
+    executeCommand(Command.newBuilder()
+      .setWriteOperation(writeBuilder.build())
+      .build())
 
   def insertInto(tableName: String): Unit =
     mode("append").saveAsTable(tableName)
@@ -113,8 +79,23 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
   def csv(path: String): Unit = format("csv").save(path)
   def text(path: String): Unit = format("text").save(path)
 
+  private def buildWriteOp(): WriteOperation.Builder =
+    val builder = WriteOperation.newBuilder()
+      .setInput(df.relation)
+      .setSource(source)
+      .setMode(toProtoMode(saveMode))
+    opts.foreach { (k, v) => builder.putOptions(k, v) }
+    sortColNames.foreach(builder.addSortColumnNames)
+    partitionCols.foreach(builder.addPartitioningColumns)
+    if numBuckets > 0 then
+      val bucketBuilder = WriteOperation.BucketBy.newBuilder()
+        .setNumBuckets(numBuckets)
+      bucketColNames.foreach(bucketBuilder.addBucketColumnNames)
+      builder.setBucketBy(bucketBuilder.build())
+    builder
+
   private def executeCommand(command: Command): Unit =
-    val plan = Plan(opType = Plan.OpType.Command(command))
+    val plan = Plan.newBuilder().setCommand(command).build()
     val responses = df.session.client.execute(plan)
     responses.foreach(_ => ()) // drain iterator
 

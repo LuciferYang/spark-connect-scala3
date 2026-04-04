@@ -1,32 +1,31 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.expressions.Expression
-import org.apache.spark.connect.proto.expressions.Expression.ExprType
+import org.apache.spark.connect.proto.Expression
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 class FunctionsSuite extends AnyFunSuite with Matchers:
 
   private def assertFn(c: Column, expectedName: String, expectedArgCount: Int): Unit =
-    c.expr.exprType shouldBe a[ExprType.UnresolvedFunction]
-    val fn = c.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value
-    fn.functionName shouldBe expectedName
-    fn.arguments should have size expectedArgCount
+    c.expr.hasUnresolvedFunction shouldBe true
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe expectedName
+    fn.getArgumentsList should have size expectedArgCount
 
   test("col and column create UnresolvedAttribute") {
-    functions.col("x").expr.exprType shouldBe a[ExprType.UnresolvedAttribute]
-    functions.column("y").expr.exprType shouldBe a[ExprType.UnresolvedAttribute]
+    functions.col("x").expr.hasUnresolvedAttribute shouldBe true
+    functions.column("y").expr.hasUnresolvedAttribute shouldBe true
   }
 
   test("lit delegates to Column.lit") {
     val c = functions.lit(42)
-    c.expr.exprType shouldBe a[ExprType.Literal]
+    c.expr.hasLiteral shouldBe true
   }
 
   test("expr creates ExpressionString") {
     val c = functions.expr("a + b")
-    c.expr.exprType shouldBe a[ExprType.ExpressionString]
-    c.expr.exprType.asInstanceOf[ExprType.ExpressionString].value.expression shouldBe "a + b"
+    c.expr.hasExpressionString shouldBe true
+    c.expr.getExpressionString.getExpression shouldBe "a + b"
   }
 
   test("aggregate functions") {
@@ -41,10 +40,11 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("countDistinct sets isDistinct") {
     val c = functions.countDistinct(Column("a"), Column("b"))
-    val fn = c.expr.exprType.asInstanceOf[ExprType.UnresolvedFunction].value
-    fn.functionName shouldBe "count"
-    fn.isDistinct shouldBe true
-    fn.arguments should have size 2
+    c.expr.hasUnresolvedFunction shouldBe true
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "count"
+    fn.getIsDistinct shouldBe true
+    fn.getArgumentsList should have size 2
   }
 
   test("math functions") {
