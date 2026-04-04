@@ -14,12 +14,14 @@ lazy val root = (project in file("."))
     ),
 
     libraryDependencies ++= {
-      val grpcVersion = "1.68.1"
+      val grpcVersion = "1.80.0"
       val scalapbVersion = scalapb.compiler.Version.scalapbVersion
-      val arrowVersion = "18.1.0"
+      val arrowVersion = "19.0.0"
+      val protobufVersion = "4.34.1"
 
       Seq(
         // gRPC and Protocol Buffers
+        "com.google.protobuf" % "protobuf-java" % protobufVersion,
         "io.grpc" % "grpc-netty-shaded" % grpcVersion,
         "io.grpc" % "grpc-protobuf" % grpcVersion,
         "io.grpc" % "grpc-stub" % grpcVersion,

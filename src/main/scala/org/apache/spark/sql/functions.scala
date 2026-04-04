@@ -381,3 +381,56 @@ object functions:
         isDistinct = isDistinct
       )
     )))
+
+  // ---------------------------------------------------------------------------
+  // User-Defined Functions (UDF)
+  // ---------------------------------------------------------------------------
+
+  /** Create a UDF from a Function1. */
+  inline def udf[T1, R](f: T1 => R): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(Encoder.sparkTypeOf[T1])
+    )
+
+  /** Create a UDF from a Function2. */
+  inline def udf[T1, T2, R](f: (T1, T2) => R): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(Encoder.sparkTypeOf[T1], Encoder.sparkTypeOf[T2])
+    )
+
+  /** Create a UDF from a Function3. */
+  inline def udf[T1, T2, T3, R](f: (T1, T2, T3) => R): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1], Encoder.sparkTypeOf[T2], Encoder.sparkTypeOf[T3]
+      )
+    )
+
+  /** Create a UDF from a Function4. */
+  inline def udf[T1, T2, T3, T4, R](f: (T1, T2, T3, T4) => R): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1], Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3], Encoder.sparkTypeOf[T4]
+      )
+    )
+
+  /** Create a UDF from a Function5. */
+  inline def udf[T1, T2, T3, T4, T5, R](f: (T1, T2, T3, T4, T5) => R): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1], Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3], Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5]
+      )
+    )

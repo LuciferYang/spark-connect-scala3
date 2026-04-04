@@ -112,6 +112,13 @@ final class SparkSession private (
   def conf: RuntimeConfig = RuntimeConfig(client)
 
   // ---------------------------------------------------------------------------
+  // UDF Registration
+  // ---------------------------------------------------------------------------
+
+  /** Access the UDF registration interface. */
+  def udf: UDFRegistration = UDFRegistration(client)
+
+  // ---------------------------------------------------------------------------
   // Version
   // ---------------------------------------------------------------------------
 
