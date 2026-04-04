@@ -312,6 +312,8 @@ final class DataFrame private[sql] (
 
   def na: DataFrameNaFunctions = DataFrameNaFunctions(this)
 
+  def stat: DataFrameStatFunctions = DataFrameStatFunctions(this)
+
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
@@ -358,23 +360,11 @@ final class DataFrame private[sql] (
 
   def explain(extended: Boolean = false): Unit =
     val plan = Plan(opType = Plan.OpType.Root(relation))
-    val analyze = AnalyzePlanRequest.Analyze.Explain(
-      AnalyzePlanRequest.Explain(
-        plan = Some(plan),
-        explainMode =
-          if extended then AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_EXTENDED
-          else AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
-      )
-    )
-    val request = AnalyzePlanRequest(
-      sessionId = session.sessionId,
-      userContext = Some(UserContext(userId = session.client.userId)),
-      analyze = analyze
-    )
-    val resp = session.client.analyzeSchema(plan) // use the base analyze
-    // For proper explain, we'd call stub directly. For now, schema-based response:
-    println("== Physical Plan ==")
-    println("(use server-side explain for full output)")
+    val mode =
+      if extended then AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_EXTENDED
+      else AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
+    val explainStr = client.analyzeExplain(plan, mode)
+    println(explainStr)
 
   def isEmpty: Boolean = limit(1).collect().isEmpty
 
@@ -428,7 +418,7 @@ final class DataFrame private[sql] (
         case _ => None
     catch case _: Exception => None
 
-  private def withRelation(relType: Relation.RelType): DataFrame =
+  private[sql] def withRelation(relType: Relation.RelType): DataFrame =
     DataFrame(session, Relation(
       common = Some(RelationCommon(planId = Some(session.nextPlanId()))),
       relType = relType

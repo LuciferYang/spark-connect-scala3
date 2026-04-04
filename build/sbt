@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+#
+# Licensed under the Apache License, Version 2.0.
+# Simplified sbt launcher for spark-connect-scala3.
+# Inspired by Apache Spark's build/sbt script.
+#
+
+set -e
+
+SELF="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$SELF")"
+
+SBT_VERSION=$(awk -F "=" '/sbt\.version/ {print $2}' "$PROJECT_DIR/project/build.properties")
+JAR="$SELF/sbt-launch-${SBT_VERSION}.jar"
+
+DEFAULT_ARTIFACT_REPOSITORY=${DEFAULT_ARTIFACT_REPOSITORY:-https://maven-central.storage-download.googleapis.com/maven2/}
+
+if [ ! -f "$JAR" ]; then
+  URL="${DEFAULT_ARTIFACT_REPOSITORY%/}/org/scala-sbt/sbt-launch/${SBT_VERSION}/sbt-launch-${SBT_VERSION}.jar"
+  JAR_DL="${JAR}.part"
+  printf "Downloading sbt launcher %s ...\n" "$SBT_VERSION"
+  if command -v curl > /dev/null; then
+    curl --fail --location --silent "$URL" > "$JAR_DL" && mv "$JAR_DL" "$JAR"
+  elif command -v wget > /dev/null; then
+    wget --quiet "$URL" -O "$JAR_DL" && mv "$JAR_DL" "$JAR"
+  else
+    printf "Error: curl or wget required. Install sbt manually from https://www.scala-sbt.org/\n"
+    exit 1
+  fi
+  if [ ! -f "$JAR" ]; then
+    printf "Failed to download sbt launcher. Install sbt manually from https://www.scala-sbt.org/\n"
+    exit 1
+  fi
+fi
+
+# Default JVM options
+SBT_OPTS="${SBT_OPTS:--Xss64m -Xmx2g}"
+
+exec "${JAVA_HOME:+$JAVA_HOME/bin/}java" \
+  $SBT_OPTS \
+  -jar "$JAR" \
+  "$@"

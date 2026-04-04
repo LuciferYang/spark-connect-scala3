@@ -247,7 +247,7 @@ final class Column private[sql] (private[sql] val expr: Expression):
         windowFunction = Some(expr),
         partitionSpec = window.partitionExprs,
         orderSpec = window.orderExprs.map(_.toSortOrder),
-        frameSpec = None
+        frameSpec = window.frameSpec
       )
     )))
 
@@ -313,20 +313,66 @@ object Column:
 
     Column(Expression(exprType = ExprType.Literal(literal)))
 
-/** Minimal WindowSpec for Column.over(). */
+/** WindowSpec with partition, order, and frame specifications. */
 final class WindowSpec private[sql] (
     private[sql] val partitionExprs: Seq[Expression],
-    private[sql] val orderExprs: Seq[Column]
+    private[sql] val orderExprs: Seq[Column],
+    private[sql] val frameSpec: Option[Expression.Window.WindowFrame] = None
 ):
   def partitionBy(cols: Column*): WindowSpec =
-    WindowSpec(cols.map(_.expr), orderExprs)
+    WindowSpec(cols.map(_.expr), orderExprs, frameSpec)
 
   def orderBy(cols: Column*): WindowSpec =
-    WindowSpec(partitionExprs, cols.toSeq)
+    WindowSpec(partitionExprs, cols.toSeq, frameSpec)
+
+  def rowsBetween(start: Long, end: Long): WindowSpec =
+    WindowSpec(partitionExprs, orderExprs, Some(
+      Expression.Window.WindowFrame(
+        frameType = Expression.Window.WindowFrame.FrameType.FRAME_TYPE_ROW,
+        lower = Some(Window.toBoundary(start)),
+        upper = Some(Window.toBoundary(end))
+      )
+    ))
+
+  def rangeBetween(start: Long, end: Long): WindowSpec =
+    WindowSpec(partitionExprs, orderExprs, Some(
+      Expression.Window.WindowFrame(
+        frameType = Expression.Window.WindowFrame.FrameType.FRAME_TYPE_RANGE,
+        lower = Some(Window.toBoundary(start)),
+        upper = Some(Window.toBoundary(end))
+      )
+    ))
 
 object Window:
+  /** Represents the value of `unboundedPreceding` for frame boundaries. */
+  val unboundedPreceding: Long = Long.MinValue
+
+  /** Represents the value of `unboundedFollowing` for frame boundaries. */
+  val unboundedFollowing: Long = Long.MaxValue
+
+  /** Represents the value of `currentRow` for frame boundaries. */
+  val currentRow: Long = 0L
+
   def partitionBy(cols: Column*): WindowSpec =
     WindowSpec(cols.map(_.expr), Seq.empty)
 
   def orderBy(cols: Column*): WindowSpec =
     WindowSpec(Seq.empty, cols.toSeq)
+
+  def rowsBetween(start: Long, end: Long): WindowSpec =
+    WindowSpec(Seq.empty, Seq.empty).rowsBetween(start, end)
+
+  def rangeBetween(start: Long, end: Long): WindowSpec =
+    WindowSpec(Seq.empty, Seq.empty).rangeBetween(start, end)
+
+  private[sql] def toBoundary(value: Long): Expression.Window.WindowFrame.FrameBoundary =
+    import Expression.Window.WindowFrame.FrameBoundary
+    if value == Long.MinValue then
+      FrameBoundary(boundary = FrameBoundary.Boundary.Unbounded(true))
+    else if value == Long.MaxValue then
+      FrameBoundary(boundary = FrameBoundary.Boundary.Unbounded(true))
+    else if value == 0L then
+      FrameBoundary(boundary = FrameBoundary.Boundary.CurrentRow(true))
+    else
+      val litExpr = Column.lit(value).expr
+      FrameBoundary(boundary = FrameBoundary.Boundary.Value(litExpr))

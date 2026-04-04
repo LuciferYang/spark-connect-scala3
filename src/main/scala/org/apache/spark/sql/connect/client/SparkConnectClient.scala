@@ -53,6 +53,24 @@ final class SparkConnectClient private (
     )
     retryOnUnavailable { bstub.analyzePlan(request) }
 
+  /** Retrieve the explain string for a plan without executing it. */
+  def analyzeExplain(
+      plan: Plan,
+      mode: AnalyzePlanRequest.Explain.ExplainMode =
+        AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
+  ): String =
+    val request = AnalyzePlanRequest(
+      sessionId = sessionId,
+      userContext = Some(UserContext(userId = userId)),
+      analyze = AnalyzePlanRequest.Analyze.Explain(
+        AnalyzePlanRequest.Explain(plan = Some(plan), explainMode = mode)
+      )
+    )
+    val resp = retryOnUnavailable { bstub.analyzePlan(request) }
+    resp.result match
+      case AnalyzePlanResponse.Result.Explain(e) => e.explainString
+      case _ => "(no explain output)"
+
   /** Retrieve the Spark version from the server. */
   def version(): String =
     val request = AnalyzePlanRequest(

@@ -22,10 +22,15 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-          cache: sbt
+
+      - name: Cache sbt launcher
+        uses: actions/cache@v4
+        with:
+          path: build/sbt-launch-*.jar
+          key: sbt-launcher-${{ hashFiles('project/build.properties') }}
 
       - name: Compile
-        run: sbt compile
+        run: build/sbt compile
 
       - name: Run unit tests
-        run: sbt test
+        run: build/sbt test

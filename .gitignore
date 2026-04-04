@@ -2,6 +2,7 @@
 target/
 project/target/
 project/project/
+build/sbt-launch-*.jar
 
 # IDE
 .idea/
