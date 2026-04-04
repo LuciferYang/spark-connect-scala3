@@ -3,7 +3,7 @@ package org.apache.spark.sql.connect.client
 import io.grpc.{ManagedChannel, ManagedChannelBuilder, Metadata, Status, StatusRuntimeException}
 import io.grpc.stub.MetadataUtils
 import org.apache.spark.connect.proto.base.*
-// KeyValue is in base.* wildcard import
+import org.apache.spark.connect.proto.commands.Command
 
 import java.net.URI
 import java.util.UUID
@@ -93,6 +93,16 @@ final class SparkConnectClient private (
       ))
     )
     retryOnUnavailable { bstub.config(request) }
+
+  // ---------------------------------------------------------------------------
+  // Execute Command
+  // ---------------------------------------------------------------------------
+
+  /** Execute a command (write, create view, etc.) and consume all responses. */
+  def executeCommand(command: Command): Unit =
+    val plan = Plan(opType = Plan.OpType.Command(command))
+    val responses = execute(plan)
+    responses.foreach(_ => ()) // drain iterator
 
   // ---------------------------------------------------------------------------
   // Interrupt / Close

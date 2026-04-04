@@ -6,6 +6,7 @@ import org.apache.spark.connect.proto.expressions.Expression.ExprType
 import org.apache.spark.connect.proto.relations.*
 import org.apache.spark.sql.connect.client.{ArrowDeserializer, DataTypeProtoConverter, SparkConnectClient}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.connect.proto.commands.{Command, CreateDataFrameViewCommand}
 
 import scala.collection.mutable
 
@@ -267,6 +268,33 @@ final class DataFrame private[sql] (
     println("(use server-side explain for full output)")
 
   def isEmpty: Boolean = limit(1).collect().isEmpty
+
+  // ---------------------------------------------------------------------------
+  // Temp Views
+  // ---------------------------------------------------------------------------
+
+  def createTempView(viewName: String): Unit =
+    createViewCommand(viewName, isGlobal = false, replace = false)
+
+  def createOrReplaceTempView(viewName: String): Unit =
+    createViewCommand(viewName, isGlobal = false, replace = true)
+
+  def createGlobalTempView(viewName: String): Unit =
+    createViewCommand(viewName, isGlobal = true, replace = false)
+
+  def createOrReplaceGlobalTempView(viewName: String): Unit =
+    createViewCommand(viewName, isGlobal = true, replace = true)
+
+  private def createViewCommand(viewName: String, isGlobal: Boolean, replace: Boolean): Unit =
+    val cmd = Command(commandType = Command.CommandType.CreateDataframeView(
+      CreateDataFrameViewCommand(
+        input = Some(relation),
+        name = viewName,
+        isGlobal = isGlobal,
+        replace = replace
+      )
+    ))
+    client.executeCommand(cmd)
 
   // ---------------------------------------------------------------------------
   // Writer

@@ -90,6 +90,19 @@ import org.apache.spark.sql.types.*
     println("\n[8] Config: spark.sql.shuffle.partitions")
     println(s"  Current value: ${spark.conf.get("spark.sql.shuffle.partitions")}")
 
+    // 9. Temp View + Catalog
+    println("\n[9] createOrReplaceTempView + catalog")
+    spark.range(5).createOrReplaceTempView("my_range")
+    println(s"  tableExists('my_range'): ${spark.catalog.tableExists("my_range")}")
+    println(s"  tableExists('no_such_table'): ${spark.catalog.tableExists("no_such_table")}")
+    println(s"  currentDatabase: ${spark.catalog.currentDatabase}")
+    println("  listTables:")
+    spark.catalog.listTables().show()
+    println("  Query temp view via SQL:")
+    spark.sql("SELECT * FROM my_range").show()
+    spark.catalog.dropTempView("my_range")
+    println(s"  After drop, tableExists('my_range'): ${spark.catalog.tableExists("my_range")}")
+
     println("\n" + "=" * 60)
     println("All examples completed successfully!")
 
