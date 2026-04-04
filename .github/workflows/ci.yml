@@ -29,6 +29,9 @@ jobs:
           path: build/sbt-launch-*.jar
           key: sbt-launcher-${{ hashFiles('project/build.properties') }}
 
+      - name: Check formatting
+        run: build/sbt scalafmtCheckAll
+
       - name: Compile
         run: build/sbt compile
 
