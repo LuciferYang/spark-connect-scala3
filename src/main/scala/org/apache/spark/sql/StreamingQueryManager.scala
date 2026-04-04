@@ -32,7 +32,8 @@ final class StreamingQueryManager private[sql] (private val session: SparkSessio
     ))
     ()
 
-  /** Block until any streaming query terminates or the timeout expires. Returns true if terminated. */
+  /** Block until any streaming query terminates or the timeout expires. Returns true if terminated.
+    */
   def awaitAnyTermination(timeoutMs: Long): Boolean =
     val result = executeManagerCmd(_.setAwaitAnyTermination(
       StreamingQueryManagerCommand.AwaitAnyTerminationCommand.newBuilder()
