@@ -102,7 +102,7 @@ object Encoder:
   inline def fieldsOf[Types <: Tuple, Labels <: Tuple]: List[StructField] =
     inline (erasedValue[Types], erasedValue[Labels]) match
       case (_: EmptyTuple, _: EmptyTuple) => Nil
-      case (_: (t *: ts), _: (l *: ls)) =>
+      case (_: (t *: ts), _: (l *: ls))   =>
         val name = constValue[l].toString
         val dt = sparkTypeOf[t]
         val nullable = isOption[t]
