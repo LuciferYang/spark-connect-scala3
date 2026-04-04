@@ -1,0 +1,377 @@
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:46:22 
+[warn] 46 |        val __value = sql
+[warn]    |                      ^^^
+[warn]    |value sql in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:51:6 
+[warn] 51 |      args.foreach { __item =>
+[warn]    |      ^^^^
+[warn]    |value args in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:55:6 
+[warn] 55 |      posArgs.foreach { __item =>
+[warn]    |      ^^^^^^^
+[warn]    |value posArgs in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:59:6 
+[warn] 59 |      namedArguments.foreach { __item =>
+[warn]    |      ^^^^^^^^^^^^^^
+[warn]    |value namedArguments in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:63:6 
+[warn] 63 |      posArguments.foreach { __item =>
+[warn]    |      ^^^^^^^^^^^^
+[warn]    |value posArguments in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:85:18 
+[warn] 85 |        val __v = sql
+[warn]    |                  ^^^
+[warn]    |value sql in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:90:6 
+[warn] 90 |      args.foreach { __v =>
+[warn]    |      ^^^^
+[warn]    |value args in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:96:6 
+[warn] 96 |      posArgs.foreach { __v =>
+[warn]    |      ^^^^^^^
+[warn]    |value posArgs in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:102:6 
+[warn] 102 |      namedArguments.foreach { __v =>
+[warn]     |      ^^^^^^^^^^^^^^
+[warn]     |value namedArguments in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:108:6 
+[warn] 108 |      posArguments.foreach { __v =>
+[warn]     |      ^^^^^^^^^^^^
+[warn]     |value posArguments in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:147:20 
+[warn] 147 |          val __t = sql
+[warn]     |                    ^^^
+[warn]     |value sql in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:150:18 
+[warn] 150 |        case 2 => args.iterator.map(org.apache.spark.connect.proto.commands.SqlCommand._typemapper_args.toBase(_)).toSeq
+[warn]     |                  ^^^^
+[warn]     |value args in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:151:18 
+[warn] 151 |        case 3 => posArgs
+[warn]     |                  ^^^^^^^
+[warn]     |value posArgs in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:152:18 
+[warn] 152 |        case 4 => namedArguments.iterator.map(org.apache.spark.connect.proto.commands.SqlCommand._typemapper_namedArguments.toBase(_)).toSeq
+[warn]     |                  ^^^^^^^^^^^^^^
+[warn]     |value namedArguments in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:153:18 
+[warn] 153 |        case 5 => posArguments
+[warn]     |                  ^^^^^^^^^^^^
+[warn]     |value posArguments in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:160:53 
+[warn] 160 |        case 1 => _root_.scalapb.descriptors.PString(sql)
+[warn]     |                                                     ^^^
+[warn]     |value sql in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:161:55 
+[warn] 161 |        case 2 => _root_.scalapb.descriptors.PRepeated(args.iterator.map(org.apache.spark.connect.proto.commands.SqlCommand._typemapper_args.toBase(_).toPMessage).toVector)
+[warn]     |                                                       ^^^^
+[warn]     |value args in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:162:55 
+[warn] 162 |        case 3 => _root_.scalapb.descriptors.PRepeated(posArgs.iterator.map(_.toPMessage).toVector)
+[warn]     |                                                       ^^^^^^^
+[warn]     |value posArgs in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:163:55 
+[warn] 163 |        case 4 => _root_.scalapb.descriptors.PRepeated(namedArguments.iterator.map(org.apache.spark.connect.proto.commands.SqlCommand._typemapper_namedArguments.toBase(_).toPMessage).toVector)
+[warn]     |                                                       ^^^^^^^^^^^^^^
+[warn]     |value namedArguments in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:164:55 
+[warn] 164 |        case 5 => _root_.scalapb.descriptors.PRepeated(posArguments.iterator.map(_.toPMessage).toVector)
+[warn]     |                                                       ^^^^^^^^^^^^
+[warn]     |value posArguments in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:552:87 
+[warn] 552 |    def sql: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Predef.String] = field(_.sql)((c_, f_) => c_.copy(sql = f_))
+[warn]     |                                                                                     ^^^^^
+[warn]     |value sql in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:553:190 
+[warn] 553 |    def args: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.collection.immutable.Map[_root_.scala.Predef.String, org.apache.spark.connect.proto.expressions.Expression.Literal]] = field(_.args)((c_, f_) => c_.copy(args = f_))
+[warn]     |                                                                                                                                                                                            ^^^^^^
+[warn]     |value args in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:554:144 
+[warn] 554 |    def posArgs: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Seq[org.apache.spark.connect.proto.expressions.Expression.Literal]] = field(_.posArgs)((c_, f_) => c_.copy(posArgs = f_))
+[warn]     |                                                                                                                                              ^^^^^^^^^
+[warn]     |value posArgs in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:555:192 
+[warn] 555 |    def namedArguments: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.collection.immutable.Map[_root_.scala.Predef.String, org.apache.spark.connect.proto.expressions.Expression]] = field(_.namedArguments)((c_, f_) => c_.copy(namedArguments = f_))
+[warn]     |                                                                                                                                                                                              ^^^^^^^^^^^^^^^^
+[warn]     |value namedArguments in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/commands/SqlCommand.scala:556:141 
+[warn] 556 |    def posArguments: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Seq[org.apache.spark.connect.proto.expressions.Expression]] = field(_.posArguments)((c_, f_) => c_.copy(posArguments = f_))
+[warn]     |                                                                                                                                           ^^^^^^^^^^^^^^
+[warn]     |value posArguments in class SqlCommand is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3132:14 
+[warn] 3132 |          if (elementType.isDefined) {
+[warn]      |              ^^^^^^^^^^^
+[warn]      |value elementType in class Array is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3133:26 
+[warn] 3133 |            val __value = elementType.get
+[warn]      |                          ^^^^^^^^^^^
+[warn]      |value elementType in class Array is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3153:10 
+[warn] 3153 |          elementType.foreach { __v =>
+[warn]      |          ^^^^^^^^^^^
+[warn]      |value elementType in class Array is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3167:76 
+[warn] 3167 |        def getElementType: org.apache.spark.connect.proto.types.DataType = elementType.getOrElse(org.apache.spark.connect.proto.types.DataType.defaultInstance)
+[warn]      |                                                                            ^^^^^^^^^^^
+[warn]      |value elementType in class Array is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3178:22 
+[warn] 3178 |            case 1 => elementType.orNull
+[warn]      |                      ^^^^^^^^^^^
+[warn]      |value elementType in class Array is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3185:22 
+[warn] 3185 |            case 1 => elementType.map(_.toPMessage).getOrElse(_root_.scalapb.descriptors.PEmpty)
+[warn]      |                      ^^^^^^^^^^^
+[warn]      |value elementType in class Array is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3249:147 
+[warn] 3249 |        def optionalElementType: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Option[org.apache.spark.connect.proto.types.DataType]] = field(_.elementType)((c_, f_) => c_.copy(elementType = f_))
+[warn]      |                                                                                                                                                 ^^^^^^^^^^^^^
+[warn]      |value elementType in class Array is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3290:14 
+[warn] 3290 |          if (keyType.isDefined) {
+[warn]      |              ^^^^^^^
+[warn]      |value keyType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3291:26 
+[warn] 3291 |            val __value = keyType.get
+[warn]      |                          ^^^^^^^
+[warn]      |value keyType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3294:14 
+[warn] 3294 |          if (valueType.isDefined) {
+[warn]      |              ^^^^^^^^^
+[warn]      |value valueType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3295:26 
+[warn] 3295 |            val __value = valueType.get
+[warn]      |                          ^^^^^^^^^
+[warn]      |value valueType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3319:10 
+[warn] 3319 |          keyType.foreach { __v =>
+[warn]      |          ^^^^^^^
+[warn]      |value keyType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3325:10 
+[warn] 3325 |          valueType.foreach { __v =>
+[warn]      |          ^^^^^^^^^
+[warn]      |value valueType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3345:72 
+[warn] 3345 |        def getKeyType: org.apache.spark.connect.proto.types.DataType = keyType.getOrElse(org.apache.spark.connect.proto.types.DataType.defaultInstance)
+[warn]      |                                                                        ^^^^^^^
+[warn]      |value keyType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3348:74 
+[warn] 3348 |        def getValueType: org.apache.spark.connect.proto.types.DataType = valueType.getOrElse(org.apache.spark.connect.proto.types.DataType.defaultInstance)
+[warn]      |                                                                          ^^^^^^^^^
+[warn]      |value valueType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3363:22 
+[warn] 3363 |            case 1 => keyType.orNull
+[warn]      |                      ^^^^^^^
+[warn]      |value keyType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3364:22 
+[warn] 3364 |            case 2 => valueType.orNull
+[warn]      |                      ^^^^^^^^^
+[warn]      |value valueType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3372:22 
+[warn] 3372 |            case 1 => keyType.map(_.toPMessage).getOrElse(_root_.scalapb.descriptors.PEmpty)
+[warn]      |                      ^^^^^^^
+[warn]      |value keyType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3373:22 
+[warn] 3373 |            case 2 => valueType.map(_.toPMessage).getOrElse(_root_.scalapb.descriptors.PEmpty)
+[warn]      |                      ^^^^^^^^^
+[warn]      |value valueType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3452:143 
+[warn] 3452 |        def optionalKeyType: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Option[org.apache.spark.connect.proto.types.DataType]] = field(_.keyType)((c_, f_) => c_.copy(keyType = f_))
+[warn]      |                                                                                                                                             ^^^^^^^^^
+[warn]      |value keyType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3454:145 
+[warn] 3454 |        def optionalValueType: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Option[org.apache.spark.connect.proto.types.DataType]] = field(_.valueType)((c_, f_) => c_.copy(valueType = f_))
+[warn]      |                                                                                                                                               ^^^^^^^^^^^
+[warn]      |value valueType in class Map is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3494:14 
+[warn] 3494 |          if (structType.isDefined) {
+[warn]      |              ^^^^^^^^^^
+[warn]      |value structType in class Struct is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3495:26 
+[warn] 3495 |            val __value = structType.get
+[warn]      |                          ^^^^^^^^^^
+[warn]      |value structType in class Struct is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3515:10 
+[warn] 3515 |          structType.foreach { __v =>
+[warn]      |          ^^^^^^^^^^
+[warn]      |value structType in class Struct is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3529:75 
+[warn] 3529 |        def getStructType: org.apache.spark.connect.proto.types.DataType = structType.getOrElse(org.apache.spark.connect.proto.types.DataType.defaultInstance)
+[warn]      |                                                                           ^^^^^^^^^^
+[warn]      |value structType in class Struct is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3540:22 
+[warn] 3540 |            case 1 => structType.orNull
+[warn]      |                      ^^^^^^^^^^
+[warn]      |value structType in class Struct is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3547:22 
+[warn] 3547 |            case 1 => structType.map(_.toPMessage).getOrElse(_root_.scalapb.descriptors.PEmpty)
+[warn]      |                      ^^^^^^^^^^
+[warn]      |value structType in class Struct is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/expressions/Expression.scala:3611:146 
+[warn] 3611 |        def optionalStructType: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Option[org.apache.spark.connect.proto.types.DataType]] = field(_.structType)((c_, f_) => c_.copy(structType = f_))
+[warn]      |                                                                                                                                                ^^^^^^^^^^^^
+[warn]      |value structType in class Struct is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineAnalysisContext.scala:44:10 
+[warn] 44 |      if (flowName.isDefined) {
+[warn]    |          ^^^^^^^^
+[warn]    |value flowName in class PipelineAnalysisContext is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineAnalysisContext.scala:45:22 
+[warn] 45 |        val __value = flowName.get
+[warn]    |                      ^^^^^^^^
+[warn]    |value flowName in class PipelineAnalysisContext is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineAnalysisContext.scala:77:6 
+[warn] 77 |      flowName.foreach { __v =>
+[warn]    |      ^^^^^^^^
+[warn]    |value flowName in class PipelineAnalysisContext is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineAnalysisContext.scala:101:50 
+[warn] 101 |    def getFlowName: _root_.scala.Predef.String = flowName.getOrElse("")
+[warn]     |                                                  ^^^^^^^^
+[warn]     |value flowName in class PipelineAnalysisContext is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineAnalysisContext.scala:117:18 
+[warn] 117 |        case 3 => flowName.orNull
+[warn]     |                  ^^^^^^^^
+[warn]     |value flowName in class PipelineAnalysisContext is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineAnalysisContext.scala:127:18 
+[warn] 127 |        case 3 => flowName.map(_root_.scalapb.descriptors.PString(_)).getOrElse(_root_.scalapb.descriptors.PEmpty)
+[warn]     |                  ^^^^^^^^
+[warn]     |value flowName in class PipelineAnalysisContext is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineAnalysisContext.scala:214:121 
+[warn] 214 |    def optionalFlowName: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Option[_root_.scala.Predef.String]] = field(_.flowName)((c_, f_) => c_.copy(flowName = f_))
+[warn]     |                                                                                                                       ^^^^^^^^^^
+[warn]     |value flowName in class PipelineAnalysisContext is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineCommand.scala:3458:12 
+[warn] 3458 |        if (flowName.isDefined) {
+[warn]      |            ^^^^^^^^
+[warn]      |value flowName in class DefineFlowQueryFunctionResult is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineCommand.scala:3459:24 
+[warn] 3459 |          val __value = flowName.get
+[warn]      |                        ^^^^^^^^
+[warn]      |value flowName in class DefineFlowQueryFunctionResult is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineCommand.scala:3487:8 
+[warn] 3487 |        flowName.foreach { __v =>
+[warn]      |        ^^^^^^^^
+[warn]      |value flowName in class DefineFlowQueryFunctionResult is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineCommand.scala:3509:52 
+[warn] 3509 |      def getFlowName: _root_.scala.Predef.String = flowName.getOrElse("")
+[warn]      |                                                    ^^^^^^^^
+[warn]      |value flowName in class DefineFlowQueryFunctionResult is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineCommand.scala:3525:20 
+[warn] 3525 |          case 1 => flowName.orNull
+[warn]      |                    ^^^^^^^^
+[warn]      |value flowName in class DefineFlowQueryFunctionResult is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineCommand.scala:3534:20 
+[warn] 3534 |          case 1 => flowName.map(_root_.scalapb.descriptors.PString(_)).getOrElse(_root_.scalapb.descriptors.PEmpty)
+[warn]      |                    ^^^^^^^^
+[warn]      |value flowName in class DefineFlowQueryFunctionResult is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineCommand.scala:3612:123 
+[warn] 3612 |      def optionalFlowName: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Option[_root_.scala.Predef.String]] = field(_.flowName)((c_, f_) => c_.copy(flowName = f_))
+[warn]      |                                                                                                                         ^^^^^^^^^^
+[warn]      |value flowName in class DefineFlowQueryFunctionResult is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineQueryFunctionExecutionSignal.scala:28:6 
+[warn] 28 |      flowNames.foreach { __item =>
+[warn]    |      ^^^^^^^^^
+[warn]    |value flowNames in class PipelineQueryFunctionExecutionSignal is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineQueryFunctionExecutionSignal.scala:49:6 
+[warn] 49 |      flowNames.foreach { __v =>
+[warn]    |      ^^^^^^^^^
+[warn]    |value flowNames in class PipelineQueryFunctionExecutionSignal is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineQueryFunctionExecutionSignal.scala:63:125 
+[warn] 63 |    def addAllFlowNames(__vs: Iterable[_root_.scala.Predef.String]): PipelineQueryFunctionExecutionSignal = copy(flowNames = flowNames ++ __vs)
+[warn]    |                                                                                                                             ^^^^^^^^^
+[warn]    |value flowNames in class PipelineQueryFunctionExecutionSignal is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineQueryFunctionExecutionSignal.scala:73:18 
+[warn] 73 |        case 1 => flowNames
+[warn]    |                  ^^^^^^^^^
+[warn]    |value flowNames in class PipelineQueryFunctionExecutionSignal is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineQueryFunctionExecutionSignal.scala:80:55 
+[warn] 80 |        case 1 => _root_.scalapb.descriptors.PRepeated(flowNames.iterator.map(_root_.scalapb.descriptors.PString(_)).toVector)
+[warn]    |                                                       ^^^^^^^^^
+[warn]    |value flowNames in class PipelineQueryFunctionExecutionSignal is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/pipelines/PipelineQueryFunctionExecutionSignal.scala:142:111 
+[warn] 142 |    def flowNames: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Seq[_root_.scala.Predef.String]] = field(_.flowNames)((c_, f_) => c_.copy(flowNames = f_))
+[warn]     |                                                                                                             ^^^^^^^^^^^
+[warn]     |value flowNames in class PipelineQueryFunctionExecutionSignal is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/RelationCommon.scala:30:22 
+[warn] 30 |        val __value = sourceInfo
+[warn]    |                      ^^^^^^^^^^
+[warn]    |value sourceInfo in class RelationCommon is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/RelationCommon.scala:57:18 
+[warn] 57 |        val __v = sourceInfo
+[warn]    |                  ^^^^^^^^^^
+[warn]    |value sourceInfo in class RelationCommon is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/RelationCommon.scala:86:20 
+[warn] 86 |          val __t = sourceInfo
+[warn]    |                    ^^^^^^^^^^
+[warn]    |value sourceInfo in class RelationCommon is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/RelationCommon.scala:96:53 
+[warn] 96 |        case 1 => _root_.scalapb.descriptors.PString(sourceInfo)
+[warn]    |                                                     ^^^^^^^^^^
+[warn]    |value sourceInfo in class RelationCommon is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/RelationCommon.scala:165:94 
+[warn] 165 |    def sourceInfo: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Predef.String] = field(_.sourceInfo)((c_, f_) => c_.copy(sourceInfo = f_))
+[warn]     |                                                                                            ^^^^^^^^^^^^
+[warn]     |value sourceInfo in class RelationCommon is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/SQL.scala:43:6 
+[warn] 43 |      args.foreach { __item =>
+[warn]    |      ^^^^
+[warn]    |value args in class SQL is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/SQL.scala:47:6 
+[warn] 47 |      posArgs.foreach { __item =>
+[warn]    |      ^^^^^^^
+[warn]    |value posArgs in class SQL is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/SQL.scala:78:6 
+[warn] 78 |      args.foreach { __v =>
+[warn]    |      ^^^^
+[warn]    |value args in class SQL is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/SQL.scala:84:6 
+[warn] 84 |      posArgs.foreach { __v =>
+[warn]    |      ^^^^^^^
+[warn]    |value posArgs in class SQL is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/SQL.scala:129:18 
+[warn] 129 |        case 2 => args.iterator.map(org.apache.spark.connect.proto.relations.SQL._typemapper_args.toBase(_)).toSeq
+[warn]     |                  ^^^^
+[warn]     |value args in class SQL is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/SQL.scala:130:18 
+[warn] 130 |        case 3 => posArgs
+[warn]     |                  ^^^^^^^
+[warn]     |value posArgs in class SQL is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/SQL.scala:139:55 
+[warn] 139 |        case 2 => _root_.scalapb.descriptors.PRepeated(args.iterator.map(org.apache.spark.connect.proto.relations.SQL._typemapper_args.toBase(_).toPMessage).toVector)
+[warn]     |                                                       ^^^^
+[warn]     |value args in class SQL is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/SQL.scala:140:55 
+[warn] 140 |        case 3 => _root_.scalapb.descriptors.PRepeated(posArgs.iterator.map(_.toPMessage).toVector)
+[warn]     |                                                       ^^^^^^^
+[warn]     |value posArgs in class SQL is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/SQL.scala:523:190 
+[warn] 523 |    def args: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.collection.immutable.Map[_root_.scala.Predef.String, org.apache.spark.connect.proto.expressions.Expression.Literal]] = field(_.args)((c_, f_) => c_.copy(args = f_))
+[warn]     |                                                                                                                                                                                            ^^^^^^
+[warn]     |value args in class SQL is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/SQL.scala:524:144 
+[warn] 524 |    def posArgs: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.Seq[org.apache.spark.connect.proto.expressions.Expression.Literal]] = field(_.posArgs)((c_, f_) => c_.copy(posArgs = f_))
+[warn]     |                                                                                                                                              ^^^^^^^^^
+[warn]     |value posArgs in class SQL is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/WithColumnsRenamed.scala:35:6 
+[warn] 35 |      renameColumnsMap.foreach { __item =>
+[warn]    |      ^^^^^^^^^^^^^^^^
+[warn]    |value renameColumnsMap in class WithColumnsRenamed is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/WithColumnsRenamed.scala:62:6 
+[warn] 62 |      renameColumnsMap.foreach { __v =>
+[warn]    |      ^^^^^^^^^^^^^^^^
+[warn]    |value renameColumnsMap in class WithColumnsRenamed is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/WithColumnsRenamed.scala:92:18 
+[warn] 92 |        case 2 => renameColumnsMap.iterator.map(org.apache.spark.connect.proto.relations.WithColumnsRenamed._typemapper_renameColumnsMap.toBase(_)).toSeq
+[warn]    |                  ^^^^^^^^^^^^^^^^
+[warn]    |value renameColumnsMap in class WithColumnsRenamed is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/WithColumnsRenamed.scala:100:55 
+[warn] 100 |        case 2 => _root_.scalapb.descriptors.PRepeated(renameColumnsMap.iterator.map(org.apache.spark.connect.proto.relations.WithColumnsRenamed._typemapper_renameColumnsMap.toBase(_).toPMessage).toVector)
+[warn]     |                                                       ^^^^^^^^^^^^^^^^
+[warn]     |value renameColumnsMap in class WithColumnsRenamed is deprecated: Marked as deprecated in proto file
+[warn] -- Deprecation Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/target/scala-3.3.7/src_managed/main/scalapb/org/apache/spark/connect/proto/relations/WithColumnsRenamed.scala:466:167 
+[warn] 466 |    def renameColumnsMap: _root_.scalapb.lenses.Lens[UpperPB, _root_.scala.collection.immutable.Map[_root_.scala.Predef.String, _root_.scala.Predef.String]] = field(_.renameColumnsMap)((c_, f_) => c_.copy(renameColumnsMap = f_))
+[warn]     |                                                                                                                                                                     ^^^^^^^^^^^^^^^^^^
+[warn]     |value renameColumnsMap in class WithColumnsRenamed is deprecated: Marked as deprecated in proto file
+[warn] -- [E030] Match case Unreachable Warning: /Users/yangjie01/SourceCode/git/spark-connect-scala3/src/main/scala/org/apache/spark/sql/connect/client/ArrowDeserializer.scala:77:11 
+[warn] 77 |      case v: MapVector =>
+[warn]    |           ^^^^^^^^^^^^
+[warn]    |           Unreachable case
+[warn] 94 warnings found

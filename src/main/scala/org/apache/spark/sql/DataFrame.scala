@@ -1,0 +1,355 @@
+package org.apache.spark.sql
+
+import org.apache.spark.connect.proto.base.*
+import org.apache.spark.connect.proto.expressions.Expression
+import org.apache.spark.connect.proto.expressions.Expression.ExprType
+import org.apache.spark.connect.proto.relations.*
+import org.apache.spark.sql.connect.client.{ArrowDeserializer, DataTypeProtoConverter, SparkConnectClient}
+import org.apache.spark.sql.types.StructType
+
+import scala.collection.mutable
+
+/**
+ * A distributed collection of rows organized into named columns.
+ *
+ * All transformation methods are lazy — they build a protobuf Relation tree.
+ * Action methods (collect, show, count, …) send the plan to the server via gRPC.
+ */
+final class DataFrame private[sql] (
+    private[sql] val session: SparkSession,
+    private[sql] val relation: Relation
+):
+  private def client: SparkConnectClient = session.client
+
+  // ---------------------------------------------------------------------------
+  // Transformations
+  // ---------------------------------------------------------------------------
+
+  def select(cols: Column*): DataFrame =
+    withRelation(Relation.RelType.Project(
+      Project(input = Some(relation), expressions = cols.map(_.expr).toSeq)
+    ))
+
+  def select(colNames: String*)(using DummyImplicit): DataFrame =
+    select(colNames.map(Column(_))*)
+
+  def selectExpr(exprs: String*): DataFrame =
+    select(exprs.map(e => functions.expr(e))*)
+
+  def filter(condition: Column): DataFrame =
+    withRelation(Relation.RelType.Filter(
+      Filter(input = Some(relation), condition = Some(condition.expr))
+    ))
+
+  def where(condition: Column): DataFrame = filter(condition)
+
+  def where(conditionExpr: String): DataFrame = filter(functions.expr(conditionExpr))
+
+  def limit(n: Int): DataFrame =
+    withRelation(Relation.RelType.Limit(
+      Limit(input = Some(relation), limit = n)
+    ))
+
+  def offset(n: Int): DataFrame =
+    withRelation(Relation.RelType.Offset(
+      Offset(input = Some(relation), offset = n)
+    ))
+
+  def sort(cols: Column*): DataFrame = orderBy(cols*)
+
+  def orderBy(cols: Column*): DataFrame =
+    withRelation(Relation.RelType.Sort(
+      Sort(
+        input = Some(relation),
+        order = cols.map(_.toSortOrder).toSeq,
+        isGlobal = Some(true)
+      )
+    ))
+
+  def groupBy(cols: Column*): GroupedDataFrame =
+    GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.GroupBy)
+
+  def groupBy(colNames: String*)(using DummyImplicit): GroupedDataFrame =
+    groupBy(colNames.map(Column(_))*)
+
+  def rollup(cols: Column*): GroupedDataFrame =
+    GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.Rollup)
+
+  def cube(cols: Column*): GroupedDataFrame =
+    GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.Cube)
+
+  def agg(aggExpr: Column, aggExprs: Column*): DataFrame =
+    groupBy(Seq.empty[Column]*).agg(aggExpr, aggExprs*)
+
+  def join(right: DataFrame, joinExpr: Column, joinType: String = "inner"): DataFrame =
+    withRelation(Relation.RelType.Join(
+      Join(
+        left = Some(relation),
+        right = Some(right.relation),
+        joinCondition = Some(joinExpr.expr),
+        joinType = toJoinType(joinType)
+      )
+    ))
+
+  def join(right: DataFrame, usingColumns: Seq[String]): DataFrame =
+    withRelation(Relation.RelType.Join(
+      Join(
+        left = Some(relation),
+        right = Some(right.relation),
+        usingColumns = usingColumns,
+        joinType = Join.JoinType.JOIN_TYPE_INNER
+      )
+    ))
+
+  def crossJoin(right: DataFrame): DataFrame =
+    withRelation(Relation.RelType.Join(
+      Join(
+        left = Some(relation),
+        right = Some(right.relation),
+        joinType = Join.JoinType.JOIN_TYPE_CROSS
+      )
+    ))
+
+  def withColumn(name: String, col: Column): DataFrame =
+    withRelation(Relation.RelType.WithColumns(
+      WithColumns(
+        input = Some(relation),
+        aliases = Seq(Expression.Alias(expr = Some(col.expr), name = Seq(name)))
+      )
+    ))
+
+  def withColumnRenamed(existing: String, newName: String): DataFrame =
+    withRelation(Relation.RelType.WithColumnsRenamed(
+      WithColumnsRenamed(
+        input = Some(relation),
+        renames = Seq(WithColumnsRenamed.Rename(colName = existing, newColName = newName))
+      )
+    ))
+
+  def drop(colNames: String*): DataFrame =
+    withRelation(Relation.RelType.Drop(
+      Drop(
+        input = Some(relation),
+        columns = colNames.map { name =>
+          Expression(exprType = ExprType.UnresolvedAttribute(
+            Expression.UnresolvedAttribute(unparsedIdentifier = name)
+          ))
+        }.toSeq
+      )
+    ))
+
+  def distinct(): DataFrame = dropDuplicates()
+
+  def dropDuplicates(): DataFrame =
+    withRelation(Relation.RelType.Deduplicate(
+      Deduplicate(input = Some(relation), allColumnsAsKeys = Some(true))
+    ))
+
+  def dropDuplicates(colNames: Seq[String]): DataFrame =
+    withRelation(Relation.RelType.Deduplicate(
+      Deduplicate(input = Some(relation), columnNames = colNames)
+    ))
+
+  def union(other: DataFrame): DataFrame =
+    setOp(other, SetOperation.SetOpType.SET_OP_TYPE_UNION, byName = false)
+
+  def unionAll(other: DataFrame): DataFrame = union(other)
+
+  def unionByName(other: DataFrame, allowMissingColumns: Boolean = false): DataFrame =
+    setOp(other, SetOperation.SetOpType.SET_OP_TYPE_UNION, byName = true, allowMissingColumns)
+
+  def intersect(other: DataFrame): DataFrame =
+    setOp(other, SetOperation.SetOpType.SET_OP_TYPE_INTERSECT, byName = false)
+
+  def except(other: DataFrame): DataFrame =
+    setOp(other, SetOperation.SetOpType.SET_OP_TYPE_EXCEPT, byName = false)
+
+  def repartition(numPartitions: Int): DataFrame =
+    withRelation(Relation.RelType.Repartition(
+      Repartition(input = Some(relation), numPartitions = numPartitions, shuffle = Some(true))
+    ))
+
+  def coalesce(numPartitions: Int): DataFrame =
+    withRelation(Relation.RelType.Repartition(
+      Repartition(input = Some(relation), numPartitions = numPartitions, shuffle = Some(false))
+    ))
+
+  def sample(fraction: Double, withReplacement: Boolean = false, seed: Long = 0L): DataFrame =
+    withRelation(Relation.RelType.Sample(
+      Sample(
+        input = Some(relation),
+        lowerBound = 0.0,
+        upperBound = fraction,
+        withReplacement = Some(withReplacement),
+        seed = Some(seed)
+      )
+    ))
+
+  def describe(colNames: String*): DataFrame =
+    withRelation(Relation.RelType.Describe(
+      StatDescribe(input = Some(relation), cols = colNames.toSeq)
+    ))
+
+  def summary(statistics: String*): DataFrame =
+    withRelation(Relation.RelType.Summary(
+      StatSummary(input = Some(relation), statistics = statistics.toSeq)
+    ))
+
+  def alias(name: String): DataFrame =
+    withRelation(Relation.RelType.SubqueryAlias(
+      SubqueryAlias(input = Some(relation), alias = name)
+    ))
+
+  def na: DataFrameNaFunctions = DataFrameNaFunctions(this)
+
+  // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+
+  def collect(): Array[Row] =
+    val plan = Plan(opType = Plan.OpType.Root(relation))
+    val responses = client.execute(plan)
+    val rows = mutable.ArrayBuffer.empty[Row]
+    responses.foreach { resp =>
+      resp.responseType match
+        case ExecutePlanResponse.ResponseType.ArrowBatch(batch) =>
+          rows ++= ArrowDeserializer.fromArrowBatch(batch.data.toByteArray)
+        case _ => // skip metrics, schema, etc.
+    }
+    rows.toArray
+
+  def count(): Long =
+    import functions.{count as countFn, lit}
+    groupBy(Seq.empty[Column]*).agg(countFn(lit(1)).as("count")).collect().head.getLong(0)
+
+  def first(): Row = limit(1).collect().head
+
+  def head(n: Int = 1): Array[Row] = limit(n).collect()
+
+  def take(n: Int): Array[Row] = head(n)
+
+  def show(numRows: Int = 20, truncate: Int = 20): Unit =
+    val schemaOpt = schemaInternal()
+    val rows = limit(numRows).collect()
+    val colNames = schemaOpt.map(_.fieldNames.toSeq).getOrElse(
+      if rows.nonEmpty then (0 until rows.head.size).map(i => s"col$i").toSeq
+      else Seq.empty
+    )
+    printTable(colNames, rows, truncate)
+
+  def printSchema(): Unit =
+    val s = schema
+    println(s.treeString)
+
+  def schema: StructType =
+    schemaInternal().getOrElse(StructType.empty)
+
+  def columns: Array[String] = schema.fieldNames
+
+  def explain(extended: Boolean = false): Unit =
+    val plan = Plan(opType = Plan.OpType.Root(relation))
+    val analyze = AnalyzePlanRequest.Analyze.Explain(
+      AnalyzePlanRequest.Explain(
+        plan = Some(plan),
+        explainMode =
+          if extended then AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_EXTENDED
+          else AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
+      )
+    )
+    val request = AnalyzePlanRequest(
+      sessionId = session.sessionId,
+      userContext = Some(UserContext(userId = session.client.userId)),
+      analyze = analyze
+    )
+    val resp = session.client.analyzeSchema(plan) // use the base analyze
+    // For proper explain, we'd call stub directly. For now, schema-based response:
+    println("== Physical Plan ==")
+    println("(use server-side explain for full output)")
+
+  def isEmpty: Boolean = limit(1).collect().isEmpty
+
+  // ---------------------------------------------------------------------------
+  // Writer
+  // ---------------------------------------------------------------------------
+
+  def write: DataFrameWriter = DataFrameWriter(this)
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  /** Resolve schema from the server. */
+  private def schemaInternal(): Option[StructType] =
+    try
+      val plan = Plan(opType = Plan.OpType.Root(relation))
+      val resp = client.analyzeSchema(plan)
+      resp.result match
+        case AnalyzePlanResponse.Result.Schema(s) =>
+          s.schema.map(DataTypeProtoConverter.fromProto(_)).collect {
+            case st: StructType => st
+          }
+        case _ => None
+    catch case _: Exception => None
+
+  private def withRelation(relType: Relation.RelType): DataFrame =
+    DataFrame(session, Relation(
+      common = Some(RelationCommon(planId = Some(session.nextPlanId()))),
+      relType = relType
+    ))
+
+  private def setOp(
+      other: DataFrame,
+      opType: SetOperation.SetOpType,
+      byName: Boolean,
+      allowMissingColumns: Boolean = false
+  ): DataFrame =
+    withRelation(Relation.RelType.SetOp(
+      SetOperation(
+        leftInput = Some(relation),
+        rightInput = Some(other.relation),
+        setOpType = opType,
+        byName = Some(byName),
+        allowMissingColumns = Some(allowMissingColumns)
+      )
+    ))
+
+  private def toJoinType(s: String): Join.JoinType =
+    s.toLowerCase match
+      case "inner"                       => Join.JoinType.JOIN_TYPE_INNER
+      case "left" | "leftouter"          => Join.JoinType.JOIN_TYPE_LEFT_OUTER
+      case "right" | "rightouter"        => Join.JoinType.JOIN_TYPE_RIGHT_OUTER
+      case "full" | "outer" | "fullouter" => Join.JoinType.JOIN_TYPE_FULL_OUTER
+      case "cross"                       => Join.JoinType.JOIN_TYPE_CROSS
+      case "semi" | "leftsemi"           => Join.JoinType.JOIN_TYPE_LEFT_SEMI
+      case "anti" | "leftanti"           => Join.JoinType.JOIN_TYPE_LEFT_ANTI
+      case _                             => Join.JoinType.JOIN_TYPE_INNER
+
+  private def printTable(colNames: Seq[String], rows: Array[Row], truncate: Int): Unit =
+    if colNames.isEmpty && rows.isEmpty then
+      println("(empty DataFrame)")
+      return
+
+    def truncStr(s: String): String =
+      if s.length > truncate then s.take(truncate - 3) + "..." else s
+
+    val allRows: Seq[Seq[String]] = colNames.map(truncStr) +: rows.map { row =>
+      (0 until row.size).map { i =>
+        val v = row.get(i)
+        truncStr(if v == null then "null" else v.toString)
+      }.toSeq
+    }.toSeq
+
+    val widths = allRows.transpose.map(col => col.map(_.length).max)
+    val sep = widths.map("-" * _).mkString("+", "+", "+")
+    def fmtRow(row: Seq[String]): String =
+      row.zip(widths).map { (s, w) => s.padTo(w, ' ') }.mkString("|", "|", "|")
+
+    println(sep)
+    println(fmtRow(allRows.head))
+    println(sep)
+    allRows.tail.foreach(r => println(fmtRow(r)))
+    println(sep)
+
+object DataFrame:
+  private[sql] def apply(session: SparkSession, relation: Relation): DataFrame =
+    new DataFrame(session, relation)
