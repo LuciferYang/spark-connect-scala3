@@ -83,6 +83,17 @@ final class SparkSession private (
     ))
 
   // ---------------------------------------------------------------------------
+  // createDataset (typed)
+  // ---------------------------------------------------------------------------
+
+  /** Create a Dataset[T] from a local Seq using a compile-time derived Encoder. */
+  def createDataset[T: Encoder: scala.reflect.ClassTag](data: Seq[T]): Dataset[T] =
+    val enc = summon[Encoder[T]]
+    val rows = data.map(enc.toRow)
+    val df = createDataFrame(rows, enc.schema)
+    Dataset(df, enc)
+
+  // ---------------------------------------------------------------------------
   // Reader
   // ---------------------------------------------------------------------------
 

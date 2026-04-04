@@ -401,6 +401,9 @@ final class DataFrame private[sql] (
 
   def write: DataFrameWriter = DataFrameWriter(this)
 
+  /** Convert this DataFrame to a strongly-typed Dataset[T]. */
+  def as[T: Encoder: scala.reflect.ClassTag]: Dataset[T] = Dataset(this, summon[Encoder[T]])
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
