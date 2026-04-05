@@ -1,6 +1,10 @@
 package org.apache.spark.sql.expressions
 
-import org.apache.spark.sql.Encoder
+import com.google.protobuf.ByteString
+import org.apache.spark.connect.proto.{Expression, ScalarScalaUDF, TypedAggregateExpression}
+import org.apache.spark.sql.{Encoder, Encoders, TypedColumn}
+import org.apache.spark.sql.connect.client.DataTypeProtoConverter
+import org.apache.spark.sql.connect.common.UdfPacket
 
 /** A base class for user-defined aggregations, which can be used in `Dataset` operations to take
   * all of the elements of a group and reduce them to a single value.
@@ -52,3 +56,31 @@ abstract class Aggregator[-IN, BUF, OUT] extends Serializable:
 
   /** Specifies the `Encoder` for the final output value type. */
   def outputEncoder: Encoder[OUT]
+
+  /** Returns this `Aggregator` as a [[TypedColumn]] that can be used in
+    * [[org.apache.spark.sql.KeyValueGroupedDataset.agg]].
+    *
+    * The Aggregator is serialized into a `TypedAggregateExpression` proto, which the server unpacks
+    * and evaluates as a UDAF.
+    */
+  def toColumn: TypedColumn[IN, OUT] =
+    val outEnc = outputEncoder
+    val outAg = Encoders.asAgnostic(outEnc)
+    val bufAg = Encoders.asAgnostic(bufferEncoder)
+    val packet = UdfPacket(this, Seq(bufAg), outAg)
+    val payload = UdfPacket.serialize(packet)
+    val scalaUdf = ScalarScalaUDF
+      .newBuilder()
+      .setPayload(ByteString.copyFrom(payload))
+      .setOutputType(DataTypeProtoConverter.toProto(outAg.dataType))
+      .setNullable(true)
+      .setAggregate(true)
+    val expr = Expression
+      .newBuilder()
+      .setTypedAggregateExpression(
+        TypedAggregateExpression
+          .newBuilder()
+          .setScalarScalaUdf(scalaUdf.build())
+      )
+      .build()
+    TypedColumn(expr, outEnc)

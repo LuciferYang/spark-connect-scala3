@@ -2,6 +2,7 @@ package org.apache.spark.sql
 
 import com.google.protobuf.ByteString
 import org.apache.spark.connect.proto.{
+  Aggregate,
   CommonInlineUserDefinedFunction,
   Expression,
   GroupMap,
@@ -13,6 +14,7 @@ import org.apache.spark.connect.proto.{
 import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.UdfPacket
+import org.apache.spark.sql.expressions.{Aggregator, ReduceAggregator}
 import org.apache.spark.sql.streaming.{
   GroupState,
   GroupStateTimeout,
@@ -23,6 +25,7 @@ import org.apache.spark.sql.streaming.{
   TimeMode
 }
 
+import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
 /** A Dataset that has been grouped by a key-extracting function, enabling typed group operations.
@@ -99,16 +102,22 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
 
   /** Reduce the values in each group using an associative binary operator.
     *
-    * Returns a Dataset of (key, reduced_value) pairs. Requires an Encoder for the pair type.
+    * Returns a Dataset of (key, reduced_value) pairs. When AgnosticEncoder is available, uses a
+    * server-side [[ReduceAggregator]]; otherwise falls back to client-side mapGroups.
     */
   def reduceGroups(func: (V, V) => V)(using
       pairEnc: Encoder[(K, V)],
       pairCt: ClassTag[(K, V)]
   ): Dataset[(K, V)] =
-    mapGroups { (k, iter) =>
-      val reduced = iter.reduce(func)
-      (k, reduced)
-    }
+    val valueAg = valueEncoder.agnosticEncoder
+    if valueAg != null then
+      val reducer = ReduceAggregator[V](func)(using valueEncoder)
+      agg(reducer.toColumn)
+    else
+      mapGroups { (k, iter) =>
+        val reduced = iter.reduce(func)
+        (k, reduced)
+      }
 
   /** Count the number of elements in each group.
     *
@@ -131,6 +140,97 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   )(func: (K, Iterator[V], Iterator[U]) => IterableOnce[R]): Dataset[R] =
     val outEnc = summon[Encoder[R]]
     cogroupLocal(other, func, outEnc)
+
+  // ---------------------------------------------------------------------------
+  // Typed aggregation (agg with TypedColumn)
+  // ---------------------------------------------------------------------------
+
+  /** Compute aggregates by specifying a series of aggregate columns. The aggregate columns must be
+    * [[TypedColumn]]s created by typed aggregation functions (e.g. `Aggregator.toColumn` or
+    * `typed.sum`). The result is a Dataset containing the key and the aggregation results.
+    */
+  def agg[U1](col1: TypedColumn[V, U1])(using
+      e1: Encoder[U1],
+      pairEnc: Encoder[(K, U1)],
+      pairCt: ClassTag[(K, U1)]
+  ): Dataset[(K, U1)] =
+    aggUntyped(pairEnc, pairCt)(col1)
+
+  def agg[U1, U2](
+      col1: TypedColumn[V, U1],
+      col2: TypedColumn[V, U2]
+  )(using
+      e1: Encoder[U1],
+      e2: Encoder[U2],
+      tupleEnc: Encoder[(K, U1, U2)],
+      tupleCt: ClassTag[(K, U1, U2)]
+  ): Dataset[(K, U1, U2)] =
+    aggUntyped(tupleEnc, tupleCt)(col1, col2)
+
+  def agg[U1, U2, U3](
+      col1: TypedColumn[V, U1],
+      col2: TypedColumn[V, U2],
+      col3: TypedColumn[V, U3]
+  )(using
+      e1: Encoder[U1],
+      e2: Encoder[U2],
+      e3: Encoder[U3],
+      tupleEnc: Encoder[(K, U1, U2, U3)],
+      tupleCt: ClassTag[(K, U1, U2, U3)]
+  ): Dataset[(K, U1, U2, U3)] =
+    aggUntyped(tupleEnc, tupleCt)(col1, col2, col3)
+
+  def agg[U1, U2, U3, U4](
+      col1: TypedColumn[V, U1],
+      col2: TypedColumn[V, U2],
+      col3: TypedColumn[V, U3],
+      col4: TypedColumn[V, U4]
+  )(using
+      e1: Encoder[U1],
+      e2: Encoder[U2],
+      e3: Encoder[U3],
+      e4: Encoder[U4],
+      tupleEnc: Encoder[(K, U1, U2, U3, U4)],
+      tupleCt: ClassTag[(K, U1, U2, U3, U4)]
+  ): Dataset[(K, U1, U2, U3, U4)] =
+    aggUntyped(tupleEnc, tupleCt)(col1, col2, col3, col4)
+
+  /** Internal implementation for typed aggregation with [[TypedColumn]]s.
+    *
+    * Builds an `Aggregate` proto (not `GroupMap`) with the grouping key UDF in
+    * `grouping_expressions` and each `TypedColumn.expr` (a `TypedAggregateExpression`) in
+    * `aggregate_expressions`.
+    */
+  private def aggUntyped[R](resultEnc: Encoder[R], resultCt: ClassTag[R])(
+      columns: TypedColumn[?, ?]*
+  ): Dataset[R] =
+    val keyAg = keyEncoder.agnosticEncoder
+    val valueAg = valueEncoder.agnosticEncoder
+    require(
+      keyAg != null && valueAg != null,
+      "agg(TypedColumn) requires AgnosticEncoder support for key and value types"
+    )
+    val groupingUdf = buildGroupingUdf(keyAg, valueAg)
+    val aggBuilder = Aggregate
+      .newBuilder()
+      .setInput(ds.df.relation)
+      .setGroupType(Aggregate.GroupType.GROUP_TYPE_GROUPBY)
+      .addGroupingExpressions(
+        Expression
+          .newBuilder()
+          .setCommonInlineUserDefinedFunction(groupingUdf)
+          .build()
+      )
+    columns.foreach(c => aggBuilder.addAggregateExpressions(c.expr))
+    val relation = Relation
+      .newBuilder()
+      .setCommon(
+        RelationCommon.newBuilder().setPlanId(ds.sparkSession.nextPlanId()).build()
+      )
+      .setAggregate(aggBuilder.build())
+      .build()
+    val newDf = DataFrame(ds.sparkSession, relation)
+    Dataset(newDf, resultEnc)(using resultCt)
 
   // ---------------------------------------------------------------------------
   // Stateful streaming operations

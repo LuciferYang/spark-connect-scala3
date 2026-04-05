@@ -9,7 +9,7 @@ import scala.jdk.CollectionConverters.*
   * Column objects are lazy — they build a protobuf Expression tree that gets sent to the server
   * only when an action is triggered.
   */
-final class Column private[sql] (private[sql] val expr: Expression):
+class Column private[sql] (private[sql] val expr: Expression):
 
   // ---------------------------------------------------------------------------
   // Constructors

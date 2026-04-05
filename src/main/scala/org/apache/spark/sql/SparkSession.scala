@@ -108,6 +108,13 @@ final class SparkSession private[sql] (
     Dataset(df, enc)
 
   // ---------------------------------------------------------------------------
+  // Table-Valued Functions
+  // ---------------------------------------------------------------------------
+
+  /** Access table-valued functions (explode, inline, posexplode, etc.). */
+  def tvf: TableValuedFunction = TableValuedFunction(this)
+
+  // ---------------------------------------------------------------------------
   // Reader
   // ---------------------------------------------------------------------------
 

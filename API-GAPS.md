@@ -24,6 +24,11 @@ These features have been implemented:
 | StreamingQueryListener | — | `StreamingQueryListener` + `StreamingQueryListenerBus` + event dispatch |
 | SQLImplicits / DatasetHolder | — | Scala 3 `object implicits` with extension methods (`$"col"`, `Seq[T].toDS/toDF`) |
 | ConnectRepl | — | Ammonite-based Scala 3 REPL with `SparkConnectClientParser` + `AmmoniteClassFinder` |
+| Aggregator.toColumn / TypedColumn | — | `TypedColumn[-T, U]` + `Aggregator.toColumn` via `TypedAggregateExpression` proto |
+| ReduceAggregator | — | `ReduceAggregator[T]` + server-side `reduceGroups` via `agg(TypedColumn)` |
+| TableValuedFunction (TVF) | — | `SparkSession.tvf` with explode, inline, posexplode, json_tuple, stack, etc. |
+| `typed` Object | — | `typed.avg`, `typed.count`, `typed.sum`, `typed.sumLong` via typed aggregators |
+| `KeyValueGroupedDataset.agg(TypedColumn)` | — | `agg[U1]` through `agg[U1,U2,U3,U4]` via `Aggregate` proto |
 
 ## Remaining Gaps
 
@@ -33,31 +38,7 @@ These features have been implemented:
 
 ### Medium Priority
 
-#### 5. Aggregator.toColumn / TypedColumn
-
-**Upstream**: `Aggregator[IN, BUF, OUT].toColumn` returns a `TypedColumn[IN, OUT]` that can be used in typed aggregations on `KeyValueGroupedDataset`.
-
-**What it does**: Enables `groupedDs.agg(myAggregator.toColumn)`. Requires `TypedColumn` class + `InvokeInlineUserDefinedFunction` column node.
-
-**SC3 status**: `Aggregator` class exists; `toColumn` is not yet implemented.
-
-#### 6. ReduceAggregator
-
-**Upstream**: Built-in `ReduceAggregator[T]` for simple reduce operations, used internally by `KeyValueGroupedDataset.reduceGroups`.
-
-**SC3 status**: `reduceGroups` uses a `mapGroups`-based client-side implementation, which works but doesn't delegate to the server's `ReduceAggregator`.
-
-#### 7. TableValuedFunction (TVF)
-
-**Upstream**: `SparkSession.tvf` provides access to table-valued functions: `range`, `explode`, `inline`, `json_tuple`, `posexplode`, `stack`, `collations`, `sql_keywords`, `variant_explode`.
-
-**Proto support**: `Relation.TableValuedFunction` proto exists.
-
-#### 8. `typed` Object
-
-**Upstream**: `org.apache.spark.sql.typed` provides typed aggregation functions: `typed.count`, `typed.sum`, `typed.avg`, `typed.sumLong` etc.
-
-**SC3 status**: Not implemented. Requires `TypedColumn` support.
+(None currently)
 
 ### Low Priority
 

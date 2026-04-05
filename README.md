@@ -24,6 +24,11 @@ This project provides that Scala 3 client.
 - **Catalog** — full Catalog API: list/get/create/drop databases, tables, views, functions; cache management; table properties; partitions; analyze/truncate
 - **UDF** — register and use JVM lambda UDFs (0–10 arguments)
 - **UDAF** — user-defined aggregate functions via `Aggregator[IN, BUF, OUT]` with `Encoders` factory
+- **TypedColumn / Aggregator.toColumn** — type-safe aggregation via `TypedColumn[-T, U]` and `Aggregator.toColumn`
+- **ReduceAggregator** — server-side reduce aggregator for `reduceGroups`
+- **typed object** — typed aggregation functions: `typed.avg`, `typed.count`, `typed.sum`, `typed.sumLong`
+- **TableValuedFunction** — `SparkSession.tvf` for explode, inline, posexplode, json_tuple, stack, collations, sql_keywords, variant_explode, and more
+- **KeyValueGroupedDataset.agg(TypedColumn)** — typed aggregation with 1–4 TypedColumn arguments via `Aggregate` proto
 - **DataFrameNaFunctions** — drop / fill / replace null values
 - **DataFrameStatFunctions** — statistical functions (crosstab, freqItems, approxQuantile, etc.)
 - **Window** — window specifications with partitionBy, orderBy, rowsBetween, rangeBetween
@@ -158,6 +163,8 @@ src/
 │       ├── DataFrame.scala              # Transformations + Actions
 │       ├── Dataset.scala                # Typed Dataset[T]
 │       ├── Column.scala                 # Expression tree builder
+│       ├── TypedColumn.scala            # Column + Encoder for type-safe aggregation
+│       ├── TableValuedFunction.scala    # Table-valued functions (explode, inline, etc.)
 │       ├── functions.scala              # 542 built-in SQL functions (100% coverage)
 │       ├── Row.scala                    # Row with typed accessors
 │       ├── Encoder.scala                # Compile-time encoder derivation
@@ -196,7 +203,12 @@ src/
 │       │   ├── TTLConfig.scala          # TTL configuration
 │       │   └── QueryInfo.scala          # Query info trait stub
 │       ├── expressions/
-│       │   └── Aggregator.scala         # UDAF Aggregator abstract class
+│       │   ├── Aggregator.scala         # UDAF Aggregator abstract class
+│       │   ├── ReduceAggregator.scala   # Server-side reduce aggregator
+│       │   └── scalalang/
+│       │       └── typed.scala          # Typed aggregation functions (avg, sum, etc.)
+│       ├── internal/
+│       │   └── TypedAggregators.scala   # TypedAverage, TypedCount, TypedSumDouble, TypedSumLong
 │       ├── types/DataType.scala         # Spark SQL type system
 │       ├── catalyst/encoders/
 │       │   └── AgnosticEncoder.scala    # Agnostic encoder definitions
@@ -243,7 +255,11 @@ src/
         ├── KeyValueGroupedDatasetStatefulSuite.scala
         ├── IntegrationSuite.scala       # Requires running server
         ├── expressions/
-        │   └── AggregatorSuite.scala    # UDAF unit tests
+        │   ├── AggregatorSuite.scala    # UDAF unit tests
+        │   └── scalalang/
+        │       └── TypedSuite.scala     # typed.avg/count/sum/sumLong tests
+        ├── TypedColumnSuite.scala
+        ├── TableValuedFunctionSuite.scala
         ├── connect/client/
         │   ├── SparkConnectClientParserSuite.scala
         │   ├── DataTypeProtoConverterSuite.scala
@@ -285,7 +301,7 @@ src/
 ## Supported API
 
 ### SparkSession
-`sql`, `table`, `range`, `emptyDataFrame`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `version`, `stop`
+`sql`, `table`, `range`, `emptyDataFrame`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `tvf`, `version`, `stop`
 
 ### DataFrame Transformations
 `select`, `selectExpr`, `filter`, `where`, `limit`, `offset`, `sort`, `orderBy`, `groupBy`, `rollup`, `cube`, `agg`, `join`, `crossJoin`, `withColumn`, `withColumnRenamed`, `drop`, `distinct`, `dropDuplicates`, `union`, `unionAll`, `unionByName`, `intersect`, `intersectAll`, `except`, `exceptAll`, `repartition`, `coalesce`, `sample`, `describe`, `summary`, `alias`, `toDF`, `hint`, `broadcast`, `sortWithinPartitions`, `tail`, `transform`, `na`, `stat`, `cache`, `persist`, `unpersist`, `withWatermark`, `writeStream`
@@ -316,11 +332,16 @@ src/
 - [x] Encoder derivation (Scala 3 `derives`)
 - [x] UDF support
 - [x] UDAF support (Aggregator + Encoders factory)
+- [x] Aggregator.toColumn / TypedColumn (type-safe aggregation)
+- [x] ReduceAggregator (server-side reduceGroups)
+- [x] TableValuedFunction (SparkSession.tvf)
+- [x] typed object (typed.avg, typed.sum, typed.count, typed.sumLong)
+- [x] KeyValueGroupedDataset.agg(TypedColumn) (1–4 typed columns)
 - [x] Structured Streaming
 - [x] `foreachBatch` / `foreach` (ForeachWriter)
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
-- [x] Unit tests (455 tests)
+- [x] Unit tests (461 tests)
 - [x] Integration tests (Spark 4.0.2 / 4.1.1)
 - [x] Error handling (retry policies, gRPC exception conversion)
 - [ ] Publish to Maven Central
