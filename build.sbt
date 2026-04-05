@@ -2,6 +2,31 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "3.3.7"
 ThisBuild / organization := "io.github.spark-connect"
 
+// ---------------------------------------------------------------------------
+// Publishing metadata (required by Maven Central)
+// ---------------------------------------------------------------------------
+ThisBuild / description := "A lightweight Apache Spark Connect client for Scala 3"
+ThisBuild / homepage := Some(url("https://github.com/LuciferYang/spark-connect-scala3"))
+ThisBuild / licenses := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0"))
+ThisBuild / developers := List(
+  Developer(
+    id = "LuciferYang",
+    name = "Yang Jie",
+    email = "yangjie01@baidu.com",
+    url = url("https://github.com/LuciferYang")
+  )
+)
+ThisBuild / scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/LuciferYang/spark-connect-scala3"),
+    "scm:git@github.com:LuciferYang/spark-connect-scala3.git"
+  )
+)
+
+// Sonatype / Maven Central publishing
+ThisBuild / sonatypeCredentialHost := "central.sonatype.com"
+ThisBuild / publishTo := sonatypePublishToBundle.value
+
 val grpcVersion = "1.80.0"
 val protobufVersion = "4.34.1"
 
@@ -65,5 +90,15 @@ lazy val root = (project in file("."))
     run / javaOptions ++= Seq(
       "--add-opens=java.base/java.nio=ALL-UNNAMED"
     ),
-    run / fork := true
+    run / fork := true,
+
+    // Include LICENSE and NOTICE in the jar
+    Compile / packageBin / mappings ++= Seq(
+      baseDirectory.value / "LICENSE" -> "META-INF/LICENSE",
+      baseDirectory.value / "NOTICE" -> "META-INF/NOTICE"
+    ),
+    Compile / packageSrc / mappings ++= Seq(
+      baseDirectory.value / "LICENSE" -> "META-INF/LICENSE",
+      baseDirectory.value / "NOTICE" -> "META-INF/NOTICE"
+    )
   )
