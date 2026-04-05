@@ -17,7 +17,9 @@ This project provides that Scala 3 client.
 - **functions** — 542 built-in SQL functions (aggregates, math, string, date/time, window, collection, JSON, XML, URL, variant, datasketch, geospatial, and more) — **100% coverage** of the official API
 - **GroupedDataFrame** — groupBy / rollup / cube / pivot with agg, count, sum, avg, min, max
 - **DataFrameReader / Writer** — read and write Parquet, JSON, CSV, ORC, text, and tables
-- **DataStreamReader / Writer** — structured streaming read / write with trigger support
+- **DataFrameWriterV2 / MergeIntoWriter** — V2 table writes (create, append, overwrite, overwritePartitions) and MERGE INTO support
+- **DataStreamReader / Writer** — structured streaming read / write with trigger, `foreachBatch`, and `foreach` support
+- **Stateful Streaming** — `mapGroupsWithState`, `flatMapGroupsWithState`, `transformWithState` on `KeyValueGroupedDataset`
 - **StreamingQuery / Manager** — streaming query lifecycle management
 - **Catalog** — full Catalog API: list/get/create/drop databases, tables, views, functions; cache management; table properties; partitions; analyze/truncate
 - **UDF** — register and use JVM lambda UDFs (0–10 arguments)
@@ -136,10 +138,13 @@ src/
 │       ├── GroupedDataFrame.scala        # groupBy / rollup / cube / pivot
 │       ├── DataFrameReader.scala        # Batch read
 │       ├── DataFrameWriter.scala        # Batch write
+│       ├── DataFrameWriterV2.scala      # V2 table writes (create/append/overwrite)
+│       ├── MergeIntoWriter.scala        # MERGE INTO support
 │       ├── DataStreamReader.scala       # Streaming read
-│       ├── DataStreamWriter.scala       # Streaming write + Trigger types
+│       ├── DataStreamWriter.scala       # Streaming write + Trigger + foreachBatch/foreach
 │       ├── StreamingQuery.scala         # Query lifecycle management
 │       ├── StreamingQueryManager.scala  # Active query manager
+│       ├── ForeachWriter.scala          # Streaming foreach writer abstract class
 │       ├── Catalog.scala                # Database/table/function catalog
 │       ├── UserDefinedFunction.scala    # UDF + UDAF support
 │       ├── UDFRegistration.scala        # UDF registration
@@ -147,10 +152,22 @@ src/
 │       ├── DataFrameStatFunctions.scala # Statistical functions
 │       ├── StorageLevel.scala           # Cache storage levels
 │       ├── ArrowSerializer.scala        # Row → Arrow IPC encoding
-│       ├── KeyValueGroupedDataset.scala # Typed grouped operations
+│       ├── KeyValueGroupedDataset.scala # Typed grouped + stateful streaming ops
 │       ├── implicits.scala              # Implicit conversions
 │       ├── SparkException.scala         # Spark exception hierarchy
 │       ├── Artifact.scala               # Artifact management
+│       ├── streaming/                   # Stateful streaming types
+│       │   ├── OutputMode.scala         # Append / Update / Complete
+│       │   ├── GroupStateTimeout.scala  # NoTimeout / ProcessingTime / EventTime
+│       │   ├── TimeMode.scala           # None / ProcessingTime / EventTime
+│       │   ├── GroupState.scala         # Managed state trait stub
+│       │   ├── StatefulProcessor.scala  # StatefulProcessor + WithInitialState
+│       │   ├── StatefulProcessorHandle.scala  # State handle trait stub
+│       │   ├── StateVariables.scala     # ValueState / ListState / MapState stubs
+│       │   ├── TimerValues.scala        # Timer values trait stub
+│       │   ├── ExpiredTimerInfo.scala   # Expired timer info trait stub
+│       │   ├── TTLConfig.scala          # TTL configuration
+│       │   └── QueryInfo.scala          # Query info trait stub
 │       ├── expressions/
 │       │   └── Aggregator.scala         # UDAF Aggregator abstract class
 │       ├── types/DataType.scala         # Spark SQL type system
@@ -165,7 +182,8 @@ src/
 │       │   ├── GrpcRetryHandler.scala      # gRPC retry logic
 │       │   └── GrpcExceptionConverter.scala # gRPC → Spark exceptions
 │       ├── connect/common/
-│       │   └── UdfPacket.scala             # UDF serialization
+│       │   ├── UdfPacket.scala             # UDF serialization
+│       │   └── ForeachWriterPacket.scala   # ForeachWriter serialization
 │       └── examples/
 │           └── QuickStart.scala         # End-to-end example
 └── test/
@@ -178,20 +196,29 @@ src/
         ├── StorageLevelSuite.scala
         ├── DataStreamReaderSuite.scala
         ├── DataStreamWriterSuite.scala
+        ├── DataStreamWriterForeachSuite.scala
         ├── StreamingQuerySuite.scala
         ├── StreamingQueryManagerSuite.scala
+        ├── StreamingTypesSuite.scala
         ├── DataFrameStatFunctionsSuite.scala
+        ├── DataFrameSuite.scala
+        ├── DataFrameWriterV2Suite.scala
+        ├── MergeIntoWriterSuite.scala
         ├── UserDefinedFunctionSuite.scala
         ├── CatalogSuite.scala
-        ├── DataFrameSuite.scala
         ├── TypedOpsSuite.scala
         ├── ExpandedEncoderSuite.scala
         ├── ImplicitsSuite.scala
+        ├── KeyValueGroupedDatasetStatefulSuite.scala
         ├── IntegrationSuite.scala       # Requires running server
         ├── expressions/
         │   └── AggregatorSuite.scala    # UDAF unit tests
-        └── connect/client/
-            └── DataTypeProtoConverterSuite.scala
+        ├── connect/client/
+        │   ├── DataTypeProtoConverterSuite.scala
+        │   ├── GrpcExceptionConverterSuite.scala
+        │   └── RetryPolicySuite.scala
+        └── types/
+            └── DataTypeSuite.scala
 ```
 
 ## How It Works
@@ -232,7 +259,7 @@ src/
 `collect`, `count`, `first`, `head`, `take`, `show`, `printSchema`, `schema`, `columns`, `explain`, `isEmpty`, `createTempView`, `createOrReplaceTempView`, `createGlobalTempView`, `write`
 
 ### Structured Streaming
-`readStream` (DataStreamReader), `writeStream` (DataStreamWriter), `StreamingQuery` (isActive, stop, awaitTermination, recentProgress, explain, exception), `StreamingQueryManager` (active, get, awaitAnyTermination, resetTerminated), `Trigger` (ProcessingTime, AvailableNow, Once, Continuous)
+`readStream` (DataStreamReader), `writeStream` (DataStreamWriter), `StreamingQuery` (isActive, stop, awaitTermination, recentProgress, explain, exception), `StreamingQueryManager` (active, get, awaitAnyTermination, resetTerminated), `Trigger` (ProcessingTime, AvailableNow, Once, Continuous), `foreachBatch`, `foreach` (ForeachWriter), `mapGroupsWithState`, `flatMapGroupsWithState`, `transformWithState`
 
 ### Column Operators
 `===`, `=!=`, `>`, `>=`, `<`, `<=`, `&&`, `||`, `!`, `+`, `-`, `*`, `/`, `%`, `isNull`, `isNotNull`, `isNaN`, `contains`, `startsWith`, `endsWith`, `like`, `rlike`, `isin`, `between`, `substr`, `cast`, `alias`, `as`, `asc`, `desc`, `over`, `when`, `otherwise`, `getItem`, `getField`, `withField`, `dropFields`
@@ -249,18 +276,25 @@ src/
 - [x] DataFrame / Dataset[T] API
 - [x] Column expressions + 542 built-in functions (100% coverage)
 - [x] DataFrameReader / Writer
+- [x] DataFrameWriterV2 / MergeIntoWriter
 - [x] Catalog API (full coverage — all 37 proto RPCs)
 - [x] Encoder derivation (Scala 3 `derives`)
 - [x] UDF support
 - [x] UDAF support (Aggregator + Encoders factory)
 - [x] Structured Streaming
+- [x] `foreachBatch` / `foreach` (ForeachWriter)
+- [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
-- [x] Unit tests (328 tests)
+- [x] Unit tests (412 tests)
 - [x] Integration tests (Spark 4.0.2 / 4.1.1)
-- [ ] Publish to Maven Central
 - [x] Error handling (retry policies, gRPC exception conversion)
-- [ ] `foreach` / `foreachBatch` (requires ArtifactManager)
+- [ ] Publish to Maven Central
+- [ ] ConnectRepl (Scala 3 REPL / scala-cli integration)
+- [ ] Observation / CollectMetrics (`Dataset.observe()`)
 - [ ] StreamingQueryListener
+- [ ] SQLImplicits / DatasetHolder (`.toDS()`, `.toDF()` implicit conversions)
+
+See [API-GAPS.md](API-GAPS.md) for a detailed comparison with the official Spark Connect client.
 
 ## License
 
