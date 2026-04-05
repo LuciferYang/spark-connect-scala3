@@ -298,6 +298,142 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
       df.repartitionByRange(4)
   }
 
+  // ---------- range(4-param) ----------
+
+  test("range with numPartitions builds Range proto with num_partitions") {
+    val session = SparkSession(null)
+    val df = session.range(0, 100, 1, 4)
+    val rel = df.relation
+    rel.hasRange shouldBe true
+    val range = rel.getRange
+    range.getStart shouldBe 0
+    range.getEnd shouldBe 100
+    range.getStep shouldBe 1
+    range.getNumPartitions shouldBe 4
+  }
+
+  // ---------- collectAsList / takeAsList ----------
+
+  test("collectAsList return type is java.util.List[Row]") {
+    val method = classOf[DataFrame].getMethod("collectAsList")
+    method should not be null
+    classOf[java.util.List[?]].isAssignableFrom(method.getReturnType) shouldBe true
+  }
+
+  test("takeAsList return type is java.util.List[Row]") {
+    val method = classOf[DataFrame].getMethod("takeAsList", classOf[Int])
+    method should not be null
+    classOf[java.util.List[?]].isAssignableFrom(method.getReturnType) shouldBe true
+  }
+
+  // ---------- dropDuplicatesWithinWatermark ----------
+
+  test("dropDuplicatesWithinWatermark() builds Deduplicate proto with within_watermark") {
+    val df = testDf()
+    val result = df.dropDuplicatesWithinWatermark()
+    val rel = result.relation
+    rel.hasDeduplicate shouldBe true
+    val dedup = rel.getDeduplicate
+    dedup.getAllColumnsAsKeys shouldBe true
+    dedup.getWithinWatermark shouldBe true
+  }
+
+  test("dropDuplicatesWithinWatermark(colNames) builds Deduplicate proto") {
+    val df = testDf()
+    val result = df.dropDuplicatesWithinWatermark(Seq("a", "b"))
+    val dedup = result.relation.getDeduplicate
+    dedup.getWithinWatermark shouldBe true
+    dedup.getColumnNamesList.asScala.toSeq shouldBe Seq("a", "b")
+    dedup.getAllColumnsAsKeys shouldBe false
+  }
+
+  test("dropDuplicatesWithinWatermark(col1, cols*) builds Deduplicate proto") {
+    val df = testDf()
+    val result = df.dropDuplicatesWithinWatermark("x", "y")
+    val dedup = result.relation.getDeduplicate
+    dedup.getWithinWatermark shouldBe true
+    dedup.getColumnNamesList.asScala.toSeq shouldBe Seq("x", "y")
+  }
+
+  // ---------- transpose ----------
+
+  test("transpose(indexColumn) builds Transpose proto") {
+    val df = testDf()
+    val result = df.transpose(Column("id"))
+    val rel = result.relation
+    rel.hasTranspose shouldBe true
+    val transpose = rel.getTranspose
+    transpose.getIndexColumnsList should have size 1
+  }
+
+  test("transpose() without index builds Transpose proto") {
+    val df = testDf()
+    val result = df.transpose()
+    val rel = result.relation
+    rel.hasTranspose shouldBe true
+    rel.getTranspose.getIndexColumnsList should have size 0
+  }
+
+  // ---------- zipWithIndex ----------
+
+  test("zipWithIndex builds projection with distributed_sequence_id") {
+    val df = testDf()
+    val result = df.zipWithIndex
+    val rel = result.relation
+    rel.hasProject shouldBe true
+    val exprs = rel.getProject.getExpressionsList.asScala
+    exprs should have size 2
+    // Second expression should be an alias wrapping distributed_sequence_id
+    val indexExpr = exprs(1)
+    indexExpr.hasAlias shouldBe true
+    indexExpr.getAlias.getNameList.asScala.head shouldBe "index"
+    val inner = indexExpr.getAlias.getExpr
+    inner.hasUnresolvedFunction shouldBe true
+    inner.getUnresolvedFunction.getFunctionName shouldBe "distributed_sequence_id"
+    inner.getUnresolvedFunction.getIsInternal shouldBe true
+  }
+
+  // ---------- colRegex ----------
+
+  test("colRegex builds UnresolvedRegex proto") {
+    val df = testDf()
+    val col = df.colRegex("`id`")
+    col.expr.hasUnresolvedRegex shouldBe true
+    col.expr.getUnresolvedRegex.getColName shouldBe "`id`"
+  }
+
+  // ---------- metadataColumn ----------
+
+  test("metadataColumn builds UnresolvedAttribute with is_metadata_column") {
+    val df = testDf()
+    val col = df.metadataColumn("_metadata")
+    col.expr.hasUnresolvedAttribute shouldBe true
+    val attr = col.expr.getUnresolvedAttribute
+    attr.getUnparsedIdentifier shouldBe "_metadata"
+    attr.getIsMetadataColumn shouldBe true
+  }
+
+  // ---------- withMetadata ----------
+
+  test("withMetadata builds WithColumns proto with metadata in Alias") {
+    val df = testDf()
+    val result = df.withMetadata("col1", """{"key": "value"}""")
+    val rel = result.relation
+    rel.hasWithColumns shouldBe true
+    val aliases = rel.getWithColumns.getAliasesList.asScala
+    aliases should have size 1
+    aliases.head.getNameList.asScala.head shouldBe "col1"
+    aliases.head.getMetadata shouldBe """{"key": "value"}"""
+  }
+
+  // ---------- isLocal ----------
+
+  test("isLocal method exists with correct signature") {
+    val method = classOf[DataFrame].getMethod("isLocal")
+    method should not be null
+    method.getReturnType shouldBe classOf[Boolean]
+  }
+
   // ---------- tag API ----------
 
   test("SparkSession tag API round-trip") {

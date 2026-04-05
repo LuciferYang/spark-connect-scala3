@@ -153,6 +153,20 @@ final class DataFrame private[sql] (
     colNames.foreach(dedup.addColumnNames)
     withRelation(_.setDeduplicate(dedup.build()))
 
+  def dropDuplicatesWithinWatermark(): DataFrame =
+    withRelation(_.setDeduplicate(
+      Deduplicate.newBuilder()
+        .setInput(relation).setAllColumnsAsKeys(true).setWithinWatermark(true).build()
+    ))
+
+  def dropDuplicatesWithinWatermark(colNames: Seq[String]): DataFrame =
+    val dedup = Deduplicate.newBuilder().setInput(relation).setWithinWatermark(true)
+    colNames.foreach(dedup.addColumnNames)
+    withRelation(_.setDeduplicate(dedup.build()))
+
+  def dropDuplicatesWithinWatermark(col1: String, cols: String*): DataFrame =
+    dropDuplicatesWithinWatermark(col1 +: cols)
+
   def union(other: DataFrame): DataFrame =
     setOp(other, SetOperation.SetOpType.SET_OP_TYPE_UNION, byName = false)
 
@@ -533,6 +547,10 @@ final class DataFrame private[sql] (
     if observed.nonEmpty then session.processObservedMetrics(observed)
     rows
 
+  def collectAsList(): java.util.List[Row] = java.util.Arrays.asList(collect()*)
+
+  def takeAsList(n: Int): java.util.List[Row] = java.util.Arrays.asList(take(n)*)
+
   def count(): Long =
     import functions.{count as countFn, lit}
     groupBy(Seq.empty[Column]*).agg(countFn(lit(1)).as("count")).collect().head.getLong(0)
@@ -637,6 +655,17 @@ final class DataFrame private[sql] (
     }
     resp.getIsStreaming.getIsStreaming
 
+  /** Returns true if the `collect` and `take` methods can be run locally. */
+  def isLocal: Boolean =
+    val resp = client.analyzePlan { b =>
+      b.setIsLocal(
+        AnalyzePlanRequest.IsLocal.newBuilder()
+          .setPlan(Plan.newBuilder().setRoot(relation).build())
+          .build()
+      )
+    }
+    resp.getIsLocal.getIsLocal
+
   /** Return the input files that were used to create this DataFrame. */
   def inputFiles: Array[String] =
     val resp = client.analyzePlan { b =>
@@ -739,8 +768,59 @@ final class DataFrame private[sql] (
         .build()
     ))
 
+  /** Transpose this DataFrame from wide to tall format. */
+  def transpose(indexColumn: Column): DataFrame =
+    withRelation(_.setTranspose(
+      Transpose.newBuilder()
+        .setInput(relation).addIndexColumns(indexColumn.expr).build()
+    ))
+
+  /** Transpose this DataFrame from wide to tall format (no index column). */
+  def transpose(): DataFrame =
+    withRelation(_.setTranspose(
+      Transpose.newBuilder().setInput(relation).build()
+    ))
+
+  /** Zip this DataFrame with a unique Long index for each row. */
+  def zipWithIndex: DataFrame =
+    val seqId = Expression.newBuilder()
+      .setUnresolvedFunction(Expression.UnresolvedFunction.newBuilder()
+        .setFunctionName("distributed_sequence_id")
+        .setIsInternal(true)
+        .addArguments(Column.lit(0L).expr)
+        .build())
+      .build()
+    select(Column("*"), Column(seqId).as("index"))
+
   /** Convert this DataFrame to a strongly-typed Dataset[T]. */
   def as[T: Encoder: scala.reflect.ClassTag]: Dataset[T] = Dataset(this, summon[Encoder[T]])
+
+  /** Select columns matching a regex pattern. */
+  def colRegex(colName: String): Column =
+    Column(Expression.newBuilder()
+      .setUnresolvedRegex(Expression.UnresolvedRegex.newBuilder()
+        .setColName(colName).build())
+      .build())
+
+  /** Access a metadata column by name (e.g., `_metadata`). */
+  def metadataColumn(colName: String): Column =
+    Column(Expression.newBuilder()
+      .setUnresolvedAttribute(Expression.UnresolvedAttribute.newBuilder()
+        .setUnparsedIdentifier(colName).setIsMetadataColumn(true).build())
+      .build())
+
+  /** Attach metadata (as JSON string) to a column. */
+  def withMetadata(columnName: String, metadata: String): DataFrame =
+    withRelation(_.setWithColumns(
+      WithColumns.newBuilder()
+        .setInput(relation)
+        .addAliases(Expression.Alias.newBuilder()
+          .setExpr(Column(columnName).expr)
+          .addName(columnName)
+          .setMetadata(metadata)
+          .build())
+        .build()
+    ))
 
   // ---------------------------------------------------------------------------
   // Helpers

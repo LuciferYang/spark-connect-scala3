@@ -323,6 +323,24 @@ final class SparkConnectClient private (
   def newClient(): SparkConnectClient =
     SparkConnectClient.create(connectionUrl)
 
+  /** Clone the current session on the server (preserving config, temp views, UDFs). */
+  def cloneSession(): SparkConnectClient =
+    val rb = CloneSessionRequest.newBuilder()
+      .setSessionId(sessionId)
+      .setUserContext(userContext)
+    serverSideSessionId.foreach(rb.setClientObservedServerSideSessionId)
+    val resp = GrpcExceptionConverter.convert(retryHandler.retry(bstub.cloneSession(rb.build())))
+    val clonedSessionId = resp.getSessionId
+    SparkConnectClient(
+      channel,
+      bstub,
+      asyncStub,
+      clonedSessionId,
+      userId,
+      retryHandler,
+      connectionUrl
+    )
+
   /** Fetch enriched error details from the server for the given error ID. */
   private[client] def fetchErrorDetails(
       errorId: String

@@ -213,3 +213,75 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     val method = classOf[Dataset[?]].getMethod("show", classOf[Int], classOf[Int], classOf[Boolean])
     method should not be null
   }
+
+  // ---------------------------------------------------------------------------
+  // emptyDataset type signature tests
+  // ---------------------------------------------------------------------------
+
+  test("emptyDataset method exists on SparkSession") {
+    // Verify the method compiles and exists via reflection
+    val methods = classOf[SparkSession].getMethods.filter(_.getName == "emptyDataset")
+    methods should not be empty
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dataset.collectAsList / takeAsList
+  // ---------------------------------------------------------------------------
+
+  test("Dataset.collectAsList return type is java.util.List") {
+    val method = classOf[Dataset[?]].getMethod("collectAsList")
+    method should not be null
+    classOf[java.util.List[?]].isAssignableFrom(method.getReturnType) shouldBe true
+  }
+
+  test("Dataset.takeAsList return type is java.util.List") {
+    val method = classOf[Dataset[?]].getMethod("takeAsList", classOf[Int])
+    method should not be null
+    classOf[java.util.List[?]].isAssignableFrom(method.getReturnType) shouldBe true
+  }
+
+  // ---------------------------------------------------------------------------
+  // dropDuplicatesWithinWatermark delegate tests
+  // ---------------------------------------------------------------------------
+
+  test("Dataset.dropDuplicatesWithinWatermark() delegates to DataFrame") {
+    val ds = testDataset[Long]()
+    val result = ds.dropDuplicatesWithinWatermark()
+    result.df.relation.hasDeduplicate shouldBe true
+    result.df.relation.getDeduplicate.getWithinWatermark shouldBe true
+  }
+
+  // ---------------------------------------------------------------------------
+  // colRegex / metadataColumn delegate tests
+  // ---------------------------------------------------------------------------
+
+  test("Dataset.colRegex delegates to DataFrame") {
+    val ds = testDataset[Long]()
+    val col = ds.colRegex("`id`")
+    col.expr.hasUnresolvedRegex shouldBe true
+  }
+
+  test("Dataset.metadataColumn delegates to DataFrame") {
+    val ds = testDataset[Long]()
+    val col = ds.metadataColumn("_metadata")
+    col.expr.hasUnresolvedAttribute shouldBe true
+    col.expr.getUnresolvedAttribute.getIsMetadataColumn shouldBe true
+  }
+
+  // ---------------------------------------------------------------------------
+  // Typed select (TypedColumn 1-5 arity) compile tests
+  // ---------------------------------------------------------------------------
+
+  test("Dataset has typed select with 1 TypedColumn") {
+    val methods = classOf[Dataset[?]].getMethods.filter(m =>
+      m.getName == "select" && m.getTypeParameters.length == 1
+    )
+    methods should not be empty
+  }
+
+  test("Dataset has typed select with 2 TypedColumns") {
+    val methods = classOf[Dataset[?]].getMethods.filter(m =>
+      m.getName == "select" && m.getTypeParameters.length == 2
+    )
+    methods should not be empty
+  }

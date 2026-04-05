@@ -10,9 +10,9 @@ This project provides that Scala 3 client.
 
 ## Features
 
-- **SparkSession** — `builder().remote("sc://host:port").build()`
+- **SparkSession** — `builder().remote("sc://host:port").build()`, static session management (`getActiveSession`, `getDefaultSession`, `active`), `cloneSession()`, `executeCommand` (DeveloperApi)
 - **DataFrame** — select, filter, groupBy, join, union, distinct, sort, limit, sample, and more
-- **Dataset[T]** — typed operations with compile-time `Encoder` derivation via `derives Encoder`, `joinWith` (type-safe join), `toLocalIterator`, `toJSON`
+- **Dataset[T]** — typed operations with compile-time `Encoder` derivation via `derives Encoder`, `joinWith` (type-safe join), typed `select(TypedColumn)` (1-5 arity), `toLocalIterator`, `toJSON`
 - **Column** — arithmetic, comparison, logical, string, cast, alias, window, sort operators
 - **functions** — 542 built-in SQL functions (aggregates, math, string, date/time, window, collection, JSON, XML, URL, variant, datasketch, geospatial, and more) — **100% coverage** of the official API
 - **GroupedDataFrame** — groupBy / rollup / cube / pivot / groupingSets with agg, count, sum, avg, min, max
@@ -256,6 +256,7 @@ src/
         ├── UserDefinedFunctionSuite.scala
         ├── CatalogSuite.scala
         ├── TypedOpsSuite.scala
+        ├── SparkSessionSuite.scala
         ├── ExpandedEncoderSuite.scala
         ├── ImplicitsSuite.scala
         ├── KeyValueGroupedDatasetStatefulSuite.scala
@@ -312,13 +313,13 @@ src/
 ## Supported API
 
 ### SparkSession
-`sql`, `sql(query, args)` (parameterized), `table`, `range`, `emptyDataFrame`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `tvf`, `newSession`, `version`, `addTag`, `removeTag`, `getTags`, `clearTags`, `interruptAll`, `interruptTag`, `interruptOperation`, `stop`
+`sql`, `sql(query, args)` (parameterized), `table`, `range` (2/3/4-param), `emptyDataFrame`, `emptyDataset[T]`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `tvf`, `newSession`, `cloneSession`, `version`, `addTag`, `removeTag`, `getTags`, `clearTags`, `interruptAll`, `interruptTag`, `interruptOperation`, `executeCommand`, `stop`, `getActiveSession`, `getDefaultSession`, `active`, `setActiveSession`, `clearActiveSession`, `setDefaultSession`, `clearDefaultSession`
 
 ### DataFrame Transformations
-`select`, `selectExpr`, `filter`, `where`, `limit`, `offset`, `sort`, `orderBy`, `groupBy`, `rollup`, `cube`, `agg`, `join`, `crossJoin`, `lateralJoin`, `groupingSets`, `withColumn`, `withColumnRenamed`, `drop`, `distinct`, `dropDuplicates`, `union`, `unionAll`, `unionByName`, `intersect`, `intersectAll`, `except`, `exceptAll`, `repartition`, `repartitionByRange`, `coalesce`, `sample`, `describe`, `summary`, `alias`, `toDF`, `hint`, `broadcast`, `sortWithinPartitions`, `tail`, `transform`, `na`, `stat`, `cache`, `persist`, `unpersist`, `checkpoint`, `localCheckpoint`, `withWatermark`, `writeStream`
+`select`, `selectExpr`, `filter`, `where`, `limit`, `offset`, `sort`, `orderBy`, `groupBy`, `rollup`, `cube`, `agg`, `join`, `crossJoin`, `lateralJoin`, `groupingSets`, `withColumn`, `withColumnRenamed`, `withMetadata`, `drop`, `distinct`, `dropDuplicates`, `dropDuplicatesWithinWatermark`, `union`, `unionAll`, `unionByName`, `intersect`, `intersectAll`, `except`, `exceptAll`, `repartition`, `repartitionByRange`, `coalesce`, `sample`, `describe`, `summary`, `alias`, `toDF`, `hint`, `broadcast`, `sortWithinPartitions`, `tail`, `transform`, `transpose`, `zipWithIndex`, `colRegex`, `metadataColumn`, `na`, `stat`, `cache`, `persist`, `unpersist`, `checkpoint`, `localCheckpoint`, `withWatermark`, `writeStream`
 
 ### DataFrame Actions
-`collect`, `count`, `first`, `head`, `take`, `show`, `show(vertical)`, `toJSON`, `printSchema`, `schema`, `columns`, `explain`, `isEmpty`, `toLocalIterator`, `createTempView`, `createOrReplaceTempView`, `createGlobalTempView`, `write`
+`collect`, `collectAsList`, `count`, `first`, `head`, `take`, `takeAsList`, `show`, `show(vertical)`, `toJSON`, `printSchema`, `schema`, `columns`, `explain`, `isEmpty`, `isLocal`, `toLocalIterator`, `createTempView`, `createOrReplaceTempView`, `createGlobalTempView`, `write`
 
 ### Structured Streaming
 `readStream` (DataStreamReader), `writeStream` (DataStreamWriter), `StreamingQuery` (isActive, stop, awaitTermination, recentProgress, explain, exception), `StreamingQueryManager` (active, get, awaitAnyTermination, resetTerminated), `Trigger` (ProcessingTime, AvailableNow, Once, Continuous), `foreachBatch`, `foreach` (ForeachWriter), `mapGroupsWithState`, `flatMapGroupsWithState`, `transformWithState`
@@ -352,7 +353,7 @@ src/
 - [x] `foreachBatch` / `foreach` (ForeachWriter)
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
-- [x] Unit tests (504 tests)
+- [x] Unit tests (533 tests)
 - [x] Integration tests (Spark 4.0.2 / 4.1.1)
 - [x] Error handling (retry policies, gRPC exception conversion, reattachable execution, enriched error details via FetchErrorDetails RPC)
 - [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)
@@ -370,6 +371,7 @@ src/
 - [x] `toJSON` / `show(vertical)` (server-side ShowString proto)
 - [x] `lateralJoin` / `groupingSets` / `repartitionByRange`
 - [x] Plan Compression (ZSTD with server-config-driven threshold)
+- [x] Phase 3 API Completeness: `cloneSession`, `range(numPartitions)`, `emptyDataset[T]`, typed `select(TypedColumn)` (1-5 arity), `dropDuplicatesWithinWatermark`, `collectAsList`/`takeAsList`, `withMetadata`, `colRegex`, `metadataColumn`, `transpose`, `zipWithIndex`, `isLocal`, static session management, `executeCommand`
 
 See [API-GAPS.md](API-GAPS.md) for a detailed comparison with the official Spark Connect client.
 

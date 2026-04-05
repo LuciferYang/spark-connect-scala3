@@ -101,6 +101,16 @@ final class Dataset[T: ClassTag] private[sql] (
   /** Return a new Dataset with distinct elements. */
   def distinct(): Dataset[T] = Dataset(df.distinct(), encoder)
 
+  /** Drop duplicates within watermark for streaming. */
+  def dropDuplicatesWithinWatermark(): Dataset[T] =
+    Dataset(df.dropDuplicatesWithinWatermark(), encoder)
+
+  def dropDuplicatesWithinWatermark(colNames: Seq[String]): Dataset[T] =
+    Dataset(df.dropDuplicatesWithinWatermark(colNames), encoder)
+
+  def dropDuplicatesWithinWatermark(col1: String, cols: String*): Dataset[T] =
+    Dataset(df.dropDuplicatesWithinWatermark(col1, cols*), encoder)
+
   /** Reduce the elements using the given associative binary operator.
     *
     * Falls back to client-side collect when AgnosticEncoder is not available.
@@ -129,6 +139,56 @@ final class Dataset[T: ClassTag] private[sql] (
   // ---------------------------------------------------------------------------
 
   def select(cols: Column*): DataFrame = df.select(cols*)
+
+  // ---------------------------------------------------------------------------
+  // Typed select (TypedColumn 1-5 arity)
+  // ---------------------------------------------------------------------------
+
+  /** Type-safe select with a single TypedColumn. */
+  def select[U1: ClassTag](c1: TypedColumn[T, U1]): Dataset[U1] =
+    Dataset(df.select(c1), c1.encoder)
+
+  /** Type-safe select with two TypedColumns, returning a Dataset of tuples. */
+  def select[U1, U2](
+      c1: TypedColumn[T, U1],
+      c2: TypedColumn[T, U2]
+  ): Dataset[(U1, U2)] =
+    given enc: Encoder[(U1, U2)] = Encoders.tuple(c1.encoder, c2.encoder)
+    Dataset(df.select(c1, c2), enc)(using scala.reflect.classTag[(U1, U2)])
+
+  /** Type-safe select with three TypedColumns, returning a Dataset of tuples. */
+  def select[U1, U2, U3](
+      c1: TypedColumn[T, U1],
+      c2: TypedColumn[T, U2],
+      c3: TypedColumn[T, U3]
+  ): Dataset[(U1, U2, U3)] =
+    given enc: Encoder[(U1, U2, U3)] = Encoders.tuple(c1.encoder, c2.encoder, c3.encoder)
+    Dataset(df.select(c1, c2, c3), enc)(using scala.reflect.classTag[(U1, U2, U3)])
+
+  /** Type-safe select with four TypedColumns, returning a Dataset of tuples. */
+  def select[U1, U2, U3, U4](
+      c1: TypedColumn[T, U1],
+      c2: TypedColumn[T, U2],
+      c3: TypedColumn[T, U3],
+      c4: TypedColumn[T, U4]
+  ): Dataset[(U1, U2, U3, U4)] =
+    given enc: Encoder[(U1, U2, U3, U4)] =
+      Encoders.tuple(c1.encoder, c2.encoder, c3.encoder, c4.encoder)
+    Dataset(df.select(c1, c2, c3, c4), enc)(using scala.reflect.classTag[(U1, U2, U3, U4)])
+
+  /** Type-safe select with five TypedColumns, returning a Dataset of tuples. */
+  def select[U1, U2, U3, U4, U5](
+      c1: TypedColumn[T, U1],
+      c2: TypedColumn[T, U2],
+      c3: TypedColumn[T, U3],
+      c4: TypedColumn[T, U4],
+      c5: TypedColumn[T, U5]
+  ): Dataset[(U1, U2, U3, U4, U5)] =
+    given enc: Encoder[(U1, U2, U3, U4, U5)] =
+      Encoders.tuple(c1.encoder, c2.encoder, c3.encoder, c4.encoder, c5.encoder)
+    Dataset(df.select(c1, c2, c3, c4, c5), enc)(
+      using scala.reflect.classTag[(U1, U2, U3, U4, U5)]
+    )
 
   def filter(condition: Column): Dataset[T] = Dataset(df.filter(condition), encoder)
 
@@ -196,6 +256,12 @@ final class Dataset[T: ClassTag] private[sql] (
 
   def withColumn(name: String, col: Column): DataFrame = df.withColumn(name, col)
 
+  /** Select columns matching a regex pattern. */
+  def colRegex(colName: String): Column = df.colRegex(colName)
+
+  /** Access a metadata column by name. */
+  def metadataColumn(colName: String): Column = df.metadataColumn(colName)
+
   def drop(colNames: String*): DataFrame = df.drop(colNames*)
 
   def union(other: Dataset[T]): Dataset[T] = Dataset(df.union(other.df), encoder)
@@ -223,6 +289,12 @@ final class Dataset[T: ClassTag] private[sql] (
   /** Collect all rows and convert to typed array. */
   def collect(): Array[T] =
     df.collect().map(encoder.fromRow)
+
+  /** Collect all rows as a Java List. */
+  def collectAsList(): java.util.List[T] = java.util.Arrays.asList(collect()*)
+
+  /** Return the first n elements as a Java List. */
+  def takeAsList(n: Int): java.util.List[T] = java.util.Arrays.asList(take(n)*)
 
   /** Return the first element. */
   def first(): T = encoder.fromRow(df.first())

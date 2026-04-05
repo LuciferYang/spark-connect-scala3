@@ -45,146 +45,61 @@ These features have been implemented:
 | `repartitionByRange` | — | Range-based repartitioning with sort-order expressions |
 | `SparkResult` extract | — | Unified `executeAndCollect` helper with observed metrics extraction |
 | Plan Compression (ZSTD) | — | Server-config-driven ZSTD compression for large plans via `CompressedOperation` proto |
+| `range(numPartitions)` | — | 4-parameter `range(start, end, step, numPartitions)` via `Range.num_partitions` proto |
+| `emptyDataset[T]` | — | `SparkSession.emptyDataset[T: Encoder]` via `LocalRelation` with encoder schema |
+| `collectAsList` / `takeAsList` | — | Java-friendly `java.util.List` collection methods on both `DataFrame` and `Dataset` |
+| `isLocal` | — | `DataFrame.isLocal` via `AnalyzePlan.IsLocal` RPC |
+| `dropDuplicatesWithinWatermark` | — | 3 overloads using `Deduplicate.within_watermark` proto field on `DataFrame` and `Dataset` |
+| `transpose` | — | `DataFrame.transpose(indexColumn)` and `transpose()` via `Transpose` proto |
+| `zipWithIndex` | — | `DataFrame.zipWithIndex` via internal `distributed_sequence_id` function |
+| `colRegex` | — | `DataFrame.colRegex` / `Dataset.colRegex` via `UnresolvedRegex` proto |
+| `metadataColumn` | — | `DataFrame.metadataColumn` / `Dataset.metadataColumn` via `UnresolvedAttribute.is_metadata_column` |
+| `withMetadata` | — | `DataFrame.withMetadata(columnName, metadata)` via `Alias.metadata` JSON string |
+| `cloneSession()` | — | `SparkSession.cloneSession()` via `CloneSession` RPC preserving config/views/UDFs |
+| Typed `select` with TypedColumn | — | `Dataset.select(TypedColumn)` 1-5 arity overloads with `Encoders.tuple` |
+| Static Session Management | — | `getActiveSession`/`getDefaultSession`/`active`/`setActiveSession`/`clearActiveSession`/`setDefaultSession`/`clearDefaultSession` |
+| `executeCommand` (DeveloperApi) | — | `SparkSession.executeCommand(runner, command, options)` via `ExecuteExternalCommand` proto |
+| `sameSemantics` / `semanticHash` | — | Semantic equivalence checking via `AnalyzePlan` RPC (implemented in earlier phase) |
+| `inputFiles` | — | `DataFrame.inputFiles` via `AnalyzePlan` RPC (implemented in earlier phase) |
+| `storageLevel` | — | `DataFrame.storageLevel` via `AnalyzePlan` RPC (implemented in earlier phase) |
 
 ## Remaining Gaps
 
-### Medium Priority
+### Deferred (Not Planned)
 
-#### 12. Typed `select` with TypedColumn
+These gaps are intentionally deferred due to low priority or architectural reasons:
 
-**Upstream**: `Dataset.select(c1: TypedColumn[T, U1]): Dataset[U1]` through 5-arity overloads — type-safe column selection.
-
-**SC3 status**: Not implemented. Only untyped `select(cols: Column*)` is available.
-
-#### 14. `dropDuplicatesWithinWatermark`
-
-**Upstream**: `Dataset.dropDuplicatesWithinWatermark(colNames: Seq[String])` — streaming deduplication within event-time watermark.
-
-**SC3 status**: Not implemented.
-
-#### 15. `cloneSession()`
-
-**Upstream**: `SparkSession.cloneSession(): SparkSession` — clones session with all current configuration.
-
-**SC3 status**: Not implemented.
-
-#### 18. `range` with `numPartitions`
-
-**Upstream**: `SparkSession.range(start, end, step, numPartitions)` — 4-parameter range with partition control.
-
-**SC3 status**: Only `range(start, end)` and `range(start, end, step)` are implemented.
-
-#### 19. `emptyDataset[T]`
-
-**Upstream**: `SparkSession.emptyDataset[T: Encoder]: Dataset[T]` — creates an empty typed Dataset.
-
-**SC3 status**: Only `emptyDataFrame` is implemented.
-
-#### 20. `collectAsList` / `takeAsList`
-
-**Upstream**: `Dataset.collectAsList(): java.util.List[T]` and `takeAsList(n): java.util.List[T]` — Java-friendly collection methods.
-
-**SC3 status**: Not implemented. Only Scala `collect()` and `take()` are available.
-
-#### 21. `withMetadata`
-
-**Upstream**: `Dataset.withMetadata(columnName: String, metadata: Metadata): DataFrame` — attaches metadata to a column.
-
-**SC3 status**: Not implemented.
-
-#### 22. `colRegex`
-
-**Upstream**: `Dataset.colRegex(colName: String): Column` — selects columns by regex pattern matching.
-
-**SC3 status**: Not implemented.
-
-### Low Priority
-
-#### 23. Scalar / Exists Subquery
+#### Scalar / Exists Subquery
 
 **Upstream**: `Dataset.scalar()` and `Dataset.exists()` — correlated scalar and EXISTS subqueries as Column expressions.
 
-**SC3 status**: Not implemented.
+**SC3 status**: Not implemented. Requires `WithRelations` architecture restructuring. High complexity, low priority.
 
-#### 24. `transpose`
-
-**Upstream**: `Dataset.transpose(indexColumn: Column): DataFrame` — row-to-column transposition.
-
-**SC3 status**: Not implemented.
-
-#### 25. `zipWithIndex`
-
-**Upstream**: `Dataset.zipWithIndex: DataFrame` — adds a monotonically increasing index column.
-
-**SC3 status**: Not implemented.
-
-#### 26. `sameSemantics` / `semanticHash`
-
-**Upstream**: `Dataset.sameSemantics(other: Dataset[_]): Boolean` and `semanticHash(): Int` — semantic equivalence checking.
-
-**SC3 status**: Not implemented.
-
-#### 27. `inputFiles`
-
-**Upstream**: `Dataset.inputFiles: Array[String]` — returns the list of input files for the Dataset.
-
-**SC3 status**: Not implemented.
-
-#### 28. `storageLevel`
-
-**Upstream**: `Dataset.storageLevel: StorageLevel` — queries the current cache storage level.
-
-**SC3 status**: Not implemented.
-
-#### 29. `isLocal` / `isStreaming`
-
-**Upstream**: `Dataset.isLocal: Boolean` and `isStreaming: Boolean` — query execution locality and streaming status.
-
-**SC3 status**: Not implemented.
-
-#### 30. `isEmpty` Optimization
+#### `isEmpty` Optimization
 
 **Upstream**: Uses `IsEmpty` AnalyzePlan RPC for efficient emptiness check.
 
-**SC3 status**: Implemented via `head(1).isEmpty` — functionally correct but less efficient.
+**SC3 status**: Implemented via `limit(1).collect().isEmpty` — functionally correct. The `IsEmpty` AnalyzePlan variant does not exist in the current proto definitions.
 
-#### 31. `metadataColumn`
-
-**Upstream**: `Dataset.metadataColumn(colName: String): Column` — access metadata columns (e.g., `_metadata`).
-
-**SC3 status**: Not implemented.
-
-#### 32. Static Session Management
-
-**Upstream**: `SparkSession.getActiveSession`, `getDefaultSession`, `active` — static/thread-local session management.
-
-**SC3 status**: Not implemented. Sessions are managed explicitly.
-
-#### 33. `executeCommand` (DeveloperApi)
-
-**Upstream**: `SparkSession.executeCommand(runner: String, command: String, options: Map)` — DeveloperApi for direct proto command execution.
-
-**SC3 status**: Not implemented.
-
-#### 34. Java API Overloads
+#### Java API Overloads
 
 **Upstream**: `map`/`flatMap`/`mapPartitions`/`reduce` with explicit `Encoder` parameter — Java interop overloads.
 
-**SC3 status**: Not implemented. Scala 3 `derives Encoder` covers the Scala use case; Java API overloads are lower priority.
+**SC3 status**: Not implemented. Scala 3 `derives Encoder` covers the Scala use case; Java API overloads are not needed for a pure Scala 3 project.
 
-#### 35. ConnectConversions / ColumnNodeToProtoConverter
+#### ConnectConversions / ColumnNodeToProtoConverter
 
 **Upstream**: The official client uses a `ColumnNode` tree that is converted to proto via `ColumnNodeToProtoConverter`. SC3 uses a different (direct proto-building) approach for column expressions.
 
 **SC3 status**: Functionally equivalent but architecturally different. No action needed unless upstream introduces ColumnNode-only features.
 
-#### 36. `CustomSparkConnectBlockingStub` / `CustomSparkConnectStub`
+#### `CustomSparkConnectBlockingStub` / `CustomSparkConnectStub`
 
 **Upstream**: Custom gRPC stubs with session ID injection, dynamic retry policy updates, and stub state management via `SparkConnectStubState`.
 
 **SC3 status**: Uses direct gRPC stub wrapping. Functionally equivalent for current feature set.
 
-## Suggested Implementation Phases
+## Implementation Phases
 
 **Phase 1** (High Priority — ✅ COMPLETED):
 1. ~~Parameterized `sql` with args~~
@@ -199,18 +114,15 @@ These features have been implemented:
 8. ~~`lateralJoin` / `groupingSets` / `repartitionByRange`~~
 9. ~~`SparkResult` extract / Plan compression (ZSTD)~~
 
-**Phase 3** (Medium Priority — API completeness):
-10. `cloneSession` / `range(numPartitions)` / `emptyDataset[T]`
-11. Typed `select` with TypedColumn
-12. `dropDuplicatesWithinWatermark`
-13. `collectAsList` / `takeAsList`
-14. `withMetadata` / `colRegex`
-
-**Phase 4** (Low Priority — can defer):
-15. Subquery support (`scalar` / `exists`)
-16. Utility APIs (`transpose`, `zipWithIndex`, `sameSemantics`, etc.)
-17. Static session management
-18. Java API overloads
+**Phase 3** (API Completeness — ✅ COMPLETED):
+10. ~~`cloneSession` / `range(numPartitions)` / `emptyDataset[T]`~~
+11. ~~Typed `select` with TypedColumn~~
+12. ~~`dropDuplicatesWithinWatermark`~~
+13. ~~`collectAsList` / `takeAsList`~~
+14. ~~`withMetadata` / `colRegex` / `metadataColumn`~~
+15. ~~`transpose` / `zipWithIndex`~~
+16. ~~Static session management~~
+17. ~~`executeCommand` (DeveloperApi)~~
 
 ## Architecture Differences
 

@@ -2,11 +2,11 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.{Catalog as _, StorageLevel as _, *}
 import org.apache.spark.sql.connect.SessionCleaner
-import org.apache.spark.sql.connect.client.{ClassFinder, SparkConnectClient}
+import org.apache.spark.sql.connect.client.{ClassFinder, DataTypeProtoConverter, SparkConnectClient}
 
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
 
 /** Entry point for Spark Connect Scala 3 client.
   *
@@ -108,6 +108,25 @@ final class SparkSession private[sql] (
           .setStart(start).setEnd(end).setStep(step).build())
         .build()
     )
+
+  def range(start: Long, end: Long, step: Long, numPartitions: Int): DataFrame =
+    DataFrame(
+      this,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+        .setRange(Range.newBuilder()
+          .setStart(start).setEnd(end).setStep(step).setNumPartitions(numPartitions).build())
+        .build()
+    )
+
+  def emptyDataset[T: Encoder: scala.reflect.ClassTag]: Dataset[T] =
+    val enc = summon[Encoder[T]]
+    val schema = DataTypeProtoConverter.toProto(enc.schema)
+    val rel = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+      .setLocalRelation(LocalRelation.newBuilder().setSchema(schema.toString).build())
+      .build()
+    Dataset(DataFrame(this, rel), enc)
 
   def emptyDataFrame: DataFrame =
     DataFrame(
@@ -260,8 +279,68 @@ final class SparkSession private[sql] (
     */
   def newSession(): SparkSession = SparkSession(client.newClient())
 
+  /** Clone this session, preserving all SQL configuration, temporary views, and UDFs.
+    *
+    * Uses the server-side CloneSession RPC to create a copy of the current session state.
+    */
+  def cloneSession(): SparkSession = SparkSession(client.cloneSession())
+
+  // ---------------------------------------------------------------------------
+  // Execute External Command (DeveloperApi)
+  // ---------------------------------------------------------------------------
+
+  /** Execute an external command via the server.
+    *
+    * This is a DeveloperApi for running commands through an external runner (e.g., shell, Python).
+    */
+  def executeCommand(
+      runner: String,
+      command: String,
+      options: Map[String, String] = Map.empty
+  ): DataFrame =
+    val cmdBuilder = ExecuteExternalCommand.newBuilder()
+      .setRunner(runner).setCommand(command)
+    options.foreach((k, v) => cmdBuilder.putOptions(k, v))
+    val cmd = Command.newBuilder().setExecuteExternalCommand(cmdBuilder.build()).build()
+    val responses = client.executeCommandWithResponses(cmd)
+    // Look for a SqlCommandResult that has a relation
+    val relation = responses
+      .find(_.hasSqlCommandResult)
+      .filter(_.getSqlCommandResult.hasRelation)
+      .map(_.getSqlCommandResult.getRelation)
+    relation match
+      case Some(rel) => DataFrame(this, rel)
+      case None      => emptyDataFrame
+
 object SparkSession:
+  private val activeSession = InheritableThreadLocal[SparkSession]()
+  private val defaultSession = AtomicReference[SparkSession]()
+
   def builder(): Builder = Builder()
+
+  /** Return the active SparkSession for the current thread. */
+  def getActiveSession: Option[SparkSession] = Option(activeSession.get)
+
+  /** Return the default SparkSession. */
+  def getDefaultSession: Option[SparkSession] = Option(defaultSession.get)
+
+  /** Return the active SparkSession, or the default one, or throw. */
+  def active: SparkSession =
+    getActiveSession.orElse(getDefaultSession).getOrElse(
+      throw IllegalStateException("No active or default SparkSession found")
+    )
+
+  /** Set the active SparkSession for the current thread. */
+  def setActiveSession(session: SparkSession): Unit = activeSession.set(session)
+
+  /** Clear the active SparkSession for the current thread. */
+  def clearActiveSession(): Unit = activeSession.remove()
+
+  /** Set the default SparkSession. */
+  def setDefaultSession(session: SparkSession): Unit = defaultSession.set(session)
+
+  /** Clear the default SparkSession. */
+  def clearDefaultSession(): Unit = defaultSession.set(null)
 
   final class Builder:
     private var url: String = "sc://localhost:15002"
@@ -277,7 +356,9 @@ object SparkSession:
 
     def build(): SparkSession =
       val client = SparkConnectClient.create(url, configs = configs)
-      SparkSession(client)
+      val session = SparkSession(client)
+      if defaultSession.get() == null then defaultSession.compareAndSet(null, session)
+      session
 
 /** Thin wrapper around client config get/set. */
 final class RuntimeConfig private[sql] (private val client: SparkConnectClient):
