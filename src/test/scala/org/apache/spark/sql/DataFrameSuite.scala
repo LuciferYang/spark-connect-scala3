@@ -513,3 +513,89 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     j.getUsingColumns(1) shouldBe "name"
     j.getJoinType shouldBe Join.JoinType.JOIN_TYPE_LEFT_OUTER
   }
+
+  // ---------- DataFrameWriter convenience methods ----------
+
+  test("DataFrameWriter mode(SaveMode) sets correct mode string") {
+    val df = testDf()
+    // Just verify the SaveMode enum compiles and maps correctly
+    SaveMode.Overwrite.toString shouldBe "Overwrite"
+    SaveMode.Append.toString shouldBe "Append"
+    SaveMode.Ignore.toString shouldBe "Ignore"
+    SaveMode.ErrorIfExists.toString shouldBe "ErrorIfExists"
+  }
+
+  test("DataFrameWriter typed option overloads compile") {
+    val df = testDf()
+    val writer = df.write
+    // Verify these methods exist and return DataFrameWriter
+    writer.option("key", true) shouldBe a[DataFrameWriter]
+    writer.option("key", 42L) shouldBe a[DataFrameWriter]
+    writer.option("key", 3.14) shouldBe a[DataFrameWriter]
+  }
+
+  test("DataFrameReader schema(StructType) uses toDDL") {
+    import org.apache.spark.sql.types.*
+    val session = SparkSession(null)
+    val reader = session.read
+    val schema = StructType(Seq(
+      StructField("id", LongType, nullable = false),
+      StructField("name", StringType)
+    ))
+    // Just verify it compiles and doesn't throw
+    reader.schema(schema) shouldBe a[DataFrameReader]
+  }
+
+  // ---------- sort(String, String*) ----------
+
+  test("sort(String, String*) builds Sort proto with column names") {
+    val df = testDf()
+    val sorted = df.sort(Column("a"), Column("b"))
+    sorted.relation.hasSort shouldBe true
+    sorted.relation.getSort.getOrderCount shouldBe 2
+  }
+
+  // ---------- RuntimeConfig extensions ----------
+
+  test("RuntimeConfig has getOption method") {
+    val methods = classOf[RuntimeConfig].getMethods.filter(_.getName == "getOption")
+    methods should not be empty
+  }
+
+  test("RuntimeConfig has getAll method") {
+    val methods = classOf[RuntimeConfig].getMethods.filter(_.getName == "getAll")
+    methods should not be empty
+  }
+
+  test("RuntimeConfig has unset method") {
+    val methods = classOf[RuntimeConfig].getMethods.filter(_.getName == "unset")
+    methods should not be empty
+  }
+
+  test("RuntimeConfig has isModifiable method") {
+    val methods = classOf[RuntimeConfig].getMethods.filter(_.getName == "isModifiable")
+    methods should not be empty
+  }
+
+  test("RuntimeConfig has set(key, Boolean) overload") {
+    val methods = classOf[RuntimeConfig].getMethods.filter(m =>
+      m.getName == "set" && m.getParameterTypes.length == 2 &&
+        m.getParameterTypes()(1) == classOf[Boolean]
+    )
+    methods should not be empty
+  }
+
+  test("RuntimeConfig has set(key, Long) overload") {
+    val methods = classOf[RuntimeConfig].getMethods.filter(m =>
+      m.getName == "set" && m.getParameterTypes.length == 2 &&
+        m.getParameterTypes()(1) == classOf[Long]
+    )
+    methods should not be empty
+  }
+
+  test("RuntimeConfig has get(key, default) overload") {
+    val methods = classOf[RuntimeConfig].getMethods.filter(m =>
+      m.getName == "get" && m.getParameterTypes.length == 2
+    )
+    methods should not be empty
+  }

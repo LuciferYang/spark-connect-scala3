@@ -22,12 +22,20 @@ final class DataFrameReader private[sql] (private val session: SparkSession):
     opts = opts + (key -> value)
     this
 
+  def option(key: String, value: Boolean): DataFrameReader = option(key, value.toString)
+  def option(key: String, value: Long): DataFrameReader = option(key, value.toString)
+  def option(key: String, value: Double): DataFrameReader = option(key, value.toString)
+
   def options(m: Map[String, String]): DataFrameReader =
     opts = opts ++ m
     this
 
   def schema(schemaString: String): DataFrameReader =
     userSchema = Some(schemaString)
+    this
+
+  def schema(schema: types.StructType): DataFrameReader =
+    userSchema = Some(schema.toDDL)
     this
 
   def load(path: String): DataFrame = load(Seq(path))
@@ -52,8 +60,8 @@ final class DataFrameReader private[sql] (private val session: SparkSession):
 
   def table(tableName: String): DataFrame = session.table(tableName)
 
-  def json(path: String): DataFrame = format("json").load(path)
-  def parquet(path: String): DataFrame = format("parquet").load(path)
-  def orc(path: String): DataFrame = format("orc").load(path)
-  def csv(path: String): DataFrame = format("csv").load(path)
-  def text(path: String): DataFrame = format("text").load(path)
+  def json(paths: String*): DataFrame = format("json").load(paths)
+  def parquet(paths: String*): DataFrame = format("parquet").load(paths)
+  def orc(paths: String*): DataFrame = format("orc").load(paths)
+  def csv(paths: String*): DataFrame = format("csv").load(paths)
+  def text(paths: String*): DataFrame = format("text").load(paths)

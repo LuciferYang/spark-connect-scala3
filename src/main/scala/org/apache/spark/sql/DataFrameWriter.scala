@@ -26,9 +26,21 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
     saveMode = m
     this
 
+  def mode(m: SaveMode): DataFrameWriter =
+    saveMode = m match
+      case SaveMode.Overwrite     => "overwrite"
+      case SaveMode.Append        => "append"
+      case SaveMode.Ignore        => "ignore"
+      case SaveMode.ErrorIfExists => "error"
+    this
+
   def option(key: String, value: String): DataFrameWriter =
     opts = opts + (key -> value)
     this
+
+  def option(key: String, value: Boolean): DataFrameWriter = option(key, value.toString)
+  def option(key: String, value: Long): DataFrameWriter = option(key, value.toString)
+  def option(key: String, value: Double): DataFrameWriter = option(key, value.toString)
 
   def options(m: Map[String, String]): DataFrameWriter =
     opts = opts ++ m
@@ -78,6 +90,15 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
   def orc(path: String): Unit = format("orc").save(path)
   def csv(path: String): Unit = format("csv").save(path)
   def text(path: String): Unit = format("text").save(path)
+
+  def jdbc(url: String, table: String, connectionProperties: java.util.Properties): Unit =
+    import scala.jdk.CollectionConverters.*
+    val propsMap = connectionProperties.asScala.toMap
+    format("jdbc")
+      .option("url", url)
+      .option("dbtable", table)
+      .options(propsMap)
+      .save()
 
   private def buildWriteOp(): WriteOperation.Builder =
     val builder = WriteOperation.newBuilder()

@@ -5,48 +5,64 @@ sealed trait DataType:
   def typeName: String
   def simpleString: String = typeName
 
+  /** SQL representation used in DDL strings. */
+  def sql: String = typeName.toUpperCase
+
 case object BooleanType extends DataType:
   def typeName = "boolean"
 
 case object ByteType extends DataType:
   def typeName = "byte"
+  override def sql = "TINYINT"
 
 case object ShortType extends DataType:
   def typeName = "short"
+  override def sql = "SMALLINT"
 
 case object IntegerType extends DataType:
   def typeName = "integer"
+  override def sql = "INT"
 
 case object LongType extends DataType:
   def typeName = "long"
+  override def sql = "BIGINT"
 
 case object FloatType extends DataType:
   def typeName = "float"
+  override def sql = "FLOAT"
 
 case object DoubleType extends DataType:
   def typeName = "double"
+  override def sql = "DOUBLE"
 
 case object StringType extends DataType:
   def typeName = "string"
+  override def sql = "STRING"
 
 case object BinaryType extends DataType:
   def typeName = "binary"
+  override def sql = "BINARY"
 
 case object DateType extends DataType:
   def typeName = "date"
+  override def sql = "DATE"
 
 case object TimestampType extends DataType:
   def typeName = "timestamp"
+  override def sql = "TIMESTAMP"
 
 case object TimestampNTZType extends DataType:
   def typeName = "timestamp_ntz"
+  override def sql = "TIMESTAMP_NTZ"
 
 case object NullType extends DataType:
   def typeName = "null"
+  override def sql = "VOID"
 
 final case class DecimalType(precision: Int, scale: Int) extends DataType:
   def typeName = "decimal"
   override def simpleString = s"decimal($precision,$scale)"
+  override def sql = s"DECIMAL($precision,$scale)"
 
 object DecimalType:
   val DEFAULT: DecimalType = DecimalType(10, 0)
@@ -54,11 +70,13 @@ object DecimalType:
 final case class ArrayType(elementType: DataType, containsNull: Boolean) extends DataType:
   def typeName = "array"
   override def simpleString = s"array<${elementType.simpleString}>"
+  override def sql = s"ARRAY<${elementType.sql}>"
 
 final case class MapType(keyType: DataType, valueType: DataType, valueContainsNull: Boolean)
     extends DataType:
   def typeName = "map"
   override def simpleString = s"map<${keyType.simpleString},${valueType.simpleString}>"
+  override def sql = s"MAP<${keyType.sql},${valueType.sql}>"
 
 final case class StructField(name: String, dataType: DataType, nullable: Boolean = true)
 
@@ -80,6 +98,13 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
 
   override def simpleString: String =
     s"struct<${fields.map(f => s"${f.name}:${f.dataType.simpleString}").mkString(",")}>"
+
+  /** Return the DDL string representation (e.g. "id BIGINT, name STRING"). */
+  def toDDL: String =
+    fields.map { f =>
+      val nullStr = if f.nullable then "" else " NOT NULL"
+      s"${f.name} ${f.dataType.sql}$nullStr"
+    }.mkString(", ")
 
   def treeString: String = treeString(Int.MaxValue)
 

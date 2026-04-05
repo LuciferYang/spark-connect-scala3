@@ -200,6 +200,46 @@ final class Dataset[T: ClassTag] private[sql] (
 
   def sort(cols: Column*): Dataset[T] = orderBy(cols*)
 
+  def sort(sortCol: String, sortCols: String*): Dataset[T] =
+    orderBy((sortCol +: sortCols).map(Column(_))*)
+
+  def orderBy(sortCol: String, sortCols: String*): Dataset[T] =
+    orderBy((sortCol +: sortCols).map(Column(_))*)
+
+  /** Sample a fraction of rows. */
+  def sample(withReplacement: Boolean, fraction: Double, seed: Long): Dataset[T] =
+    Dataset(df.sample(fraction, withReplacement, seed), encoder)
+
+  def sample(withReplacement: Boolean, fraction: Double): Dataset[T] =
+    sample(withReplacement, fraction, 0L)
+
+  def sample(fraction: Double, seed: Long): Dataset[T] =
+    Dataset(df.sample(fraction, seed = seed), encoder)
+
+  def sample(fraction: Double): Dataset[T] =
+    Dataset(df.sample(fraction), encoder)
+
+  /** Repartition by number of partitions. */
+  def repartition(numPartitions: Int): Dataset[T] = Dataset(df.repartition(numPartitions), encoder)
+
+  /** Repartition by columns. */
+  def repartition(numPartitions: Int, cols: Column*): Dataset[T] =
+    Dataset(df.repartition(numPartitions, cols*), encoder)
+
+  /** Repartition by columns with default partition count. */
+  def repartition(cols: Column*)(using DummyImplicit): Dataset[T] =
+    Dataset(df.repartition(cols*), encoder)
+
+  /** Coalesce to fewer partitions. */
+  def coalesce(numPartitions: Int): Dataset[T] = Dataset(df.coalesce(numPartitions), encoder)
+
+  /** Sort within each partition. */
+  def sortWithinPartitions(cols: Column*): Dataset[T] =
+    Dataset(df.sortWithinPartitions(cols*), encoder)
+
+  def sortWithinPartitions(colNames: String*)(using DummyImplicit): Dataset[T] =
+    Dataset(df.sortWithinPartitions(colNames*), encoder)
+
   def groupBy(cols: Column*): GroupedDataFrame = df.groupBy(cols*)
 
   def join(right: DataFrame, joinExpr: Column, joinType: String = "inner"): DataFrame =
@@ -256,6 +296,15 @@ final class Dataset[T: ClassTag] private[sql] (
 
   def withColumn(name: String, col: Column): DataFrame = df.withColumn(name, col)
 
+  def withColumnRenamed(existing: String, newName: String): DataFrame =
+    df.withColumnRenamed(existing, newName)
+
+  def withColumnsRenamed(colsMap: Map[String, String]): DataFrame =
+    df.withColumnsRenamed(colsMap)
+
+  def withColumns(colsMap: Map[String, Column]): DataFrame =
+    df.withColumns(colsMap)
+
   /** Select columns matching a regex pattern. */
   def colRegex(colName: String): Column = df.colRegex(colName)
 
@@ -263,6 +312,17 @@ final class Dataset[T: ClassTag] private[sql] (
   def metadataColumn(colName: String): Column = df.metadataColumn(colName)
 
   def drop(colNames: String*): DataFrame = df.drop(colNames*)
+
+  def drop(cols: Column*)(using DummyImplicit): DataFrame = df.drop(cols*)
+
+  def dropDuplicates(): Dataset[T] = Dataset(df.dropDuplicates(), encoder)
+
+  def dropDuplicates(colNames: Seq[String]): Dataset[T] =
+    Dataset(df.dropDuplicates(colNames), encoder)
+
+  def describe(colNames: String*): DataFrame = df.describe(colNames*)
+
+  def summary(statistics: String*): DataFrame = df.summary(statistics*)
 
   def union(other: Dataset[T]): Dataset[T] = Dataset(df.union(other.df), encoder)
 
@@ -336,6 +396,90 @@ final class Dataset[T: ClassTag] private[sql] (
     Dataset(df.toJSON, summon[Encoder[String]])
 
   def isEmpty: Boolean = df.isEmpty
+
+  /** Column names. */
+  def columns: Array[String] = df.columns
+
+  /** Array of (column name, data type string) pairs. */
+  def dtypes: Array[(String, String)] = df.dtypes
+
+  /** Select a column by name, bound to this Dataset's plan. */
+  def col(colName: String): Column = df.col(colName)
+
+  /** Select a column by name — alias for `col`. */
+  def apply(colName: String): Column = col(colName)
+
+  /** Explain the query plan. */
+  def explain(extended: Boolean = false): Unit = df.explain(extended)
+  def explain(mode: String): Unit = df.explain(mode)
+
+  /** Print the schema tree. */
+  def printSchema(): Unit = df.printSchema()
+  def printSchema(level: Int): Unit = df.printSchema(level)
+
+  /** Check if this Dataset is a streaming query. */
+  def isStreaming: Boolean = df.isStreaming
+
+  /** Check if collect/take can be run locally. */
+  def isLocal: Boolean = df.isLocal
+
+  /** Input files used to create this Dataset. */
+  def inputFiles: Array[String] = df.inputFiles
+
+  /** Compare semantic equivalence of two DataFrames. */
+  def sameSemantics(other: Dataset[T]): Boolean = df.sameSemantics(other.df)
+
+  /** Return a semantic hash of the logical plan. */
+  def semanticHash: Int = df.semanticHash
+
+  /** Get the storage level. */
+  def storageLevel: StorageLevel = df.storageLevel
+
+  /** Checkpoint this Dataset. */
+  def checkpoint(eager: Boolean = true): Dataset[T] = Dataset(df.checkpoint(eager), encoder)
+
+  /** Locally checkpoint this Dataset. */
+  def localCheckpoint(eager: Boolean = true): Dataset[T] =
+    Dataset(df.localCheckpoint(eager), encoder)
+
+  /** Randomly split into multiple Datasets. */
+  def randomSplit(weights: Array[Double], seed: Long = 0L): Array[Dataset[T]] =
+    df.randomSplit(weights, seed).map(f => Dataset(f, encoder))
+
+  /** Return the last n elements. */
+  def tail(n: Int): Array[T] = df.tail(n).map(encoder.fromRow)
+
+  /** Access DataFrameNaFunctions. */
+  def na: DataFrameNaFunctions = df.na
+
+  /** Access DataFrameStatFunctions. */
+  def stat: DataFrameStatFunctions = df.stat
+
+  /** Hint the optimizer. */
+  def hint(name: String, parameters: Any*): Dataset[T] =
+    Dataset(df.hint(name, parameters*), encoder)
+
+  /** Cross join with another DataFrame. */
+  def crossJoin(right: DataFrame): DataFrame = df.crossJoin(right)
+
+  /** Access the V2 writer. */
+  def writeTo(table: String): DataFrameWriterV2 = df.writeTo(table)
+
+  /** Access the streaming writer. */
+  def writeStream: DataStreamWriter = df.writeStream
+
+  /** Define a watermark for streaming aggregations. */
+  def withWatermark(eventTime: String, delayThreshold: String): Dataset[T] =
+    Dataset(df.withWatermark(eventTime, delayThreshold), encoder)
+
+  /** Persist with a specific storage level. */
+  def persist(storageLevel: StorageLevel): Dataset[T] =
+    df.persist(storageLevel)
+    this
+
+  def createGlobalTempView(viewName: String): Unit = df.createGlobalTempView(viewName)
+  def createOrReplaceGlobalTempView(viewName: String): Unit =
+    df.createOrReplaceGlobalTempView(viewName)
 
   /** Return a `java.util.Iterator` that iterates typed elements lazily.
     *

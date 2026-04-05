@@ -50,6 +50,33 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   private val keyEncoder: Encoder[K] = summon[Encoder[K]]
   private val valueEncoder: Encoder[V] = ds.encoder
 
+  /** Cast the key type of this grouped dataset to a new type. */
+  def keyAs[L: Encoder: ClassTag]: KeyValueGroupedDataset[L, V] =
+    KeyValueGroupedDataset(ds, groupingFunc.asInstanceOf[V => L])(
+      using
+      summon[Encoder[L]],
+      summon[ClassTag[L]],
+      ds.encoder,
+      summon[ClassTag[V]]
+    )
+
+  /** Apply a transformation function to the value of each group. */
+  def mapValues[W: Encoder: ClassTag](func: V => W): KeyValueGroupedDataset[K, W] =
+    val transformedDs = ds.map(func)(using summon[Encoder[W]], summon[ClassTag[W]])
+    val newGroupingFunc: W => K = w =>
+      throw UnsupportedOperationException(
+        "mapValues grouping function should not be called directly"
+      )
+    // Build a new KVGD with the original grouping expressions applied to the original input
+    // but values mapped through func. The server-side implementation handles this correctly.
+    KeyValueGroupedDataset(transformedDs, newGroupingFunc)(
+      using
+      keyEncoder,
+      summon[ClassTag[K]],
+      summon[Encoder[W]],
+      summon[ClassTag[W]]
+    )
+
   /** Return a Dataset of the unique keys. */
   def keys: Dataset[K] =
     ds.map(groupingFunc)
@@ -131,6 +158,43 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       (k, iter.size.toLong)
     }
 
+  /** Apply a function to each group with sorted values, returning an iterator of results per group.
+    *
+    * The sorting expressions define the order of values within each group before the function is
+    * applied.
+    */
+  def flatMapSortedGroups[U: Encoder: ClassTag](
+      sortExprs: Column*
+  )(func: (K, Iterator[V]) => IterableOnce[U]): Dataset[U] =
+    val outEnc = summon[Encoder[U]]
+    val keyAg = keyEncoder.agnosticEncoder
+    val valueAg = valueEncoder.agnosticEncoder
+    val outAg = outEnc.agnosticEncoder
+    if keyAg == null || valueAg == null || outAg == null then
+      return flatMapGroupsLocal(func, outEnc)
+    val groupingUdf = buildGroupingUdf(keyAg, valueAg)
+    val mapUdf = buildGroupMapUdf(func, keyAg, valueAg, outAg)
+    val groupMapBuilder = GroupMap
+      .newBuilder()
+      .setInput(ds.df.relation)
+      .addGroupingExpressions(
+        Expression
+          .newBuilder()
+          .setCommonInlineUserDefinedFunction(groupingUdf)
+          .build()
+      )
+      .setFunc(mapUdf)
+    sortExprs.foreach(c => groupMapBuilder.addSortingExpressions(c.expr))
+    val relation = Relation
+      .newBuilder()
+      .setCommon(
+        RelationCommon.newBuilder().setPlanId(ds.sparkSession.nextPlanId()).build()
+      )
+      .setGroupMap(groupMapBuilder.build())
+      .build()
+    val newDf = DataFrame(ds.sparkSession, relation)
+    Dataset(newDf, outEnc)
+
   /** Co-group with another KeyValueGroupedDataset and apply a function.
     *
     * Falls back to client-side implementation since CoGroupMap requires additional proto support.
@@ -194,6 +258,86 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       tupleCt: ClassTag[(K, U1, U2, U3, U4)]
   ): Dataset[(K, U1, U2, U3, U4)] =
     aggUntyped(tupleEnc, tupleCt)(col1, col2, col3, col4)
+
+  def agg[U1, U2, U3, U4, U5](
+      col1: TypedColumn[V, U1],
+      col2: TypedColumn[V, U2],
+      col3: TypedColumn[V, U3],
+      col4: TypedColumn[V, U4],
+      col5: TypedColumn[V, U5]
+  )(using
+      e1: Encoder[U1],
+      e2: Encoder[U2],
+      e3: Encoder[U3],
+      e4: Encoder[U4],
+      e5: Encoder[U5],
+      tupleEnc: Encoder[(K, U1, U2, U3, U4, U5)],
+      tupleCt: ClassTag[(K, U1, U2, U3, U4, U5)]
+  ): Dataset[(K, U1, U2, U3, U4, U5)] =
+    aggUntyped(tupleEnc, tupleCt)(col1, col2, col3, col4, col5)
+
+  def agg[U1, U2, U3, U4, U5, U6](
+      col1: TypedColumn[V, U1],
+      col2: TypedColumn[V, U2],
+      col3: TypedColumn[V, U3],
+      col4: TypedColumn[V, U4],
+      col5: TypedColumn[V, U5],
+      col6: TypedColumn[V, U6]
+  )(using
+      e1: Encoder[U1],
+      e2: Encoder[U2],
+      e3: Encoder[U3],
+      e4: Encoder[U4],
+      e5: Encoder[U5],
+      e6: Encoder[U6],
+      tupleEnc: Encoder[(K, U1, U2, U3, U4, U5, U6)],
+      tupleCt: ClassTag[(K, U1, U2, U3, U4, U5, U6)]
+  ): Dataset[(K, U1, U2, U3, U4, U5, U6)] =
+    aggUntyped(tupleEnc, tupleCt)(col1, col2, col3, col4, col5, col6)
+
+  def agg[U1, U2, U3, U4, U5, U6, U7](
+      col1: TypedColumn[V, U1],
+      col2: TypedColumn[V, U2],
+      col3: TypedColumn[V, U3],
+      col4: TypedColumn[V, U4],
+      col5: TypedColumn[V, U5],
+      col6: TypedColumn[V, U6],
+      col7: TypedColumn[V, U7]
+  )(using
+      e1: Encoder[U1],
+      e2: Encoder[U2],
+      e3: Encoder[U3],
+      e4: Encoder[U4],
+      e5: Encoder[U5],
+      e6: Encoder[U6],
+      e7: Encoder[U7],
+      tupleEnc: Encoder[(K, U1, U2, U3, U4, U5, U6, U7)],
+      tupleCt: ClassTag[(K, U1, U2, U3, U4, U5, U6, U7)]
+  ): Dataset[(K, U1, U2, U3, U4, U5, U6, U7)] =
+    aggUntyped(tupleEnc, tupleCt)(col1, col2, col3, col4, col5, col6, col7)
+
+  def agg[U1, U2, U3, U4, U5, U6, U7, U8](
+      col1: TypedColumn[V, U1],
+      col2: TypedColumn[V, U2],
+      col3: TypedColumn[V, U3],
+      col4: TypedColumn[V, U4],
+      col5: TypedColumn[V, U5],
+      col6: TypedColumn[V, U6],
+      col7: TypedColumn[V, U7],
+      col8: TypedColumn[V, U8]
+  )(using
+      e1: Encoder[U1],
+      e2: Encoder[U2],
+      e3: Encoder[U3],
+      e4: Encoder[U4],
+      e5: Encoder[U5],
+      e6: Encoder[U6],
+      e7: Encoder[U7],
+      e8: Encoder[U8],
+      tupleEnc: Encoder[(K, U1, U2, U3, U4, U5, U6, U7, U8)],
+      tupleCt: ClassTag[(K, U1, U2, U3, U4, U5, U6, U7, U8)]
+  ): Dataset[(K, U1, U2, U3, U4, U5, U6, U7, U8)] =
+    aggUntyped(tupleEnc, tupleCt)(col1, col2, col3, col4, col5, col6, col7, col8)
 
   /** Internal implementation for typed aggregation with [[TypedColumn]]s.
     *

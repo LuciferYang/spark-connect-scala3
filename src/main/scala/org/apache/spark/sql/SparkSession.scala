@@ -377,4 +377,11 @@ object SparkSession:
 /** Thin wrapper around client config get/set. */
 final class RuntimeConfig private[sql] (private val client: SparkConnectClient):
   def get(key: String): String = client.getConfig(key)
+  def get(key: String, default: String): String = getOption(key).getOrElse(default)
+  def getOption(key: String): Option[String] = client.getConfigOption(key)
+  def getAll: Map[String, String] = client.getAllConfig()
   def set(key: String, value: String): Unit = client.setConfig(key, value)
+  def set(key: String, value: Boolean): Unit = set(key, value.toString)
+  def set(key: String, value: Long): Unit = set(key, value.toString)
+  def unset(key: String): Unit = client.unsetConfig(key)
+  def isModifiable(key: String): Boolean = client.isModifiableConfig(key)

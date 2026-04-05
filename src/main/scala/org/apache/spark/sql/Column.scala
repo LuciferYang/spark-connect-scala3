@@ -47,6 +47,14 @@ class Column private[sql] (private[sql] val expr: Expression):
   def <(v: Any): Column = <(Column.lit(v))
   def <=(v: Any): Column = <=(Column.lit(v))
 
+  // Java-friendly comparison aliases
+  def equalTo(other: Any): Column = ===(other)
+  def notEqual(other: Any): Column = =!=(other)
+  def gt(other: Any): Column = >(Column.lit(other))
+  def lt(other: Any): Column = <(Column.lit(other))
+  def geq(other: Any): Column = >=(Column.lit(other))
+  def leq(other: Any): Column = <=(Column.lit(other))
+
   // ---------------------------------------------------------------------------
   // Logical operators
   // ---------------------------------------------------------------------------
@@ -54,6 +62,10 @@ class Column private[sql] (private[sql] val expr: Expression):
   def &&(other: Column): Column = fn("and", other)
   def ||(other: Column): Column = fn("or", other)
   def unary_! : Column = fn0("not")
+
+  // Java-friendly logical aliases
+  def and(other: Column): Column = &&(other)
+  def or(other: Column): Column = ||(other)
 
   // ---------------------------------------------------------------------------
   // Arithmetic operators
@@ -71,6 +83,17 @@ class Column private[sql] (private[sql] val expr: Expression):
   def multiply(v: Any): Column = this * Column.lit(v)
   def divide(v: Any): Column = this / Column.lit(v)
   def mod(v: Any): Column = this % Column.lit(v)
+
+  // ---------------------------------------------------------------------------
+  // Bitwise operators
+  // ---------------------------------------------------------------------------
+
+  def bitwiseOR(other: Any): Column = fn("|", Column.lit(other))
+  def bitwiseAND(other: Any): Column = fn("&", Column.lit(other))
+  def bitwiseXOR(other: Any): Column = fn("^", Column.lit(other))
+  def |(other: Any): Column = bitwiseOR(other)
+  def &(other: Any): Column = bitwiseAND(other)
+  def ^(other: Any): Column = bitwiseXOR(other)
 
   // ---------------------------------------------------------------------------
   // Null / NaN checks
@@ -112,6 +135,12 @@ class Column private[sql] (private[sql] val expr: Expression):
 
   def substr(startPos: Int, length: Int): Column =
     fn("substring", Column.lit(startPos), Column.lit(length))
+
+  def substr(startPos: Column, len: Column): Column =
+    fn("substring", startPos, len)
+
+  /** Scala collection variant of isin. */
+  def isInCollection(values: Iterable[?]): Column = isin(values.toSeq*)
 
   // ---------------------------------------------------------------------------
   // when / otherwise (case-when chaining)
@@ -249,6 +278,22 @@ class Column private[sql] (private[sql] val expr: Expression):
 
   def name(n: String): Column = as(n)
 
+  /** Assign multiple aliases (for tuple/struct columns). */
+  def as(aliases: Seq[String]): Column =
+    val aliasBuilder = Expression.Alias.newBuilder().setExpr(expr)
+    aliases.foreach(aliasBuilder.addName)
+    Column(Expression.newBuilder().setAlias(aliasBuilder.build()).build())
+
+  /** Assign an alias with metadata (JSON string). */
+  def as(alias: String, metadata: String): Column =
+    Column(Expression.newBuilder().setAlias(
+      Expression.Alias.newBuilder()
+        .setExpr(expr)
+        .addName(alias)
+        .setMetadata(metadata)
+        .build()
+    ).build())
+
   /** Provide a type hint to generate a TypedColumn for Dataset operations. */
   def as[U: Encoder]: TypedColumn[Any, U] =
     TypedColumn(expr, summon[Encoder[U]])
@@ -309,6 +354,9 @@ class Column private[sql] (private[sql] val expr: Expression):
     window.orderExprs.foreach(c => windowBuilder.addOrderSpec(c.toSortOrder))
     window.frameSpec.foreach(windowBuilder.setFrameSpec)
     Column(Expression.newBuilder().setWindow(windowBuilder.build()).build())
+
+  /** Apply a window function with an empty window specification. */
+  def over(): Column = over(WindowSpec(Seq.empty, Seq.empty))
 
   // ---------------------------------------------------------------------------
   // Helpers

@@ -332,3 +332,119 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     result.df.relation.hasSetOp shouldBe true
     result.df.relation.getSetOp.getIsAll shouldBe true
   }
+
+  // ---------- Dataset.sort(String, String*) ----------
+
+  test("Dataset.sort(String, String*) delegates to DataFrame") {
+    val ds = testDataset[Long]()
+    val result = ds.sort("id", "name")
+    result.df.relation.hasSort shouldBe true
+    result.df.relation.getSort.getOrderCount shouldBe 2
+  }
+
+  // ---------- Dataset sample / repartition / coalesce ----------
+
+  test("Dataset.sample delegates to DataFrame") {
+    val ds = testDataset[Long]()
+    val result = ds.sample(0.5)
+    result.df.relation.hasSample shouldBe true
+  }
+
+  test("Dataset.sample(withReplacement, fraction) compiles") {
+    val ds = testDataset[Long]()
+    val result = ds.sample(true, 0.5)
+    result.df.relation.hasSample shouldBe true
+  }
+
+  test("Dataset.repartition delegates to DataFrame") {
+    val ds = testDataset[Long]()
+    val result = ds.repartition(4)
+    result.df.relation.hasRepartition shouldBe true
+    result.df.relation.getRepartition.getNumPartitions shouldBe 4
+  }
+
+  test("Dataset.coalesce delegates to DataFrame") {
+    val ds = testDataset[Long]()
+    val result = ds.coalesce(2)
+    result.df.relation.hasRepartition shouldBe true
+    result.df.relation.getRepartition.getNumPartitions shouldBe 2
+    result.df.relation.getRepartition.getShuffle shouldBe false
+  }
+
+  test("Dataset.sortWithinPartitions delegates to DataFrame") {
+    val ds = testDataset[Long]()
+    val result = ds.sortWithinPartitions(Column("id"))
+    result.df.relation.hasSort shouldBe true
+    result.df.relation.getSort.getIsGlobal shouldBe false
+  }
+
+  // ---------- Dataset delegate methods ----------
+
+  test("Dataset.dropDuplicates delegates to DataFrame") {
+    val ds = testDataset[Long]()
+    val result = ds.dropDuplicates()
+    result.df.relation.hasDeduplicate shouldBe true
+  }
+
+  test("Dataset has columns/dtypes/col/apply methods") {
+    classOf[Dataset[?]].getMethod("columns") should not be null
+    classOf[Dataset[?]].getMethod("dtypes") should not be null
+    classOf[Dataset[?]].getMethod("col", classOf[String]) should not be null
+    classOf[Dataset[?]].getMethod("apply", classOf[String]) should not be null
+  }
+
+  test("Dataset has explain methods") {
+    classOf[Dataset[?]].getMethod("explain", classOf[Boolean]) should not be null
+    classOf[Dataset[?]].getMethod("explain", classOf[String]) should not be null
+  }
+
+  test("Dataset has printSchema methods") {
+    classOf[Dataset[?]].getMethod("printSchema") should not be null
+    classOf[Dataset[?]].getMethod("printSchema", classOf[Int]) should not be null
+  }
+
+  test("Dataset has checkpoint methods") {
+    classOf[Dataset[?]].getMethod("checkpoint", classOf[Boolean]) should not be null
+    classOf[Dataset[?]].getMethod("localCheckpoint", classOf[Boolean]) should not be null
+  }
+
+  test("Dataset has tail method") {
+    classOf[Dataset[?]].getMethod("tail", classOf[Int]) should not be null
+  }
+
+  test("Dataset has hint method") {
+    val ds = testDataset[Long]()
+    val result = ds.hint("broadcast")
+    result.df.relation.hasHint shouldBe true
+    result.df.relation.getHint.getName shouldBe "broadcast"
+  }
+
+  test("Dataset has withWatermark method") {
+    val ds = testDataset[Long]()
+    val result = ds.withWatermark("time", "10 seconds")
+    result.df.relation.hasWithWatermark shouldBe true
+  }
+
+  // ---------- KVGD extensions ----------
+
+  test("KeyValueGroupedDataset has keyAs method") {
+    classOf[KeyValueGroupedDataset[?, ?]].getMethods.exists(_.getName == "keyAs") shouldBe true
+  }
+
+  test("KeyValueGroupedDataset has mapValues method") {
+    classOf[KeyValueGroupedDataset[?, ?]].getMethods.exists(
+      _.getName == "mapValues"
+    ) shouldBe true
+  }
+
+  test("KeyValueGroupedDataset has flatMapSortedGroups method") {
+    classOf[KeyValueGroupedDataset[?, ?]].getMethods.exists(
+      _.getName == "flatMapSortedGroups"
+    ) shouldBe true
+  }
+
+  test("KeyValueGroupedDataset has agg 5-8 arity overloads") {
+    val aggMethods = classOf[KeyValueGroupedDataset[?, ?]].getMethods.filter(_.getName == "agg")
+    // Should have agg overloads for 1-8 columns (at minimum)
+    aggMethods.length should be >= 5
+  }
