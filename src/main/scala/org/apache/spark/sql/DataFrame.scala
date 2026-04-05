@@ -552,6 +552,34 @@ final class DataFrame private[sql] (
 
   def isEmpty: Boolean = limit(1).collect().isEmpty
 
+  /** Return a `java.util.Iterator` that iterates rows lazily, one Arrow batch at a time.
+    *
+    * The returned iterator implements `AutoCloseable` — callers should close it after use to
+    * release server-side resources. The iterator auto-closes when exhausted.
+    */
+  def toLocalIterator(): java.util.Iterator[Row] with AutoCloseable =
+    val plan = Plan.newBuilder().setRoot(relation).build()
+    val responses = client.execute(plan)
+    val rowIter = responses.flatMap { resp =>
+      if resp.hasArrowBatch then
+        ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
+      else
+        Iterator.empty
+    }
+    new java.util.Iterator[Row] with AutoCloseable:
+      private var closed = false
+      def hasNext: Boolean =
+        val hn = rowIter.hasNext
+        if !hn && !closed then close()
+        hn
+      def next(): Row = rowIter.next()
+      def close(): Unit =
+        if !closed then
+          closed = true
+          (responses: Any) match
+            case c: AutoCloseable => c.close()
+            case _                => ()
+
   /** Check if this DataFrame represents a streaming query. */
   def isStreaming: Boolean =
     val resp = client.analyzePlan { b =>
@@ -705,7 +733,7 @@ final class DataFrame private[sql] (
         .build()
     ))
 
-  private def toJoinType(s: String): Join.JoinType =
+  private[sql] def toJoinType(s: String): Join.JoinType =
     s.toLowerCase match
       case "inner"                        => Join.JoinType.JOIN_TYPE_INNER
       case "left" | "leftouter"           => Join.JoinType.JOIN_TYPE_LEFT_OUTER

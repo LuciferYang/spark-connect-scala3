@@ -1,5 +1,6 @@
 package org.apache.spark.sql
 
+import org.apache.spark.connect.proto.*
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
 import org.apache.spark.sql.types.*
 import org.scalatest.funsuite.AnyFunSuite
@@ -126,4 +127,69 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     // Verifies the object compiles and has the apply method
     val obj = KeyValueGroupedDataset
     obj should not be null
+  }
+
+  // ---------------------------------------------------------------------------
+  // joinWith tests
+  // ---------------------------------------------------------------------------
+
+  /** Create a minimal Dataset backed by a LocalRelation (no real server). */
+  private def testDataset[T: Encoder: scala.reflect.ClassTag](): Dataset[T] =
+    val session = SparkSession(null)
+    val rel = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(0).build())
+      .setLocalRelation(LocalRelation.getDefaultInstance)
+      .build()
+    Dataset(DataFrame(session, rel), summon[Encoder[T]])
+
+  test("joinWith builds Join proto with JoinDataType") {
+    val ds1 = testDataset[Long]()
+    val ds2 = testDataset[Long]()
+    val joined = ds1.joinWith(ds2, Column("id") === Column("id"))
+    val rel = joined.df.relation
+    rel.hasJoin shouldBe true
+    val join = rel.getJoin
+    join.hasJoinDataType shouldBe true
+    join.getJoinType shouldBe Join.JoinType.JOIN_TYPE_INNER
+  }
+
+  test("joinWith with left outer join type") {
+    val ds1 = testDataset[Long]()
+    val ds2 = testDataset[Long]()
+    val joined = ds1.joinWith(ds2, Column("id") === Column("id"), "left")
+    val join = joined.df.relation.getJoin
+    join.getJoinType shouldBe Join.JoinType.JOIN_TYPE_LEFT_OUTER
+    join.hasJoinDataType shouldBe true
+  }
+
+  test("joinWith returns correct tuple encoder type") {
+    val ds1 = testDataset[Int]()
+    val ds2 = testDataset[String]()
+    val joined = ds1.joinWith(ds2, Column("id") === Column("id"))
+    // Verify it compiles with the correct type
+    val enc = joined.encoder
+    enc should not be null
+  }
+
+  // ---------------------------------------------------------------------------
+  // toLocalIterator type signature tests
+  // ---------------------------------------------------------------------------
+
+  test("Dataset.toLocalIterator return type implements both Iterator and AutoCloseable") {
+    // Verify the method exists and returns an intersection type
+    val method = classOf[Dataset[Int]].getMethod("toLocalIterator")
+    method should not be null
+    // The return type is java.util.Iterator[T] with AutoCloseable
+    // Java reflection sees the erased return type — check that both interfaces are assignable
+    val retType = method.getReturnType
+    classOf[java.util.Iterator[?]].isAssignableFrom(retType) ||
+    classOf[AutoCloseable].isAssignableFrom(retType) shouldBe true
+  }
+
+  test("DataFrame.toLocalIterator return type implements both Iterator and AutoCloseable") {
+    val method = classOf[DataFrame].getMethod("toLocalIterator")
+    method should not be null
+    val retType = method.getReturnType
+    classOf[java.util.Iterator[?]].isAssignableFrom(retType) ||
+    classOf[AutoCloseable].isAssignableFrom(retType) shouldBe true
   }

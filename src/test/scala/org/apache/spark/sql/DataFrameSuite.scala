@@ -153,3 +153,37 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     s1.getLowerBound shouldBe 0.5 +- 0.01
     s1.getUpperBound shouldBe 1.0 +- 0.01
   }
+
+  // ---------- parameterized SQL ----------
+
+  test("sql with named arguments builds SQL proto with named_arguments") {
+    val session = SparkSession(null)
+    val result = session.sql("SELECT :name AS name", Map("name" -> "hello"))
+    val rel = result.relation
+    rel.hasSql shouldBe true
+    val sql = rel.getSql
+    sql.getQuery shouldBe "SELECT :name AS name"
+    sql.getNamedArgumentsMap should have size 1
+    sql.getNamedArgumentsMap.containsKey("name") shouldBe true
+  }
+
+  test("sql with positional arguments builds SQL proto with pos_arguments") {
+    val session = SparkSession(null)
+    val result =
+      session.sql("SELECT ? + ?", Column.lit(1), Column.lit(2))(using summon[DummyImplicit])
+    val rel = result.relation
+    rel.hasSql shouldBe true
+    val sql = rel.getSql
+    sql.getQuery shouldBe "SELECT ? + ?"
+    sql.getPosArgumentsList should have size 2
+  }
+
+  test("sql with empty named arguments builds SQL proto without arguments") {
+    val session = SparkSession(null)
+    val result = session.sql("SELECT 1", Map.empty[String, Any])
+    val rel = result.relation
+    rel.hasSql shouldBe true
+    val sql = rel.getSql
+    sql.getQuery shouldBe "SELECT 1"
+    sql.getNamedArgumentsMap should have size 0
+  }

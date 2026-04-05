@@ -12,7 +12,7 @@ This project provides that Scala 3 client.
 
 - **SparkSession** — `builder().remote("sc://host:port").build()`
 - **DataFrame** — select, filter, groupBy, join, union, distinct, sort, limit, sample, and more
-- **Dataset[T]** — typed operations with compile-time `Encoder` derivation via `derives Encoder`
+- **Dataset[T]** — typed operations with compile-time `Encoder` derivation via `derives Encoder`, `joinWith` (type-safe join), `toLocalIterator`
 - **Column** — arithmetic, comparison, logical, string, cast, alias, window, sort operators
 - **functions** — 542 built-in SQL functions (aggregates, math, string, date/time, window, collection, JSON, XML, URL, variant, datasketch, geospatial, and more) — **100% coverage** of the official API
 - **GroupedDataFrame** — groupBy / rollup / cube / pivot with agg, count, sum, avg, min, max
@@ -309,13 +309,13 @@ src/
 ## Supported API
 
 ### SparkSession
-`sql`, `table`, `range`, `emptyDataFrame`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `tvf`, `version`, `stop`
+`sql`, `sql(query, args)` (parameterized), `table`, `range`, `emptyDataFrame`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `tvf`, `newSession`, `version`, `stop`
 
 ### DataFrame Transformations
 `select`, `selectExpr`, `filter`, `where`, `limit`, `offset`, `sort`, `orderBy`, `groupBy`, `rollup`, `cube`, `agg`, `join`, `crossJoin`, `withColumn`, `withColumnRenamed`, `drop`, `distinct`, `dropDuplicates`, `union`, `unionAll`, `unionByName`, `intersect`, `intersectAll`, `except`, `exceptAll`, `repartition`, `coalesce`, `sample`, `describe`, `summary`, `alias`, `toDF`, `hint`, `broadcast`, `sortWithinPartitions`, `tail`, `transform`, `na`, `stat`, `cache`, `persist`, `unpersist`, `checkpoint`, `localCheckpoint`, `withWatermark`, `writeStream`
 
 ### DataFrame Actions
-`collect`, `count`, `first`, `head`, `take`, `show`, `printSchema`, `schema`, `columns`, `explain`, `isEmpty`, `createTempView`, `createOrReplaceTempView`, `createGlobalTempView`, `write`
+`collect`, `count`, `first`, `head`, `take`, `show`, `printSchema`, `schema`, `columns`, `explain`, `isEmpty`, `toLocalIterator`, `createTempView`, `createOrReplaceTempView`, `createGlobalTempView`, `write`
 
 ### Structured Streaming
 `readStream` (DataStreamReader), `writeStream` (DataStreamWriter), `StreamingQuery` (isActive, stop, awaitTermination, recentProgress, explain, exception), `StreamingQueryManager` (active, get, awaitAnyTermination, resetTerminated), `Trigger` (ProcessingTime, AvailableNow, Once, Continuous), `foreachBatch`, `foreach` (ForeachWriter), `mapGroupsWithState`, `flatMapGroupsWithState`, `transformWithState`
@@ -349,15 +349,20 @@ src/
 - [x] `foreachBatch` / `foreach` (ForeachWriter)
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
-- [x] Unit tests (474 tests)
+- [x] Unit tests (487 tests)
 - [x] Integration tests (Spark 4.0.2 / 4.1.1)
-- [x] Error handling (retry policies, gRPC exception conversion, reattachable execution)
+- [x] Error handling (retry policies, gRPC exception conversion, reattachable execution, enriched error details via FetchErrorDetails RPC)
 - [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)
 - [ ] Publish to Maven Central
 - [x] ConnectRepl (Ammonite-based Scala 3 REPL)
 - [x] Observation / CollectMetrics (`Dataset.observe()`)
 - [x] StreamingQueryListener
 - [x] SQLImplicits / DatasetHolder (`.toDS()`, `.toDF()` implicit conversions)
+- [x] Parameterized SQL (`sql(query, args: Map)` + `sql(query, args: Column*)`)
+- [x] `joinWith` (type-safe join returning `Dataset[(T, U)]`)
+- [x] `toLocalIterator` (lazy streaming iteration on DataFrame and Dataset)
+- [x] `newSession()` (independent session sharing same server endpoint)
+- [x] FetchErrorDetails RPC (enriched error details with exception chain and server stack traces)
 
 See [API-GAPS.md](API-GAPS.md) for a detailed comparison with the official Spark Connect client.
 

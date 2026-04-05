@@ -4,12 +4,14 @@ import com.google.protobuf.ByteString
 import org.apache.spark.connect.proto.{
   CommonInlineUserDefinedFunction,
   Expression,
+  Join,
   MapPartitions,
   Relation,
   RelationCommon,
   ScalarScalaUDF
 }
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.ProductEncoder
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.UdfPacket
 
@@ -143,6 +145,49 @@ final class Dataset[T: ClassTag] private[sql] (
   def join(right: DataFrame, joinExpr: Column, joinType: String = "inner"): DataFrame =
     df.join(right, joinExpr, joinType)
 
+  /** Type-preserving join that returns a Dataset of pairs.
+    *
+    * {{{
+    *   val ds1: Dataset[Person] = ...
+    *   val ds2: Dataset[Department] = ...
+    *   val joined: Dataset[(Person, Department)] = ds1.joinWith(ds2, ds1("deptId") === ds2("id"))
+    * }}}
+    */
+  def joinWith[U: Encoder: ClassTag](
+      other: Dataset[U],
+      condition: Column,
+      joinType: String = "inner"
+  ): Dataset[(T, U)] =
+    val jt = df.toJoinType(joinType)
+
+    // Determine if the left/right schemas are structs for JoinDataType
+    val isLeftStruct = encoder.schema.fields.length > 1 ||
+      (encoder.agnosticEncoder != null && encoder.agnosticEncoder.isInstanceOf[ProductEncoder[?]])
+    val isRightStruct = other.encoder.schema.fields.length > 1 ||
+      (other.encoder.agnosticEncoder != null &&
+        other.encoder.agnosticEncoder
+          .isInstanceOf[ProductEncoder[?]])
+
+    val joinBuilder = Join.newBuilder()
+      .setLeft(df.relation)
+      .setRight(other.df.relation)
+      .setJoinCondition(condition.expr)
+      .setJoinType(jt)
+      .setJoinDataType(
+        Join.JoinDataType.newBuilder()
+          .setIsLeftStruct(isLeftStruct)
+          .setIsRightStruct(isRightStruct)
+          .build()
+      )
+
+    val newRelation = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(df.session.nextPlanId()).build())
+      .setJoin(joinBuilder.build())
+      .build()
+
+    val tupleEnc = Encoders.tuple(encoder, other.encoder)
+    Dataset(DataFrame(df.session, newRelation), tupleEnc)
+
   def observe(name: String, expr: Column, exprs: Column*): Dataset[T] =
     Dataset(df.observe(name, expr, exprs*), encoder)
 
@@ -195,6 +240,17 @@ final class Dataset[T: ClassTag] private[sql] (
   def show(numRows: Int = 20, truncate: Int = 20): Unit = df.show(numRows, truncate)
 
   def isEmpty: Boolean = df.isEmpty
+
+  /** Return a `java.util.Iterator` that iterates typed elements lazily.
+    *
+    * The returned iterator implements `AutoCloseable` — callers should close it after use.
+    */
+  def toLocalIterator(): java.util.Iterator[T] with AutoCloseable =
+    val javaIter = df.toLocalIterator()
+    new java.util.Iterator[T] with AutoCloseable:
+      def hasNext: Boolean = javaIter.hasNext
+      def next(): T = encoder.fromRow(javaIter.next())
+      def close(): Unit = javaIter.close()
 
   // ---------------------------------------------------------------------------
   // Convert to another type

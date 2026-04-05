@@ -22,7 +22,8 @@ final class SparkConnectClient private (
     private val asyncStub: SparkConnectServiceGrpc.SparkConnectServiceStub,
     val sessionId: String,
     val userId: String,
-    private val retryHandler: GrpcRetryHandler
+    private val retryHandler: GrpcRetryHandler,
+    private[sql] val connectionUrl: String
 ):
 
   /** Manages uploading artifacts (class files, JARs) to the server. */
@@ -67,10 +68,11 @@ final class SparkConnectClient private (
     val inner =
       ExecutePlanResponseReattachableIterator(rb.build(), channel, retryHandler)
     val validated = responseValidator.wrapIterator(inner)
-    // Wrap with GrpcExceptionConverter.
+    // Wrap with GrpcExceptionConverter (with FetchErrorDetails support).
     new Iterator[ExecutePlanResponse] with AutoCloseable:
-      def hasNext: Boolean = GrpcExceptionConverter.convert(validated.hasNext)
-      def next(): ExecutePlanResponse = GrpcExceptionConverter.convert(validated.next())
+      def hasNext: Boolean = GrpcExceptionConverter.convert(validated.hasNext, fetchErrorDetails)
+      def next(): ExecutePlanResponse =
+        GrpcExceptionConverter.convert(validated.next(), fetchErrorDetails)
       def close(): Unit = validated.close()
 
   // ---------------------------------------------------------------------------
@@ -182,7 +184,7 @@ final class SparkConnectClient private (
         case _                => ()
 
   // ---------------------------------------------------------------------------
-  // Interrupt / Close
+  // Interrupt / Close / New Client
   // ---------------------------------------------------------------------------
 
   def interrupt(): Unit =
@@ -203,6 +205,23 @@ final class SparkConnectClient private (
       if !channel.awaitTermination(5, TimeUnit.SECONDS) then
         channel.shutdownNow()
     catch case NonFatal(_) => channel.shutdownNow()
+
+  /** Create a new client connected to the same server but with a fresh session ID. */
+  def newClient(): SparkConnectClient =
+    SparkConnectClient.create(connectionUrl)
+
+  /** Fetch enriched error details from the server for the given error ID. */
+  private[client] def fetchErrorDetails(
+      errorId: String
+  ): Option[FetchErrorDetailsResponse] =
+    try
+      val rb = FetchErrorDetailsRequest.newBuilder()
+        .setSessionId(sessionId)
+        .setUserContext(userContext)
+        .setErrorId(errorId)
+      serverSideSessionId.foreach(rb.setClientObservedServerSideSessionId)
+      Some(bstub.fetchErrorDetails(rb.build()))
+    catch case NonFatal(_) => None
 
   // ---------------------------------------------------------------------------
   // Generic Analyze helper
@@ -278,7 +297,8 @@ object SparkConnectClient:
       aStub,
       sessionId,
       userId,
-      GrpcRetryHandler(RetryPolicy.defaultPolicy())
+      GrpcRetryHandler(RetryPolicy.defaultPolicy()),
+      url
     )
 
     configs.foreach((k, v) => client.setConfig(k, v))

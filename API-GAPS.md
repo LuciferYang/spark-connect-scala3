@@ -32,40 +32,13 @@ These features have been implemented:
 | TableValuedFunction (TVF) | — | `SparkSession.tvf` with explode, inline, posexplode, json_tuple, stack, etc. |
 | `typed` Object | — | `typed.avg`, `typed.count`, `typed.sum`, `typed.sumLong` via typed aggregators |
 | `KeyValueGroupedDataset.agg(TypedColumn)` | — | `agg[U1]` through `agg[U1,U2,U3,U4]` via `Aggregate` proto |
+| Parameterized SQL | — | `sql(query, args: Map)` + `sql(query, args: Column*)` with named/positional arguments |
+| `joinWith` (Typed Join) | — | `Dataset.joinWith[U]` returning `Dataset[(T, U)]` with `JoinDataType` proto support |
+| `toLocalIterator` | — | Lazy streaming `java.util.Iterator` on both `DataFrame` and `Dataset` |
+| `newSession()` | — | Creates independent session sharing same server endpoint |
+| `FetchErrorDetails` RPC | — | Enriched error details with exception chain, server stack traces, and message parameters |
 
 ## Remaining Gaps
-
-### High Priority
-
-#### 1. Parameterized SQL (`sql` with args)
-
-**Upstream**: `SparkSession.sql(query, args: Map[String, Any])` and `sql(query, args: Column*)` — parameterized queries that prevent SQL injection and enable reusable query templates.
-
-**SC3 status**: Only `sql(query: String)` is implemented.
-
-#### 2. `joinWith` (Typed Join)
-
-**Upstream**: `Dataset.joinWith[U](other: Dataset[U], condition: Column, joinType: String): Dataset[(T, U)]` — typed join returning a Dataset of tuples, preserving type safety across joins.
-
-**SC3 status**: Not implemented. Only untyped `join()` is available.
-
-#### 3. `toLocalIterator`
-
-**Upstream**: `Dataset.toLocalIterator(): Iterator[T]` — streams results row-by-row without loading the entire result set into memory. Essential for large datasets.
-
-**SC3 status**: Not implemented. Only `collect()` (full materialization) is available.
-
-#### 4. `newSession()`
-
-**Upstream**: `SparkSession.newSession(): SparkSession` — creates a new session sharing the same underlying gRPC connection but with independent configuration and state.
-
-**SC3 status**: Not implemented.
-
-#### 5. `FetchErrorDetails` RPC
-
-**Upstream**: `GrpcExceptionConverter` calls `FetchErrorDetailsRequest` RPC to retrieve detailed server-side error information (enriched error classes, stack traces, context).
-
-**SC3 status**: `GrpcExceptionConverter` exists but uses simplified error extraction without the `FetchErrorDetails` RPC.
 
 ### Medium Priority
 
@@ -259,12 +232,12 @@ These features have been implemented:
 
 ## Suggested Implementation Phases
 
-**Phase 1** (High Priority — most commonly used APIs):
-1. Parameterized `sql` with args
-2. `joinWith` (typed join)
-3. `toLocalIterator`
-4. `newSession()`
-5. `FetchErrorDetails` RPC
+**Phase 1** (High Priority — ✅ COMPLETED):
+1. ~~Parameterized `sql` with args~~
+2. ~~`joinWith` (typed join)~~
+3. ~~`toLocalIterator`~~
+4. ~~`newSession()`~~
+5. ~~`FetchErrorDetails` RPC~~
 
 **Phase 2** (Medium Priority — API completeness):
 6. Operation tags + fine-grained interruption

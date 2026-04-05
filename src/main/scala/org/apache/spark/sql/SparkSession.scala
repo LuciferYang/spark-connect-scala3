@@ -45,6 +45,42 @@ final class SparkSession private[sql] (
         .build()
     )
 
+  /** Execute a SQL query with named parameters.
+    *
+    * {{{
+    *   spark.sql("SELECT :name AS name", Map("name" -> "hello")).show()
+    * }}}
+    */
+  def sql(query: String, args: Map[String, Any]): DataFrame =
+    val sqlBuilder = SQL.newBuilder().setQuery(query)
+    args.foreach { (name, value) =>
+      sqlBuilder.putNamedArguments(name, Column.lit(value).expr)
+    }
+    DataFrame(
+      this,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+        .setSql(sqlBuilder.build())
+        .build()
+    )
+
+  /** Execute a SQL query with positional parameters (Column expressions).
+    *
+    * {{{
+    *   spark.sql("SELECT ? + ? AS sum", functions.lit(1), functions.lit(2)).show()
+    * }}}
+    */
+  def sql(query: String, args: Column*)(using DummyImplicit): DataFrame =
+    val sqlBuilder = SQL.newBuilder().setQuery(query)
+    args.foreach(c => sqlBuilder.addPosArguments(c.expr))
+    DataFrame(
+      this,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+        .setSql(sqlBuilder.build())
+        .build()
+    )
+
   // ---------------------------------------------------------------------------
   // Table / Range / Empty
   // ---------------------------------------------------------------------------
@@ -195,6 +231,17 @@ final class SparkSession private[sql] (
   // ---------------------------------------------------------------------------
 
   def stop(): Unit = client.close()
+
+  // ---------------------------------------------------------------------------
+  // New Session
+  // ---------------------------------------------------------------------------
+
+  /** Create a new session connected to the same server but with independent state.
+    *
+    * The new session has its own session ID and does not share temporary views, UDFs, or SQL
+    * configurations with this session.
+    */
+  def newSession(): SparkSession = SparkSession(client.newClient())
 
 object SparkSession:
   def builder(): Builder = Builder()
