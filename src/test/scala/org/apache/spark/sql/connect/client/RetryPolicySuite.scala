@@ -86,8 +86,13 @@ class RetryPolicySuite extends AnyFunSuite with Matchers:
   test("GrpcRetryHandler calls sleep with increasing backoff") {
     val sleepTimes = scala.collection.mutable.ArrayBuffer.empty[Long]
     val handler = GrpcRetryHandler(
-      RetryPolicy(maxRetries = 3, initialBackoffMs = 10, backoffMultiplier = 2.0,
-        maxBackoffMs = 1000, jitterMs = 0),
+      RetryPolicy(
+        maxRetries = 3,
+        initialBackoffMs = 10,
+        backoffMultiplier = 2.0,
+        maxBackoffMs = 1000,
+        jitterMs = 0
+      ),
       sleep = t => sleepTimes += t
     )
     var attempts = 0
@@ -106,8 +111,13 @@ class RetryPolicySuite extends AnyFunSuite with Matchers:
   test("GrpcRetryHandler respects maxBackoffMs") {
     val sleepTimes = scala.collection.mutable.ArrayBuffer.empty[Long]
     val handler = GrpcRetryHandler(
-      RetryPolicy(maxRetries = 3, initialBackoffMs = 100, backoffMultiplier = 10.0,
-        maxBackoffMs = 500, jitterMs = 0),
+      RetryPolicy(
+        maxRetries = 3,
+        initialBackoffMs = 100,
+        backoffMultiplier = 10.0,
+        maxBackoffMs = 500,
+        jitterMs = 0
+      ),
       sleep = t => sleepTimes += t
     )
     var attempts = 0

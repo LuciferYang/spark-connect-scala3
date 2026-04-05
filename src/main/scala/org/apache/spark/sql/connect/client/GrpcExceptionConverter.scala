@@ -33,9 +33,11 @@ object GrpcExceptionConverter:
         val metadata = info.getMetadataMap.asScala
         val errorClass = metadata.get("errorClass")
         val sqlState = metadata.get("sqlState")
-        val message = metadata.getOrElse("message", e.getStatus.getDescription match
-          case null => e.getMessage
-          case desc => desc
+        val message = metadata.getOrElse(
+          "message",
+          e.getStatus.getDescription match
+            case null => e.getMessage
+            case desc => desc
         )
         SparkException(message, cause = e, errorClass = errorClass, sqlState = sqlState)
       case None =>

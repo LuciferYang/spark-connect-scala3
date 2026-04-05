@@ -33,7 +33,7 @@ class GrpcExceptionConverterSuite extends AnyFunSuite with Matchers:
   test("convert wraps StatusRuntimeException without ErrorInfo") {
     val sre = new StatusRuntimeException(Status.INTERNAL.withDescription("boom"))
     val ex = intercept[SparkException] {
-      GrpcExceptionConverter.convert { throw sre }
+      GrpcExceptionConverter.convert(throw sre)
     }
     ex.getMessage shouldBe "boom"
     ex.getCause shouldBe sre
@@ -49,7 +49,7 @@ class GrpcExceptionConverterSuite extends AnyFunSuite with Matchers:
       sqlState = "42P01"
     )
     val ex = intercept[SparkException] {
-      GrpcExceptionConverter.convert { throw sre }
+      GrpcExceptionConverter.convert(throw sre)
     }
     ex.getMessage shouldBe "Table not found"
     ex.errorClass shouldBe Some("TABLE_OR_VIEW_NOT_FOUND")
@@ -60,13 +60,13 @@ class GrpcExceptionConverterSuite extends AnyFunSuite with Matchers:
   test("convert passes through non-StatusRuntimeException") {
     val re = RuntimeException("not grpc")
     val thrown = intercept[RuntimeException] {
-      GrpcExceptionConverter.convert { throw re }
+      GrpcExceptionConverter.convert(throw re)
     }
     thrown shouldBe re
   }
 
   test("convert returns value when no exception") {
-    val result = GrpcExceptionConverter.convert { 42 }
+    val result = GrpcExceptionConverter.convert(42)
     result shouldBe 42
   }
 
