@@ -17,8 +17,8 @@ import scala.reflect.ClassTag
 
 /** A Dataset that has been grouped by a key-extracting function, enabling typed group operations.
   *
-  * Created via `Dataset.groupByKey`. Supports `mapGroups`, `flatMapGroups`, `reduceGroups`,
-  * `keys`, and `count`.
+  * Created via `Dataset.groupByKey`. Supports `mapGroups`, `flatMapGroups`, `reduceGroups`, `keys`,
+  * and `count`.
   *
   * {{{
   *   case class Person(name: String, age: Int) derives Encoder
@@ -46,8 +46,8 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
 
   /** Apply a function to each group and return a new Dataset.
     *
-    * When AgnosticEncoder bridges are available, builds a server-side `GroupMap` proto.
-    * Otherwise falls back to client-side implementation.
+    * When AgnosticEncoder bridges are available, builds a server-side `GroupMap` proto. Otherwise
+    * falls back to client-side implementation.
     */
   def mapGroups[U: Encoder: ClassTag](func: (K, Iterator[V]) => U): Dataset[U] =
     flatMapGroups((k, iter) => Iterator.single(func(k, iter)))
@@ -148,7 +148,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   ): Dataset[R] =
     val leftData = ds.collect().groupBy(groupingFunc)
     val rightData = other.ds.collect().groupBy(other.groupingFunc)
-    val allKeys = (leftData.keySet ++ rightData.keySet)
+    val allKeys = leftData.keySet ++ rightData.keySet
     val results = allKeys.iterator.flatMap { key =>
       val leftIter = leftData.getOrElse(key, Array.empty[V]).iterator
       val rightIter = rightData.getOrElse(key, Array.empty[U]).iterator

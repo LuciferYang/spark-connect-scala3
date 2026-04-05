@@ -266,9 +266,10 @@ class ExpandedEncoderSuite extends AnyFunSuite with Matchers:
       catch
         case _: NoSuchMethodException =>
           val parent = cls.getSuperclass
-          if parent == null then throw NoSuchMethodException(
-            s"writeReplace not found in ${obj.getClass.getName}"
-          )
+          if parent == null then
+            throw NoSuchMethodException(
+              s"writeReplace not found in ${obj.getClass.getName}"
+            )
           findWriteReplace(parent)
     val method = findWriteReplace(obj.getClass)
     method.invoke(obj)
