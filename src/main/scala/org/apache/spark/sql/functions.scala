@@ -1,6 +1,10 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.Expression
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
+import org.apache.spark.sql.expressions.Aggregator
+
+import scala.annotation.targetName
 
 /** Built-in Spark SQL functions. */
 object functions:
@@ -1573,6 +1577,43 @@ object functions:
         Encoder.sparkTypeOf[T10]
       )
     )
+
+  // ---------------------------------------------------------------------------
+  // User-Defined Aggregate Functions (UDAF)
+  // ---------------------------------------------------------------------------
+
+  /** Create a UDAF from an [[Aggregator]] with an implicit input encoder.
+    *
+    * {{{
+    *   val myUdaf = udaf(myAggregator)
+    *   df.agg(myUdaf(col("value")))
+    * }}}
+    */
+  def udaf[IN, BUF, OUT](
+      agg: Aggregator[IN, BUF, OUT]
+  )(using enc: Encoder[IN]): UserDefinedFunction =
+    val inputEnc = extractAgnosticEncoder(enc)
+    val outputEnc = extractAgnosticEncoder(agg.outputEncoder)
+    UserDefinedFunction.forAggregator(agg, inputEnc, outputEnc)
+
+  /** Create a UDAF from an [[Aggregator]] with an explicit input encoder.
+    *
+    * {{{
+    *   val myUdaf = udaf(myAggregator, Encoders.scalaLong)
+    *   df.agg(myUdaf(col("value")))
+    * }}}
+    */
+  @targetName("udafWithEncoder")
+  def udaf[IN, BUF, OUT](
+      agg: Aggregator[IN, BUF, OUT],
+      inputEncoder: Encoder[IN]
+  ): UserDefinedFunction =
+    val inputEnc = extractAgnosticEncoder(inputEncoder)
+    val outputEnc = extractAgnosticEncoder(agg.outputEncoder)
+    UserDefinedFunction.forAggregator(agg, inputEnc, outputEnc)
+
+  private def extractAgnosticEncoder[T](enc: Encoder[T]): AgnosticEncoder[?] =
+    Encoders.asAgnostic(enc)
 
   // ---------------------------------------------------------------------------
   // Higher-order functions (lambda-based)

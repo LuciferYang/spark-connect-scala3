@@ -11,6 +11,7 @@ import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.*
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.UdfPacket
+import org.apache.spark.sql.expressions.Aggregator
 import org.apache.spark.sql.types.*
 
 /** A user-defined function that can be applied to Columns.
@@ -29,20 +30,53 @@ final class UserDefinedFunction private[sql] (
     private[sql] val inputTypes: Seq[DataType],
     private val _name: Option[String] = None,
     private val _nullable: Boolean = true,
-    private val _deterministic: Boolean = true
+    private val _deterministic: Boolean = true,
+    private[sql] val _aggregate: Boolean = false,
+    private[sql] val _inputAgnosticEncoders: Option[Seq[AgnosticEncoder[?]]] = None,
+    private[sql] val _outputAgnosticEncoder: Option[AgnosticEncoder[?]] = None
 ):
 
   /** Return a copy with the given name. */
   def withName(name: String): UserDefinedFunction =
-    new UserDefinedFunction(func, returnType, inputTypes, Some(name), _nullable, _deterministic)
+    new UserDefinedFunction(
+      func,
+      returnType,
+      inputTypes,
+      Some(name),
+      _nullable,
+      _deterministic,
+      _aggregate,
+      _inputAgnosticEncoders,
+      _outputAgnosticEncoder
+    )
 
   /** Return a copy with the given nullability. */
   def asNonNullable(): UserDefinedFunction =
-    new UserDefinedFunction(func, returnType, inputTypes, _name, false, _deterministic)
+    new UserDefinedFunction(
+      func,
+      returnType,
+      inputTypes,
+      _name,
+      false,
+      _deterministic,
+      _aggregate,
+      _inputAgnosticEncoders,
+      _outputAgnosticEncoder
+    )
 
   /** Return a copy marked as non-deterministic. */
   def asNondeterministic(): UserDefinedFunction =
-    new UserDefinedFunction(func, returnType, inputTypes, _name, _nullable, false)
+    new UserDefinedFunction(
+      func,
+      returnType,
+      inputTypes,
+      _name,
+      _nullable,
+      false,
+      _aggregate,
+      _inputAgnosticEncoders,
+      _outputAgnosticEncoder
+    )
 
   /** The function name (used for registration or display). */
   def name: Option[String] = _name
@@ -65,6 +99,7 @@ final class UserDefinedFunction private[sql] (
       .setPayload(ByteString.copyFrom(payload))
       .setOutputType(DataTypeProtoConverter.toProto(returnType))
       .setNullable(_nullable)
+      .setAggregate(_aggregate)
     inputTypes.foreach(dt => scalaUdfBuilder.addInputTypes(DataTypeProtoConverter.toProto(dt)))
     val udfBuilder = CommonInlineUserDefinedFunction.newBuilder()
       .setFunctionName(functionName)
@@ -75,8 +110,8 @@ final class UserDefinedFunction private[sql] (
 
   /** Serialize a function closure wrapped in a UdfPacket. */
   private def serializeFunction(f: AnyRef): Array[Byte] =
-    val inputEncs = inputTypes.map(encoderForType)
-    val outputEnc = encoderForType(returnType)
+    val inputEncs = _inputAgnosticEncoders.getOrElse(inputTypes.map(encoderForType))
+    val outputEnc = _outputAgnosticEncoder.getOrElse(encoderForType(returnType))
     val packet = UdfPacket(f, inputEncs, outputEnc)
     UdfPacket.serialize(packet)
 
@@ -105,3 +140,22 @@ object UserDefinedFunction:
       inputTypes: Seq[DataType]
   ): UserDefinedFunction =
     new UserDefinedFunction(func, returnType, inputTypes)
+
+  /** Create a UserDefinedFunction for an Aggregator (UDAF).
+    *
+    * The Aggregator object itself is serialized as the function payload. The proto sets
+    * `aggregate = true` so the server knows to treat this as a UDAF.
+    */
+  private[sql] def forAggregator(
+      aggregator: Aggregator[?, ?, ?],
+      inputEncoder: AgnosticEncoder[?],
+      outputEncoder: AgnosticEncoder[?]
+  ): UserDefinedFunction =
+    new UserDefinedFunction(
+      func = aggregator,
+      returnType = outputEncoder.dataType,
+      inputTypes = Seq(inputEncoder.dataType),
+      _aggregate = true,
+      _inputAgnosticEncoders = Some(Seq(inputEncoder)),
+      _outputAgnosticEncoder = Some(outputEncoder)
+    )

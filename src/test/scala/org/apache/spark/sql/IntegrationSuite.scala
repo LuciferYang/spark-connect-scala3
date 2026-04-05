@@ -1,5 +1,6 @@
 package org.apache.spark.sql
 
+import org.apache.spark.sql.expressions.Aggregator
 import org.apache.spark.sql.functions.*
 import org.apache.spark.sql.types.*
 
@@ -539,4 +540,74 @@ class IntegrationSuite extends org.scalatest.funsuite.AnyFunSuite:
       val active = spark.streams.active
       assert(active.exists(_.id == query.id))
     finally query.stop()
+  }
+
+  // ---------------------------------------------------------------------------
+  // UDAF (User-Defined Aggregate Functions)
+  // ---------------------------------------------------------------------------
+
+  /** A simple Long-sum aggregator. */
+  object LongSumAggregator extends Aggregator[Long, Long, Long]:
+    def zero: Long = 0L
+    def reduce(b: Long, a: Long): Long = b + a
+    def merge(b1: Long, b2: Long): Long = b1 + b2
+    def finish(reduction: Long): Long = reduction
+    def bufferEncoder: Encoder[Long] = Encoders.scalaLong
+    def outputEncoder: Encoder[Long] = Encoders.scalaLong
+
+  /** A Long-max aggregator. */
+  object LongMaxAggregator extends Aggregator[Long, Long, Long]:
+    def zero: Long = Long.MinValue
+    def reduce(b: Long, a: Long): Long = math.max(b, a)
+    def merge(b1: Long, b2: Long): Long = math.max(b1, b2)
+    def finish(reduction: Long): Long = reduction
+    def bufferEncoder: Encoder[Long] = Encoders.scalaLong
+    def outputEncoder: Encoder[Long] = Encoders.scalaLong
+
+  test("UDAF applied to columns directly") {
+    assert(classFilesUploaded)
+    val mySum = udaf(LongSumAggregator, Encoders.scalaLong)
+    val df = spark.range(1, 11) // 1..10
+    val result = df.agg(mySum(col("id")).as("total")).collect()
+    assert(result.length == 1)
+    assert(result(0).getLong(0) == 55L) // sum 1..10 = 55
+  }
+
+  test("UDAF register and use in SQL") {
+    assert(classFilesUploaded)
+    val mySum = udaf(LongSumAggregator, Encoders.scalaLong)
+    spark.udf.register("my_long_sum", mySum)
+
+    spark.range(1, 6).createOrReplaceTempView("udaf_test") // 1..5
+    val result = spark.sql("SELECT my_long_sum(id) AS total FROM udaf_test").collect()
+    assert(result.length == 1)
+    assert(result(0).getLong(0) == 15L) // sum 1..5 = 15
+  }
+
+  test("UDAF with groupBy") {
+    assert(classFilesUploaded)
+    val myMax = udaf(LongMaxAggregator, Encoders.scalaLong)
+    val rows = Seq(
+      Row("A", 10L),
+      Row("A", 20L),
+      Row("B", 30L),
+      Row("B", 5L)
+    )
+    val schema = StructType(
+      Seq(
+        StructField("group", StringType),
+        StructField("value", LongType)
+      )
+    )
+    val df = spark.createDataFrame(rows, schema)
+    val result = df
+      .groupBy(col("group"))
+      .agg(myMax(col("value")).as("max_val"))
+      .orderBy(col("group"))
+      .collect()
+    assert(result.length == 2)
+    assert(result(0).getString(0) == "A")
+    assert(result(0).getLong(1) == 20L)
+    assert(result(1).getString(0) == "B")
+    assert(result(1).getLong(1) == 30L)
   }
