@@ -23,18 +23,13 @@ These features have been implemented:
 | Observation / CollectMetrics | — | `DataFrame.observe()` + `Observation` class |
 | StreamingQueryListener | — | `StreamingQueryListener` + `StreamingQueryListenerBus` + event dispatch |
 | SQLImplicits / DatasetHolder | — | Scala 3 `object implicits` with extension methods (`$"col"`, `Seq[T].toDS/toDF`) |
+| ConnectRepl | — | Ammonite-based Scala 3 REPL with `SparkConnectClientParser` + `AmmoniteClassFinder` |
 
 ## Remaining Gaps
 
 ### High Priority
 
-#### 1. ConnectRepl — Interactive Scala 3 REPL
-
-**Upstream**: `org.apache.spark.sql.connect.client.SparkConnectClientParser` + Ammonite-based REPL (`ConnectRepl.scala`)
-
-**Challenge**: Upstream uses Ammonite which is Scala 2 only. SC3 would need to integrate with `scala-cli` or the Scala 3 REPL.
-
-**Scope**: CLI argument parser (`--remote`, `--host`, `--port`, `--jars`, `--packages`), REPL initialization with SparkSession auto-creation, classpath/artifact handling.
+(None currently)
 
 ### Medium Priority
 

@@ -29,6 +29,12 @@ ThisBuild / publishTo := sonatypePublishToBundle.value
 
 val grpcVersion = "1.80.0"
 val protobufVersion = "4.34.1"
+val ammoniteVersion = "3.0.9"
+
+// Google Mirror of Maven Central, placed first so that it's used instead of flaky Maven Central.
+// See https://storage-download.googleapis.com/maven-central/index.html
+ThisBuild / resolvers += "gcs-maven-central-mirror" at
+  "https://maven-central.storage-download.googleapis.com/maven2/"
 
 lazy val root = (project in file("."))
   .settings(
@@ -41,8 +47,11 @@ lazy val root = (project in file("."))
       "-deprecation"
     ),
 
+    Compile / mainClass := Some("org.apache.spark.sql.application.ConnectRepl"),
+
     libraryDependencies ++= {
       val arrowVersion = "19.0.0"
+      val scalaFullVersion = scalaVersion.value // e.g. "3.3.7"
 
       Seq(
         // gRPC and Protocol Buffers
@@ -58,6 +67,9 @@ lazy val root = (project in file("."))
 
         // Zstandard for plan compression
         "com.github.luben" % "zstd-jni" % "1.5.6-8",
+
+        // Ammonite REPL (published per full Scala version, not binary)
+        "com.lihaoyi" % s"ammonite_$scalaFullVersion" % ammoniteVersion cross CrossVersion.disabled,
 
         // Testing
         "org.scalatest" %% "scalatest" % "3.2.19" % Test

@@ -79,19 +79,46 @@ SPARK_CONNECT_URL=sc://remote-host:15002 \
   build/sbt "runMain org.apache.spark.sql.examples.quickStart"
 ```
 
-### 4. Run unit tests
+### 4. Launch the Scala 3 REPL
+
+```bash
+# Connect to default server (localhost:15002)
+build/sbt run
+
+# Connect to a specific server
+build/sbt "run --remote sc://myhost:15002"
+
+# Or use the SPARK_REMOTE environment variable
+SPARK_REMOTE=sc://myhost:15002 build/sbt run
+```
+
+Once the REPL starts, `spark` is available as a pre-bound `SparkSession`:
+
+```scala
+scala> spark.sql("SELECT 1 + 1 AS result").show()
++------+
+|result|
++------+
+|     2|
++------+
+
+scala> import org.apache.spark.sql.functions.*
+scala> spark.range(10).select(col("id"), (col("id") * 2).as("doubled")).show()
+```
+
+### 5. Run unit tests
 
 ```bash
 build/sbt test
 ```
 
-### 5. Run integration tests (requires a running Spark Connect server)
+### 6. Run integration tests (requires a running Spark Connect server)
 
 ```bash
 build/sbt 'testOnly *IntegrationSuite'
 ```
 
-### 6. Use in your own project
+### 7. Use in your own project
 
 ```scala
 // build.sbt
@@ -175,6 +202,8 @@ src/
 │       │   └── AgnosticEncoder.scala    # Agnostic encoder definitions
 │       ├── connect/client/
 │       │   ├── SparkConnectClient.scala    # gRPC client
+│       │   ├── SparkConnectClientParser.scala # CLI argument parser for REPL
+│       │   ├── AmmoniteClassFinder.scala    # Ammonite REPL class discovery
 │       │   ├── ArrowDeserializer.scala     # Arrow IPC → Row decoding
 │       │   ├── DataTypeProtoConverter.scala # Proto ↔ DataType
 │       │   ├── ArtifactManager.scala       # Artifact upload/management
@@ -184,6 +213,8 @@ src/
 │       ├── connect/common/
 │       │   ├── UdfPacket.scala             # UDF serialization
 │       │   └── ForeachWriterPacket.scala   # ForeachWriter serialization
+│       ├── application/
+│       │   └── ConnectRepl.scala           # Ammonite-based Scala 3 REPL
 │       └── examples/
 │           └── QuickStart.scala         # End-to-end example
 └── test/
@@ -214,11 +245,14 @@ src/
         ├── expressions/
         │   └── AggregatorSuite.scala    # UDAF unit tests
         ├── connect/client/
+        │   ├── SparkConnectClientParserSuite.scala
         │   ├── DataTypeProtoConverterSuite.scala
         │   ├── GrpcExceptionConverterSuite.scala
         │   └── RetryPolicySuite.scala
         └── types/
             └── DataTypeSuite.scala
+        application/
+            └── ConnectReplSuite.scala
 ```
 
 ## How It Works
@@ -245,6 +279,7 @@ src/
 | [gRPC-Java](https://grpc.io/) | Transport layer for Spark Connect protocol |
 | [Protobuf-Java](https://protobuf.dev/) | Java protobuf code generation for proto definitions |
 | [Apache Arrow](https://arrow.apache.org/) | Data serialization/deserialization (IPC format) |
+| [Ammonite](https://ammonite.io/) | Interactive Scala 3 REPL |
 | [ScalaTest](https://www.scalatest.org/) | Unit and integration testing |
 
 ## Supported API
@@ -285,11 +320,11 @@ src/
 - [x] `foreachBatch` / `foreach` (ForeachWriter)
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
-- [x] Unit tests (412 tests)
+- [x] Unit tests (455 tests)
 - [x] Integration tests (Spark 4.0.2 / 4.1.1)
 - [x] Error handling (retry policies, gRPC exception conversion)
 - [ ] Publish to Maven Central
-- [ ] ConnectRepl (Scala 3 REPL / scala-cli integration)
+- [x] ConnectRepl (Ammonite-based Scala 3 REPL)
 - [ ] Observation / CollectMetrics (`Dataset.observe()`)
 - [ ] StreamingQueryListener
 - [ ] SQLImplicits / DatasetHolder (`.toDS()`, `.toDF()` implicit conversions)
