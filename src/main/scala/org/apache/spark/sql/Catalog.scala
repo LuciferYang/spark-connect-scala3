@@ -1,7 +1,14 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.{Catalog as ProtoCatalog, *}
-import org.apache.spark.sql.connect.client.SparkConnectClient
+import org.apache.spark.connect.proto.{
+  Catalog as ProtoCatalog,
+  StorageLevel as _,
+  *
+}
+import org.apache.spark.sql.connect.client.{DataTypeProtoConverter, SparkConnectClient}
+import org.apache.spark.sql.types.StructType
+
+import scala.jdk.CollectionConverters.*
 
 /** Interface through which the user may create, drop, alter or query underlying databases, tables,
   * functions, etc.
@@ -54,6 +61,11 @@ final class Catalog private[sql] (private val session: SparkSession):
       ListTables.newBuilder().setDbName(dbName).build()
     ))
 
+  def listTables(dbName: String, pattern: String): DataFrame =
+    catalogDf(_.setListTables(
+      ListTables.newBuilder().setDbName(dbName).setPattern(pattern).build()
+    ))
+
   def listColumns(tableName: String): DataFrame =
     catalogDf(_.setListColumns(
       ListColumns.newBuilder().setTableName(tableName).build()
@@ -72,12 +84,38 @@ final class Catalog private[sql] (private val session: SparkSession):
       ListFunctions.newBuilder().setDbName(dbName).build()
     ))
 
+  def listFunctions(dbName: String, pattern: String): DataFrame =
+    catalogDf(_.setListFunctions(
+      ListFunctions.newBuilder().setDbName(dbName).setPattern(pattern).build()
+    ))
+
   def listCatalogs(): DataFrame =
     catalogDf(_.setListCatalogs(ListCatalogs.getDefaultInstance))
 
   def listCatalogs(pattern: String): DataFrame =
     catalogDf(_.setListCatalogs(
       ListCatalogs.newBuilder().setPattern(pattern).build()
+    ))
+
+  def listCachedTables(): DataFrame =
+    catalogDf(_.setListCachedTables(ListCachedTables.getDefaultInstance))
+
+  def listPartitions(tableName: String): DataFrame =
+    catalogDf(_.setListPartitions(
+      ListPartitions.newBuilder().setTableName(tableName).build()
+    ))
+
+  def listViews(): DataFrame =
+    catalogDf(_.setListViews(ListViews.getDefaultInstance))
+
+  def listViews(dbName: String): DataFrame =
+    catalogDf(_.setListViews(
+      ListViews.newBuilder().setDbName(dbName).build()
+    ))
+
+  def listViews(dbName: String, pattern: String): DataFrame =
+    catalogDf(_.setListViews(
+      ListViews.newBuilder().setDbName(dbName).setPattern(pattern).build()
     ))
 
   // ---------------------------------------------------------------------------
@@ -103,6 +141,21 @@ final class Catalog private[sql] (private val session: SparkSession):
     catalogDf(_.setGetFunction(
       GetFunction.newBuilder().setFunctionName(functionName).build()
     ))
+
+  def getFunction(functionName: String, dbName: String): DataFrame =
+    catalogDf(_.setGetFunction(
+      GetFunction.newBuilder().setFunctionName(functionName).setDbName(dbName).build()
+    ))
+
+  def getTableProperties(tableName: String): DataFrame =
+    catalogDf(_.setGetTableProperties(
+      GetTableProperties.newBuilder().setTableName(tableName).build()
+    ))
+
+  def getCreateTableString(tableName: String, asSerde: Boolean = false): String =
+    catalogDf(_.setGetCreateTableString(
+      GetCreateTableString.newBuilder().setTableName(tableName).setAsSerde(asSerde).build()
+    )).collect().head.getString(0)
 
   // ---------------------------------------------------------------------------
   // Existence checks
@@ -147,6 +200,14 @@ final class Catalog private[sql] (private val session: SparkSession):
       CacheTable.newBuilder().setTableName(tableName).build()
     )).collect()
 
+  def cacheTable(tableName: String, storageLevel: StorageLevel): Unit =
+    catalogDf(_.setCacheTable(
+      CacheTable.newBuilder()
+        .setTableName(tableName)
+        .setStorageLevel(storageLevel.toProto)
+        .build()
+    )).collect()
+
   def uncacheTable(tableName: String): Unit =
     catalogDf(_.setUncacheTable(
       UncacheTable.newBuilder().setTableName(tableName).build()
@@ -156,17 +217,163 @@ final class Catalog private[sql] (private val session: SparkSession):
     catalogDf(_.setClearCache(ClearCache.getDefaultInstance)).collect()
 
   // ---------------------------------------------------------------------------
+  // Create table
+  // ---------------------------------------------------------------------------
+
+  def createTable(tableName: String, path: String): DataFrame =
+    catalogDf(_.setCreateTable(
+      CreateTable.newBuilder()
+        .setTableName(tableName)
+        .setPath(path)
+        .build()
+    ))
+
+  def createTable(tableName: String, path: String, source: String): DataFrame =
+    catalogDf(_.setCreateTable(
+      CreateTable.newBuilder()
+        .setTableName(tableName)
+        .setPath(path)
+        .setSource(source)
+        .build()
+    ))
+
+  def createTable(
+      tableName: String,
+      source: String,
+      options: Map[String, String]
+  ): DataFrame =
+    catalogDf(_.setCreateTable(
+      CreateTable.newBuilder()
+        .setTableName(tableName)
+        .setSource(source)
+        .putAllOptions(options.asJava)
+        .build()
+    ))
+
+  def createTable(
+      tableName: String,
+      source: String,
+      schema: StructType,
+      options: Map[String, String]
+  ): DataFrame =
+    catalogDf(_.setCreateTable(
+      CreateTable.newBuilder()
+        .setTableName(tableName)
+        .setSource(source)
+        .setSchema(DataTypeProtoConverter.toProto(schema))
+        .putAllOptions(options.asJava)
+        .build()
+    ))
+
+  def createTable(
+      tableName: String,
+      source: String,
+      description: String,
+      schema: StructType,
+      options: Map[String, String]
+  ): DataFrame =
+    catalogDf(_.setCreateTable(
+      CreateTable.newBuilder()
+        .setTableName(tableName)
+        .setSource(source)
+        .setDescription(description)
+        .setSchema(DataTypeProtoConverter.toProto(schema))
+        .putAllOptions(options.asJava)
+        .build()
+    ))
+
+  // ---------------------------------------------------------------------------
+  // Create external table (deprecated, delegates to createTable)
+  // ---------------------------------------------------------------------------
+
+  @deprecated("Use createTable instead.", "4.0.0")
+  def createExternalTable(tableName: String, path: String): DataFrame =
+    createTable(tableName, path)
+
+  @deprecated("Use createTable instead.", "4.0.0")
+  def createExternalTable(tableName: String, path: String, source: String): DataFrame =
+    createTable(tableName, path, source)
+
+  @deprecated("Use createTable instead.", "4.0.0")
+  def createExternalTable(
+      tableName: String,
+      source: String,
+      options: Map[String, String]
+  ): DataFrame =
+    createTable(tableName, source, options)
+
+  @deprecated("Use createTable instead.", "4.0.0")
+  def createExternalTable(
+      tableName: String,
+      source: String,
+      schema: StructType,
+      options: Map[String, String]
+  ): DataFrame =
+    createTable(tableName, source, schema, options)
+
+  // ---------------------------------------------------------------------------
+  // Database management
+  // ---------------------------------------------------------------------------
+
+  def createDatabase(
+      dbName: String,
+      ifNotExists: Boolean = false,
+      properties: Map[String, String] = Map.empty
+  ): Unit =
+    catalogDf(_.setCreateDatabase(
+      CreateDatabase.newBuilder()
+        .setDbName(dbName)
+        .setIfNotExists(ifNotExists)
+        .putAllProperties(properties.asJava)
+        .build()
+    )).collect()
+
+  def dropDatabase(
+      dbName: String,
+      ifExists: Boolean = false,
+      cascade: Boolean = false
+  ): Unit =
+    catalogDf(_.setDropDatabase(
+      DropDatabase.newBuilder()
+        .setDbName(dbName)
+        .setIfExists(ifExists)
+        .setCascade(cascade)
+        .build()
+    )).collect()
+
+  // ---------------------------------------------------------------------------
   // Drop / Refresh
   // ---------------------------------------------------------------------------
 
-  def dropTempView(viewName: String): Unit =
+  def dropTempView(viewName: String): Boolean =
     catalogDf(_.setDropTempView(
       DropTempView.newBuilder().setViewName(viewName).build()
-    )).collect()
+    )).collect().head.getBoolean(0)
 
-  def dropGlobalTempView(viewName: String): Unit =
+  def dropGlobalTempView(viewName: String): Boolean =
     catalogDf(_.setDropGlobalTempView(
       DropGlobalTempView.newBuilder().setViewName(viewName).build()
+    )).collect().head.getBoolean(0)
+
+  def dropTable(
+      tableName: String,
+      ifExists: Boolean = false,
+      purge: Boolean = false
+  ): Unit =
+    catalogDf(_.setDropTable(
+      DropTable.newBuilder()
+        .setTableName(tableName)
+        .setIfExists(ifExists)
+        .setPurge(purge)
+        .build()
+    )).collect()
+
+  def dropView(viewName: String, ifExists: Boolean = false): Unit =
+    catalogDf(_.setDropView(
+      DropView.newBuilder()
+        .setViewName(viewName)
+        .setIfExists(ifExists)
+        .build()
     )).collect()
 
   def refreshTable(tableName: String): Unit =
@@ -184,11 +391,24 @@ final class Catalog private[sql] (private val session: SparkSession):
       RecoverPartitions.newBuilder().setTableName(tableName).build()
     )).collect()
 
+  def truncateTable(tableName: String): Unit =
+    catalogDf(_.setTruncateTable(
+      TruncateTable.newBuilder().setTableName(tableName).build()
+    )).collect()
+
+  def analyzeTable(tableName: String, noScan: Boolean = false): Unit =
+    catalogDf(_.setAnalyzeTable(
+      AnalyzeTable.newBuilder()
+        .setTableName(tableName)
+        .setNoScan(noScan)
+        .build()
+    )).collect()
+
   // ---------------------------------------------------------------------------
   // Helper
   // ---------------------------------------------------------------------------
 
-  private def catalogDf(f: ProtoCatalog.Builder => ProtoCatalog.Builder): DataFrame =
+  private[sql] def catalogDf(f: ProtoCatalog.Builder => ProtoCatalog.Builder): DataFrame =
     val catBuilder = ProtoCatalog.newBuilder()
     DataFrame(
       session,
