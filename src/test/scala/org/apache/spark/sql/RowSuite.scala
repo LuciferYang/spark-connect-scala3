@@ -1,5 +1,6 @@
 package org.apache.spark.sql
 
+import org.apache.spark.sql.types.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -58,4 +59,42 @@ class RowSuite extends AnyFunSuite with Matchers:
     row.getShort(0) shouldBe 42.toShort
     row.getByte(0) shouldBe 42.toByte
     row.getFloat(0) shouldBe 42.0f
+  }
+
+  test("Row.fromSeqWithSchema") {
+    val schema = StructType(
+      Seq(
+        StructField("name", StringType),
+        StructField("age", IntegerType)
+      )
+    )
+    val row = Row.fromSeqWithSchema(Seq("Alice", 30), schema)
+    row.schema shouldBe Some(schema)
+    row.getString(0) shouldBe "Alice"
+    row.getInt(1) shouldBe 30
+  }
+
+  test("Row.getValuesMap with schema") {
+    val schema = StructType(
+      Seq(
+        StructField("count", LongType),
+        StructField("max_id", IntegerType),
+        StructField("label", StringType)
+      )
+    )
+    val row = Row.fromSeqWithSchema(Seq(100L, 42, "test"), schema)
+    val result = row.getValuesMap[Any](Seq("count", "label"))
+    result shouldBe Map("count" -> 100L, "label" -> "test")
+  }
+
+  test("Row.getValuesMap without schema throws") {
+    val row = Row(1, 2, 3)
+    an[UnsupportedOperationException] should be thrownBy
+      row.getValuesMap[Any](Seq("x"))
+  }
+
+  test("Row without schema has None schema") {
+    Row(1, 2).schema shouldBe None
+    Row.empty.schema shouldBe None
+    Row.fromSeq(Seq(1)).schema shouldBe None
   }

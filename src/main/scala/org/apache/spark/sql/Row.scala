@@ -1,7 +1,12 @@
 package org.apache.spark.sql
 
+import org.apache.spark.sql.types.StructType
+
 /** A single row of output from a relational operator. */
-final class Row private (private val values: IndexedSeq[Any]):
+final class Row private (
+    private val values: IndexedSeq[Any],
+    val schema: Option[StructType] = None
+):
 
   def size: Int = values.size
 
@@ -29,6 +34,21 @@ final class Row private (private val values: IndexedSeq[Any]):
 
   def getAs[T](i: Int): T = get(i).asInstanceOf[T]
 
+  /** Get values for the given field names as a Map.
+    *
+    * Requires that this Row was created with a schema.
+    */
+  def getValuesMap[T](fieldNames: Seq[String]): Map[String, T] =
+    schema match
+      case Some(s) =>
+        fieldNames.map { name =>
+          name -> get(s.fieldIndex(name)).asInstanceOf[T]
+        }.toMap
+      case None =>
+        throw UnsupportedOperationException(
+          "getValuesMap requires a Row with schema"
+        )
+
   def toSeq: Seq[Any] = values.toSeq
 
   def mkString(sep: String): String =
@@ -45,6 +65,9 @@ final class Row private (private val values: IndexedSeq[Any]):
 
 object Row:
   def fromSeq(values: Seq[Any]): Row = new Row(values.toIndexedSeq)
+
+  def fromSeqWithSchema(values: Seq[Any], schema: StructType): Row =
+    new Row(values.toIndexedSeq, Some(schema))
 
   def apply(values: Any*): Row = fromSeq(values)
 

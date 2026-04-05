@@ -4,6 +4,7 @@ import org.apache.spark.connect.proto.{Catalog as _, StorageLevel as _, *}
 import org.apache.spark.sql.connect.client.{ClassFinder, SparkConnectClient}
 
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /** Entry point for Spark Connect Scala 3 client.
@@ -19,6 +20,9 @@ final class SparkSession private[sql] (
     private[sql] val client: SparkConnectClient
 ):
   private val planIdCounter = AtomicLong(0L)
+
+  // Registry of Observations keyed by the plan ID of their CollectMetrics node.
+  private[sql] val observationRegistry = ConcurrentHashMap[Long, Observation]()
 
   def sessionId: String = client.sessionId
 
@@ -159,6 +163,21 @@ final class SparkSession private[sql] (
   // ---------------------------------------------------------------------------
 
   def version: String = client.version()
+
+  // ---------------------------------------------------------------------------
+  // Observation Management
+  // ---------------------------------------------------------------------------
+
+  private[sql] def registerObservation(planId: Long, obs: Observation): Unit =
+    observationRegistry.put(planId, obs)
+
+  private[sql] def processObservedMetrics(
+      metrics: Seq[(Long, Row)]
+  ): Unit =
+    metrics.foreach { (planId, row) =>
+      val obs = observationRegistry.get(planId)
+      if obs != null then obs.setMetrics(row)
+    }
 
   // ---------------------------------------------------------------------------
   // Stop

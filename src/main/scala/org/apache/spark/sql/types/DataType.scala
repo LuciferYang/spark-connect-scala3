@@ -72,6 +72,12 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
 
   def fieldNames: Array[String] = fields.map(_.name).toArray
 
+  def fieldIndex(name: String): Int =
+    fields.indexWhere(_.name == name) match
+      case -1 =>
+        throw IllegalArgumentException(s"Field '$name' not found in $this")
+      case i => i
+
   override def simpleString: String =
     s"struct<${fields.map(f => s"${f.name}:${f.dataType.simpleString}").mkString(",")}>"
 

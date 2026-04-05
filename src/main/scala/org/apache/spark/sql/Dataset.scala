@@ -143,6 +143,12 @@ final class Dataset[T: ClassTag] private[sql] (
   def join(right: DataFrame, joinExpr: Column, joinType: String = "inner"): DataFrame =
     df.join(right, joinExpr, joinType)
 
+  def observe(name: String, expr: Column, exprs: Column*): Dataset[T] =
+    Dataset(df.observe(name, expr, exprs*), encoder)
+
+  def observe(observation: Observation, expr: Column, exprs: Column*): Dataset[T] =
+    Dataset(df.observe(observation, expr, exprs*), encoder)
+
   def withColumn(name: String, col: Column): DataFrame = df.withColumn(name, col)
 
   def drop(colNames: String*): DataFrame = df.drop(colNames*)

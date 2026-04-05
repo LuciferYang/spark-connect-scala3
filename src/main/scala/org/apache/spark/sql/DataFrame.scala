@@ -7,7 +7,8 @@ import org.apache.spark.sql.connect.client.{
   DataTypeProtoConverter,
   SparkConnectClient
 }
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.connect.common.LiteralValueProtoConverter
+import org.apache.spark.sql.types.{StructField, StructType}
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -394,6 +395,19 @@ final class DataFrame private[sql] (
     exprs.foreach(e => builder.addMetrics(e.expr))
     withRelation(_.setCollectMetrics(builder.build()))
 
+  /** Observe (collect metrics) using an [[Observation]] instance.
+    *
+    * The observation is bound to the returned DataFrame and will be completed when the first action
+    * is executed.
+    */
+  def observe(observation: Observation, expr: Column, exprs: Column*): DataFrame =
+    observation.markRegistered()
+    val result = observe(observation.name, expr, exprs*)
+    val planId = result.relation.getCommon.getPlanId
+    observation.planId = planId
+    session.registerObservation(planId, observation)
+    result
+
   /** Explain this plan with a mode string. */
   def explain(mode: String): Unit =
     val plan = Plan.newBuilder().setRoot(relation).build()
@@ -437,10 +451,24 @@ final class DataFrame private[sql] (
     val plan = Plan.newBuilder().setRoot(relation).build()
     val responses = client.execute(plan)
     val rows = mutable.ArrayBuffer.empty[Row]
+    val observedMetrics = mutable.ArrayBuffer.empty[(Long, Row)]
     responses.foreach { resp =>
       if resp.hasArrowBatch then
         rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
+      // Process observed metrics from the response
+      resp.getObservedMetricsList.asScala.foreach { om =>
+        val keys = om.getKeysList.asScala.toSeq
+        val values = om.getValuesList.asScala.map(LiteralValueProtoConverter.toScalaValue).toSeq
+        val schema = StructType(
+          keys.zip(om.getValuesList.asScala).map { (key, lit) =>
+            StructField(key, LiteralValueProtoConverter.toDataType(lit))
+          }.toSeq
+        )
+        val row = Row.fromSeqWithSchema(values, schema)
+        observedMetrics += ((om.getPlanId, row))
+      }
     }
+    if observedMetrics.nonEmpty then session.processObservedMetrics(observedMetrics.toSeq)
     rows.toArray
 
   def count(): Long =

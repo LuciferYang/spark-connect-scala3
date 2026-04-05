@@ -4,8 +4,8 @@ import java.io.Serializable
 
 /** Abstract class for stateful processing in transformWithState.
   *
-  * Users extend this to implement stateful transformations using state variables
-  * (ValueState, ListState, MapState) and timers.
+  * Users extend this to implement stateful transformations using state variables (ValueState,
+  * ListState, MapState) and timers.
   */
 abstract class StatefulProcessor[K, I, O] extends Serializable:
   /** Called when the processor is initialized. Use the handle to create state variables. */

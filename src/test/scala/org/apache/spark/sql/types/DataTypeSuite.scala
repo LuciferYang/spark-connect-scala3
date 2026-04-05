@@ -79,3 +79,21 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
       st("y")
     }
   }
+
+  test("StructType.fieldIndex returns correct index") {
+    val st = StructType(
+      Seq(
+        StructField("a", IntegerType),
+        StructField("b", StringType),
+        StructField("c", LongType)
+      )
+    )
+    st.fieldIndex("a") shouldBe 0
+    st.fieldIndex("b") shouldBe 1
+    st.fieldIndex("c") shouldBe 2
+  }
+
+  test("StructType.fieldIndex throws for missing field") {
+    val st = StructType(Seq(StructField("x", IntegerType)))
+    an[IllegalArgumentException] should be thrownBy st.fieldIndex("y")
+  }

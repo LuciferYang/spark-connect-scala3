@@ -115,6 +115,23 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     cm.getMetricsList should have size 2
   }
 
+  test("observe with Observation builds CollectMetrics proto and registers") {
+    val df = testDf()
+    val obs = Observation("obs-test")
+    val result = df.observe(obs, functions.count(Column("x")))
+    result.relation.hasCollectMetrics shouldBe true
+    result.relation.getCollectMetrics.getName shouldBe "obs-test"
+    obs.planId should be >= 0L
+  }
+
+  test("observe with Observation enforces single use") {
+    val df = testDf()
+    val obs = Observation("single-use")
+    df.observe(obs, functions.count(Column("x")))
+    an[IllegalArgumentException] should be thrownBy
+      df.observe(obs, functions.count(Column("x")))
+  }
+
   // ---------- randomSplit ----------
 
   test("randomSplit returns correct number of DataFrames") {
