@@ -325,9 +325,9 @@ src/
 - [x] Error handling (retry policies, gRPC exception conversion)
 - [ ] Publish to Maven Central
 - [x] ConnectRepl (Ammonite-based Scala 3 REPL)
-- [ ] Observation / CollectMetrics (`Dataset.observe()`)
-- [ ] StreamingQueryListener
-- [ ] SQLImplicits / DatasetHolder (`.toDS()`, `.toDF()` implicit conversions)
+- [x] Observation / CollectMetrics (`Dataset.observe()`)
+- [x] StreamingQueryListener
+- [x] SQLImplicits / DatasetHolder (`.toDS()`, `.toDF()` implicit conversions)
 
 See [API-GAPS.md](API-GAPS.md) for a detailed comparison with the official Spark Connect client.
 

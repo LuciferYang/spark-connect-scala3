@@ -59,7 +59,7 @@ private[sql] object SparkConnectClientParser:
   @tailrec
   private def parseImpl(args: List[String], config: Config): Config =
     args match
-      case Nil => config
+      case Nil                => config
       case "--remote" :: tail =>
         val (value, remainder) = extract("--remote", tail)
         parseImpl(remainder, config.copy(remote = Some(value)))

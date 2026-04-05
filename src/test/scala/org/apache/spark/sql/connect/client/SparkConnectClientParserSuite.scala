@@ -57,8 +57,10 @@ class SparkConnectClientParserSuite extends AnyFunSuite:
 
   test("parse multiple --option") {
     val config = parse(Array(
-      "--option", "k1=v1",
-      "--option", "k2=v2"
+      "--option",
+      "k1=v1",
+      "--option",
+      "k2=v2"
     ))
     assert(config.options == Map("k1" -> "v1", "k2" -> "v2"))
   }

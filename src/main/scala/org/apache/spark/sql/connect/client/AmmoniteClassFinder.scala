@@ -24,8 +24,8 @@ import ammonite.runtime.SpecialClassLoader
 
 import org.apache.spark.sql.Artifact
 
-/** A [[ClassFinder]] for the Ammonite REPL that discovers in-memory class files compiled during
-  * the REPL session and uploads them to the Spark Connect server.
+/** A [[ClassFinder]] for the Ammonite REPL that discovers in-memory class files compiled during the
+  * REPL session and uploads them to the Spark Connect server.
   */
 class AmmoniteClassFinder(session: Session) extends ClassFinder:
 
