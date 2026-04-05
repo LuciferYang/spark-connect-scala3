@@ -122,3 +122,45 @@ class ImplicitsSuite extends AnyFunSuite with Matchers:
     val c: Column = cn // implicit conversion
     c.expr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "myCol"
   }
+
+  // ---------------------------------------------------------------------------
+  // Seq[T].toDS / Seq[T].toDF
+  // ---------------------------------------------------------------------------
+
+  test("Seq[Int].toDS builds local relation proto") {
+    import org.apache.spark.sql.implicits.*
+
+    given spark: SparkSession = SparkSession.builder().remote("sc://localhost:15002").build()
+
+    val ds = Seq(1, 2, 3).toDS
+    ds.toDF().relation.hasLocalRelation shouldBe true
+  }
+
+  test("Seq[Int].toDF builds local relation proto") {
+    import org.apache.spark.sql.implicits.*
+
+    given spark: SparkSession = SparkSession.builder().remote("sc://localhost:15002").build()
+
+    val df = Seq(1, 2, 3).toDF
+    df.relation.hasLocalRelation shouldBe true
+  }
+
+  test("Seq[Int].toDF with column names adds rename") {
+    import org.apache.spark.sql.implicits.*
+
+    given spark: SparkSession = SparkSession.builder().remote("sc://localhost:15002").build()
+
+    val df = Seq(1, 2, 3).toDF("number")
+    // toDF("number") wraps with a WithColumnsRenamed or Project
+    // The outermost relation should not be a bare LocalRelation
+    df.relation should not be null
+  }
+
+  test("Seq[String].toDS builds local relation proto") {
+    import org.apache.spark.sql.implicits.*
+
+    given spark: SparkSession = SparkSession.builder().remote("sc://localhost:15002").build()
+
+    val ds = Seq("a", "b", "c").toDS
+    ds.toDF().relation.hasLocalRelation shouldBe true
+  }

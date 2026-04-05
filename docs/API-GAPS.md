@@ -26,8 +26,6 @@ These are deeper infrastructure differences that don't affect function coverage:
 | Feature | Description | Priority |
 |---------|-------------|----------|
 | `Aggregator.toColumn` | Requires `TypedColumn` + `InvokeInlineUserDefinedFunction` column node layer | Low — typed Dataset path, niche use |
-| `foreach` / `foreachBatch` | Requires ArtifactManager-based serialization of user closures | Medium |
-| `StreamingQueryListener` | Requires server-side listener registration | Low |
 
 ### UDAF Limitations
 

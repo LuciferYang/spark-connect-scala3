@@ -1,6 +1,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
+import org.apache.spark.sql.streaming.{StreamingQueryListener, StreamingQueryListenerBus}
 
 import scala.jdk.CollectionConverters.*
 
@@ -9,6 +10,10 @@ import scala.jdk.CollectionConverters.*
   * Access via `spark.streams`.
   */
 final class StreamingQueryManager private[sql] (private val session: SparkSession):
+
+  /** Client-side event bus for streaming query listeners. */
+  private[sql] val streamingQueryListenerBus: StreamingQueryListenerBus =
+    StreamingQueryListenerBus(session)
 
   /** Returns a list of all active streaming queries. */
   def active: Seq[StreamingQuery] =
@@ -45,6 +50,22 @@ final class StreamingQueryManager private[sql] (private val session: SparkSessio
   def resetTerminated(): Unit =
     executeManagerCmd(_.setResetTerminated(true))
     ()
+
+  /** Register a streaming query listener. */
+  def addListener(listener: StreamingQueryListener): Unit =
+    streamingQueryListenerBus.append(listener)
+
+  /** Remove a streaming query listener. */
+  def removeListener(listener: StreamingQueryListener): Unit =
+    streamingQueryListenerBus.remove(listener)
+
+  /** List all registered streaming query listeners. */
+  def listListeners(): Array[StreamingQueryListener] =
+    streamingQueryListenerBus.list()
+
+  /** Close the listener bus, removing all listeners. */
+  def close(): Unit =
+    streamingQueryListenerBus.close()
 
   private def executeManagerCmd(
       setCmdFn: StreamingQueryManagerCommand.Builder => StreamingQueryManagerCommand.Builder

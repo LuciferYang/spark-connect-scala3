@@ -20,6 +20,9 @@ These features have been implemented:
 | 542 built-in functions | `b6776fa` | 100% coverage of the official API |
 | Full Catalog API | `67efc18` | All 37 proto RPCs |
 | Error handling | `1cf70b5` | RetryPolicy, GrpcRetryHandler, GrpcExceptionConverter |
+| Observation / CollectMetrics | — | `DataFrame.observe()` + `Observation` class |
+| StreamingQueryListener | — | `StreamingQueryListener` + `StreamingQueryListenerBus` + event dispatch |
+| SQLImplicits / DatasetHolder | — | Scala 3 `object implicits` with extension methods (`$"col"`, `Seq[T].toDS/toDF`) |
 
 ## Remaining Gaps
 
@@ -32,28 +35,6 @@ These features have been implemented:
 **Challenge**: Upstream uses Ammonite which is Scala 2 only. SC3 would need to integrate with `scala-cli` or the Scala 3 REPL.
 
 **Scope**: CLI argument parser (`--remote`, `--host`, `--port`, `--jars`, `--packages`), REPL initialization with SparkSession auto-creation, classpath/artifact handling.
-
-#### 2. Observation / CollectMetrics
-
-**Upstream**: `Dataset.observe(name, expr, exprs*)` + `Dataset.observe(observation, expr, exprs*)` + `Observation` class
-
-**What it does**: Allows collecting metrics on a DataFrame during execution without additional passes. The `Observation` class registers a listener and provides `get`/`getOrDefault` to retrieve metric values after a batch query completes.
-
-**Proto support**: `Relation.CollectMetrics` already exists in the proto definitions.
-
-#### 3. StreamingQueryListener
-
-**Upstream**: `StreamingQueryListenerBus` + `StreamingListenerPacket` serialization + server-side listener registration via `StreamingQueryListenerCommand` proto.
-
-**What it does**: Registers listeners for query start/progress/terminated events. Requires Java serialization of the listener object + server-side registration + event streaming back to the client.
-
-#### 4. SQLImplicits / DatasetHolder
-
-**Upstream**: `SQLImplicits` provides `localSeqToDatasetHolder` and implicit conversions enabling `.toDS()` / `.toDF()` on local sequences.
-
-**What it does**: `Seq(1, 2, 3).toDS()`, `Seq("a", "b").toDF("col")`. Requires `DatasetHolder[T]` wrapper class.
-
-**SC3 status**: Partial support exists via `SparkSession.createDataset()`, but the implicit extension syntax is missing.
 
 ### Medium Priority
 

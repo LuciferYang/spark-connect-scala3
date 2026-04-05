@@ -5,6 +5,7 @@ import org.apache.spark.connect.proto.*
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.ForeachWriterPacket
+import org.apache.spark.sql.streaming.StreamingQueryListener.QueryStartedEvent
 import org.apache.spark.sql.types.NullType
 
 /** Trigger types for structured streaming queries. */
@@ -102,6 +103,10 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
         queryId = result.getQueryId.getId
         runId = result.getQueryId.getRunId
         if result.getName.nonEmpty then queryName = Some(result.getName)
+        // Dispatch QueryStartedEvent synchronously before returning
+        if result.hasQueryStartedEventJson then
+          val event = QueryStartedEvent.fromJson(result.getQueryStartedEventJson)
+          df.session.streams.streamingQueryListenerBus.postToAll(event)
     }
     StreamingQuery(df.session, queryId, runId, queryName)
 

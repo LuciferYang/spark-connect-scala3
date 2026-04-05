@@ -119,7 +119,7 @@ final class SparkSession private[sql] (
 
   def readStream: DataStreamReader = DataStreamReader(this)
 
-  def streams: StreamingQueryManager = StreamingQueryManager(this)
+  lazy val streams: StreamingQueryManager = StreamingQueryManager(this)
 
   // ---------------------------------------------------------------------------
   // Catalog

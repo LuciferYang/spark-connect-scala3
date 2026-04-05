@@ -120,3 +120,18 @@ class StreamingQueryManagerSuite extends AnyFunSuite with Matchers:
     result.getQueryId.getRunId shouldBe "rid-1"
     result.getName shouldBe "my_stream"
   }
+
+  test("StreamingQueryManager provides listener methods") {
+    val spark = SparkSession.builder().remote("sc://localhost:15002").build()
+    val manager = spark.streams
+
+    // listListeners should return empty array initially
+    manager.streamingQueryListenerBus.list() shouldBe empty
+  }
+
+  test("SparkSession.streams returns same instance (lazy val)") {
+    val spark = SparkSession.builder().remote("sc://localhost:15002").build()
+    val s1 = spark.streams
+    val s2 = spark.streams
+    s1 should be theSameInstanceAs s2
+  }
