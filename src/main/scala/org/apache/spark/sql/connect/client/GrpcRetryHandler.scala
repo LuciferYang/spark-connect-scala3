@@ -6,6 +6,9 @@ import scala.util.Random
   *
   * On each retryable failure the handler sleeps for an exponentially increasing duration (with
   * random jitter) before re-attempting. Non-retryable exceptions are propagated immediately.
+  *
+  * A [[GrpcRetryHandler.RetryException]] is always retryable (no policy match needed) and triggers
+  * an immediate retry without backoff.
   */
 class GrpcRetryHandler(
     policy: RetryPolicy,
@@ -19,6 +22,8 @@ class GrpcRetryHandler(
     while attempt <= policy.maxRetries do
       try return fn
       catch
+        case _: GrpcRetryHandler.RetryException if attempt < policy.maxRetries =>
+          attempt += 1 // immediate retry, no backoff
         case e: Throwable if policy.canRetry(e) && attempt < policy.maxRetries =>
           lastException = e
           val backoff = math.min(
@@ -32,3 +37,7 @@ class GrpcRetryHandler(
           throw e
     // Should not reach here, but just in case:
     throw lastException
+
+object GrpcRetryHandler:
+  /** Always-retryable exception that triggers immediate retry without backoff. */
+  class RetryException extends Throwable

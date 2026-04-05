@@ -1,6 +1,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.{Catalog as _, StorageLevel as _, *}
+import org.apache.spark.sql.connect.SessionCleaner
 import org.apache.spark.sql.connect.client.{ClassFinder, SparkConnectClient}
 
 import java.nio.file.Path
@@ -23,6 +24,9 @@ final class SparkSession private[sql] (
 
   // Registry of Observations keyed by the plan ID of their CollectMetrics node.
   private[sql] val observationRegistry = ConcurrentHashMap[Long, Observation]()
+
+  /** GC-based cleanup of CachedRemoteRelation references on the server. */
+  private[sql] lazy val cleaner: SessionCleaner = SessionCleaner(this)
 
   def sessionId: String = client.sessionId
 

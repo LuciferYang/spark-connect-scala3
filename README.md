@@ -220,11 +220,15 @@ src/
 │       │   ├── DataTypeProtoConverter.scala # Proto ↔ DataType
 │       │   ├── ArtifactManager.scala       # Artifact upload/management
 │       │   ├── RetryPolicy.scala           # Retry policy definitions
-│       │   ├── GrpcRetryHandler.scala      # gRPC retry logic
-│       │   └── GrpcExceptionConverter.scala # gRPC → Spark exceptions
+│       │   ├── GrpcRetryHandler.scala      # gRPC retry logic + RetryException
+│       │   ├── GrpcExceptionConverter.scala # gRPC → Spark exceptions
+│       │   ├── ResponseValidator.scala     # Server-side session ID tracking
+│       │   └── ExecutePlanResponseReattachableIterator.scala # Reattachable execution
 │       ├── connect/common/
 │       │   ├── UdfPacket.scala             # UDF serialization
 │       │   └── ForeachWriterPacket.scala   # ForeachWriter serialization
+│       ├── connect/
+│       │   └── SessionCleaner.scala        # GC-based CachedRemoteRelation cleanup
 │       ├── application/
 │       │   └── ConnectRepl.scala           # Ammonite-based Scala 3 REPL
 │       └── examples/
@@ -264,7 +268,11 @@ src/
         │   ├── SparkConnectClientParserSuite.scala
         │   ├── DataTypeProtoConverterSuite.scala
         │   ├── GrpcExceptionConverterSuite.scala
-        │   └── RetryPolicySuite.scala
+        │   ├── RetryPolicySuite.scala
+        │   ├── ResponseValidatorSuite.scala
+        │   └── ReattachableIteratorSuite.scala
+        ├── connect/
+        │   └── SessionCleanerSuite.scala
         └── types/
             └── DataTypeSuite.scala
         application/
@@ -304,7 +312,7 @@ src/
 `sql`, `table`, `range`, `emptyDataFrame`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `tvf`, `version`, `stop`
 
 ### DataFrame Transformations
-`select`, `selectExpr`, `filter`, `where`, `limit`, `offset`, `sort`, `orderBy`, `groupBy`, `rollup`, `cube`, `agg`, `join`, `crossJoin`, `withColumn`, `withColumnRenamed`, `drop`, `distinct`, `dropDuplicates`, `union`, `unionAll`, `unionByName`, `intersect`, `intersectAll`, `except`, `exceptAll`, `repartition`, `coalesce`, `sample`, `describe`, `summary`, `alias`, `toDF`, `hint`, `broadcast`, `sortWithinPartitions`, `tail`, `transform`, `na`, `stat`, `cache`, `persist`, `unpersist`, `withWatermark`, `writeStream`
+`select`, `selectExpr`, `filter`, `where`, `limit`, `offset`, `sort`, `orderBy`, `groupBy`, `rollup`, `cube`, `agg`, `join`, `crossJoin`, `withColumn`, `withColumnRenamed`, `drop`, `distinct`, `dropDuplicates`, `union`, `unionAll`, `unionByName`, `intersect`, `intersectAll`, `except`, `exceptAll`, `repartition`, `coalesce`, `sample`, `describe`, `summary`, `alias`, `toDF`, `hint`, `broadcast`, `sortWithinPartitions`, `tail`, `transform`, `na`, `stat`, `cache`, `persist`, `unpersist`, `checkpoint`, `localCheckpoint`, `withWatermark`, `writeStream`
 
 ### DataFrame Actions
 `collect`, `count`, `first`, `head`, `take`, `show`, `printSchema`, `schema`, `columns`, `explain`, `isEmpty`, `createTempView`, `createOrReplaceTempView`, `createGlobalTempView`, `write`
@@ -341,9 +349,10 @@ src/
 - [x] `foreachBatch` / `foreach` (ForeachWriter)
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
-- [x] Unit tests (461 tests)
+- [x] Unit tests (474 tests)
 - [x] Integration tests (Spark 4.0.2 / 4.1.1)
-- [x] Error handling (retry policies, gRPC exception conversion)
+- [x] Error handling (retry policies, gRPC exception conversion, reattachable execution)
+- [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)
 - [ ] Publish to Maven Central
 - [x] ConnectRepl (Ammonite-based Scala 3 REPL)
 - [x] Observation / CollectMetrics (`Dataset.observe()`)

@@ -20,6 +20,9 @@ These features have been implemented:
 | 542 built-in functions | `b6776fa` | 100% coverage of the official API |
 | Full Catalog API | `67efc18` | All 37 proto RPCs |
 | Error handling | `1cf70b5` | RetryPolicy, GrpcRetryHandler, GrpcExceptionConverter |
+| ExecutePlanResponseReattachableIterator | — | Reattachable execution with automatic reconnect on transient gRPC failures |
+| ResponseValidator | — | Server-side session ID tracking and consistency validation |
+| SessionCleaner | — | GC-based cleanup of `CachedRemoteRelation` + `persist`/`unpersist`/`checkpoint` via AnalyzePlan |
 | Observation / CollectMetrics | — | `DataFrame.observe()` + `Observation` class |
 | StreamingQueryListener | — | `StreamingQueryListener` + `StreamingQueryListenerBus` + event dispatch |
 | SQLImplicits / DatasetHolder | — | Scala 3 `object implicits` with extension methods (`$"col"`, `Seq[T].toDS/toDF`) |
@@ -41,24 +44,6 @@ These features have been implemented:
 (None currently)
 
 ### Low Priority
-
-#### 9. ExecutePlanResponseReattachableIterator
-
-**Upstream**: Retryable/reattachable execution with automatic reconnect on transient failures. The iterator reattaches to an in-progress query after connection loss.
-
-**SC3 status**: Basic retry via `GrpcRetryHandler` exists, but no reattach support.
-
-#### 10. ResponseValidator
-
-**Upstream**: Validates server session ID tracking, server-side session liveness, and detects session mismatch.
-
-**SC3 status**: Not implemented. Would improve robustness for long-running applications.
-
-#### 11. SessionCleaner
-
-**Upstream**: GC-based cleanup of `CachedRemoteRelation` references on the server when client-side objects are garbage collected.
-
-**SC3 status**: Not implemented. `unpersist()` is supported for explicit cleanup.
 
 #### 12. ConnectConversions / ColumnNodeToProtoConverter
 

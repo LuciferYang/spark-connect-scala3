@@ -74,9 +74,19 @@ class TableValuedFunctionSuite extends AnyFunSuite:
     // Verify the TVF class has all expected methods via reflection
     val tvfClass = classOf[TableValuedFunction]
     val expectedMethods = Seq(
-      "range", "explode", "explode_outer", "posexplode", "posexplode_outer",
-      "inline", "inline_outer", "json_tuple", "stack", "collations",
-      "sql_keywords", "variant_explode", "variant_explode_outer"
+      "range",
+      "explode",
+      "explode_outer",
+      "posexplode",
+      "posexplode_outer",
+      "inline",
+      "inline_outer",
+      "json_tuple",
+      "stack",
+      "collations",
+      "sql_keywords",
+      "variant_explode",
+      "variant_explode_outer"
     )
     val actualMethods = tvfClass.getMethods.map(_.getName).toSet
     expectedMethods.foreach { name =>

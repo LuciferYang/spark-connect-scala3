@@ -7,8 +7,8 @@ import org.apache.spark.sql.{Encoder, Encoders}
   * Used internally by [[org.apache.spark.sql.KeyValueGroupedDataset.reduceGroups]] to push the
   * reduction to the server as a typed aggregate expression.
   *
-  * The buffer is `(Boolean, T)` where `_1` indicates whether at least one value has been seen.
-  * When `_1` is `false`, `_2` is a placeholder and must not be read.
+  * The buffer is `(Boolean, T)` where `_1` indicates whether at least one value has been seen. When
+  * `_1` is `false`, `_2` is a placeholder and must not be read.
   */
 @SerialVersionUID(5066084382969966160L)
 private[sql] class ReduceAggregator[T](func: (T, T) => T)(using enc: Encoder[T])
@@ -29,7 +29,8 @@ private[sql] class ReduceAggregator[T](func: (T, T) => T)(using enc: Encoder[T])
       case _          => (true, func(b1._2, b2._2))
 
   override def finish(reduction: (Boolean, T)): T =
-    if !reduction._1 then throw new IllegalStateException("ReduceAggregator requires at least one input row")
+    if !reduction._1 then
+      throw new IllegalStateException("ReduceAggregator requires at least one input row")
     reduction._2
 
   override def bufferEncoder: Encoder[(Boolean, T)] =

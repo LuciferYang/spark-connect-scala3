@@ -28,20 +28,50 @@ final class SparkConnectClient private (
   /** Manages uploading artifacts (class files, JARs) to the server. */
   val artifactManager: ArtifactManager = ArtifactManager(sessionId, userId, asyncStub)
 
+  /** Validates server-side session ID consistency across all responses. */
+  private val responseValidator = ResponseValidator()
+
+  /** The server-side session ID observed from the server's first response. */
+  def serverSideSessionId: Option[String] = responseValidator.getServerSideSessionId
+
+  /** Whether the underlying gRPC channel has been shut down. */
+  def isChannelShutdown: Boolean = channel.isShutdown
+
+  // ---------------------------------------------------------------------------
+  // Common helpers
+  // ---------------------------------------------------------------------------
+
+  private def userContext: UserContext =
+    UserContext.newBuilder().setUserId(userId).build()
+
+  private def addClientObservedSessionId(
+      setFn: String => Unit
+  ): Unit =
+    serverSideSessionId.foreach(setFn)
+
   // ---------------------------------------------------------------------------
   // Execute
   // ---------------------------------------------------------------------------
 
-  /** Execute a plan and return a lazy iterator of responses. */
-  def execute(plan: Plan): Iterator[ExecutePlanResponse] =
+  /** Execute a plan and return a lazy iterator of responses. The returned iterator is
+    * [[AutoCloseable]] — callers should close it after use to release server-side resources.
+    */
+  def execute(plan: Plan): Iterator[ExecutePlanResponse] & AutoCloseable =
     artifactManager.uploadAllClassFileArtifacts()
-    val request = ExecutePlanRequest.newBuilder()
+    val rb = ExecutePlanRequest.newBuilder()
       .setSessionId(sessionId)
-      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setUserContext(userContext)
       .setPlan(plan)
       .setOperationId(UUID.randomUUID().toString)
-      .build()
-    GrpcExceptionConverter.convert(retryHandler.retry(bstub.executePlan(request).asScala))
+    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
+    val inner =
+      ExecutePlanResponseReattachableIterator(rb.build(), channel, retryHandler)
+    val validated = responseValidator.wrapIterator(inner)
+    // Wrap with GrpcExceptionConverter.
+    new Iterator[ExecutePlanResponse] with AutoCloseable:
+      def hasNext: Boolean = GrpcExceptionConverter.convert(validated.hasNext)
+      def next(): ExecutePlanResponse = GrpcExceptionConverter.convert(validated.next())
+      def close(): Unit = validated.close()
 
   // ---------------------------------------------------------------------------
   // Analyze
@@ -50,12 +80,14 @@ final class SparkConnectClient private (
   /** Retrieve the schema of a plan without executing it. */
   def analyzeSchema(plan: Plan): AnalyzePlanResponse =
     artifactManager.uploadAllClassFileArtifacts()
-    val request = AnalyzePlanRequest.newBuilder()
+    val rb = AnalyzePlanRequest.newBuilder()
       .setSessionId(sessionId)
-      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setUserContext(userContext)
       .setSchema(AnalyzePlanRequest.Schema.newBuilder().setPlan(plan).build())
-      .build()
-    GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(request)))
+    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
+    responseValidator.verifyResponse(
+      GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(rb.build())))
+    )
 
   /** Retrieve the explain string for a plan without executing it. */
   def analyzeExplain(
@@ -63,25 +95,29 @@ final class SparkConnectClient private (
       mode: AnalyzePlanRequest.Explain.ExplainMode =
         AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
   ): String =
-    val request = AnalyzePlanRequest.newBuilder()
+    val rb = AnalyzePlanRequest.newBuilder()
       .setSessionId(sessionId)
-      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
-      .setExplain(AnalyzePlanRequest.Explain.newBuilder().setPlan(
-        plan
-      ).setExplainMode(mode).build())
-      .build()
-    val resp = GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(request)))
+      .setUserContext(userContext)
+      .setExplain(
+        AnalyzePlanRequest.Explain.newBuilder().setPlan(plan).setExplainMode(mode).build()
+      )
+    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
+    val resp = responseValidator.verifyResponse(
+      GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(rb.build())))
+    )
     if resp.hasExplain then resp.getExplain.getExplainString
     else "(no explain output)"
 
   /** Retrieve the Spark version from the server. */
   def version(): String =
-    val request = AnalyzePlanRequest.newBuilder()
+    val rb = AnalyzePlanRequest.newBuilder()
       .setSessionId(sessionId)
-      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setUserContext(userContext)
       .setSparkVersion(AnalyzePlanRequest.SparkVersion.getDefaultInstance)
-      .build()
-    val resp = GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(request)))
+    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
+    val resp = responseValidator.verifyResponse(
+      GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(rb.build())))
+    )
     if resp.hasSparkVersion then resp.getSparkVersion.getVersion
     else "unknown"
 
@@ -90,28 +126,38 @@ final class SparkConnectClient private (
   // ---------------------------------------------------------------------------
 
   def getConfig(key: String): String =
-    val request = ConfigRequest.newBuilder()
+    val rb = ConfigRequest.newBuilder()
       .setSessionId(sessionId)
-      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
-      .setOperation(ConfigRequest.Operation.newBuilder()
-        .setGet(ConfigRequest.Get.newBuilder().addKeys(key).build())
-        .build())
-      .build()
-    val resp = GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(request)))
+      .setUserContext(userContext)
+      .setOperation(
+        ConfigRequest.Operation.newBuilder()
+          .setGet(ConfigRequest.Get.newBuilder().addKeys(key).build())
+          .build()
+      )
+    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
+    val resp = responseValidator.verifyResponse(
+      GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(rb.build())))
+    )
     val pairs = resp.getPairsList.asScala
     pairs.headOption.map(_.getValue).getOrElse("")
 
   def setConfig(key: String, value: String): Unit =
-    val request = ConfigRequest.newBuilder()
+    val rb = ConfigRequest.newBuilder()
       .setSessionId(sessionId)
-      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
-      .setOperation(ConfigRequest.Operation.newBuilder()
-        .setSet(ConfigRequest.Set.newBuilder()
-          .addPairs(KeyValue.newBuilder().setKey(key).setValue(value).build())
-          .build())
-        .build())
-      .build()
-    GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(request)))
+      .setUserContext(userContext)
+      .setOperation(
+        ConfigRequest.Operation.newBuilder()
+          .setSet(
+            ConfigRequest.Set.newBuilder()
+              .addPairs(KeyValue.newBuilder().setKey(key).setValue(value).build())
+              .build()
+          )
+          .build()
+      )
+    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
+    responseValidator.verifyResponse(
+      GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(rb.build())))
+    )
 
   // ---------------------------------------------------------------------------
   // Execute Command
@@ -121,19 +167,34 @@ final class SparkConnectClient private (
   def executeCommand(command: Command): Unit =
     val plan = Plan.newBuilder().setCommand(command).build()
     val responses = execute(plan)
-    responses.foreach(_ => ()) // drain iterator
+    try responses.foreach(_ => ()) // drain iterator
+    finally (responses: Any) match
+        case c: AutoCloseable => c.close()
+        case _                => ()
+
+  /** Execute a command and return all responses (for commands that produce results). */
+  def executeCommandWithResponses(command: Command): Seq[ExecutePlanResponse] =
+    val plan = Plan.newBuilder().setCommand(command).build()
+    val responses = execute(plan)
+    try responses.toSeq
+    finally (responses: Any) match
+        case c: AutoCloseable => c.close()
+        case _                => ()
 
   // ---------------------------------------------------------------------------
   // Interrupt / Close
   // ---------------------------------------------------------------------------
 
   def interrupt(): Unit =
-    val request = InterruptRequest.newBuilder()
+    val rb = InterruptRequest.newBuilder()
       .setSessionId(sessionId)
-      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setUserContext(userContext)
       .setInterruptType(InterruptRequest.InterruptType.INTERRUPT_TYPE_ALL)
-      .build()
-    try GrpcExceptionConverter.convert(retryHandler.retry(bstub.interrupt(request)))
+    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
+    try
+      responseValidator.verifyResponse(
+        GrpcExceptionConverter.convert(retryHandler.retry(bstub.interrupt(rb.build())))
+      )
     catch case NonFatal(_) => () // best-effort
 
   def close(): Unit =
@@ -153,9 +214,12 @@ final class SparkConnectClient private (
   ): AnalyzePlanResponse =
     val base = AnalyzePlanRequest.newBuilder()
       .setSessionId(sessionId)
-      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+      .setUserContext(userContext)
+    addClientObservedSessionId(base.setClientObservedServerSideSessionId)
     val request = f(base).build()
-    GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(request)))
+    responseValidator.verifyResponse(
+      GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(request)))
+    )
 
 object SparkConnectClient:
 

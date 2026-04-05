@@ -249,12 +249,17 @@ final class DataFrame private[sql] (
       .build()
     val plan = Plan.newBuilder().setRoot(tailRel).build()
     val responses = client.execute(plan)
-    val rows = mutable.ArrayBuffer.empty[Row]
-    responses.foreach { resp =>
-      if resp.hasArrowBatch then
-        rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
-    }
-    rows.toArray
+    try
+      val rows = mutable.ArrayBuffer.empty[Row]
+      responses.foreach { resp =>
+        if resp.hasArrowBatch then
+          rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
+      }
+      rows.toArray
+    finally
+      (responses: Any) match
+        case c: AutoCloseable => c.close()
+        case _                => ()
 
   /** Pipeline-style transformation. */
   def transform(f: DataFrame => DataFrame): DataFrame = f(this)
@@ -284,22 +289,54 @@ final class DataFrame private[sql] (
 
   /** Persist this DataFrame with the given storage level. */
   def persist(storageLevel: StorageLevel): DataFrame =
-    val cmd = Command.newBuilder()
-      .setCheckpointCommand(CheckpointCommand.newBuilder()
-        .setRelation(relation)
-        .setLocal(true)
-        .setEager(true)
-        .setStorageLevel(storageLevel.toProto)
-        .build())
-      .build()
-    client.executeCommand(cmd)
+    val b = AnalyzePlanRequest.Persist.newBuilder().setRelation(relation)
+    b.setStorageLevel(storageLevel.toProto)
+    client.analyzePlan { rb =>
+      rb.setPersist(b.build())
+    }
     this
 
   /** Remove the cached data for this DataFrame. */
   def unpersist(blocking: Boolean = false): DataFrame =
-    // In Spark Connect, unpersist is handled via RemoveCachedRemoteRelation
-    // For now, trigger a local checkpoint removal
+    client.analyzePlan { rb =>
+      rb.setUnpersist(
+        AnalyzePlanRequest.Unpersist.newBuilder()
+          .setRelation(relation)
+          .setBlocking(blocking)
+          .build()
+      )
+    }
     this
+
+  /** Returns a checkpointed version of this DataFrame. */
+  def checkpoint(eager: Boolean = true): DataFrame = checkpointInternal(eager, local = false)
+
+  /** Returns a locally checkpointed version of this DataFrame. */
+  def localCheckpoint(eager: Boolean = true): DataFrame = checkpointInternal(eager, local = true)
+
+  private def checkpointInternal(eager: Boolean, local: Boolean): DataFrame =
+    val cmd = Command.newBuilder()
+      .setCheckpointCommand(
+        CheckpointCommand.newBuilder()
+          .setRelation(relation)
+          .setLocal(local)
+          .setEager(eager)
+          .build()
+      )
+      .build()
+    val responses = client.executeCommandWithResponses(cmd)
+    val result = responses
+      .find(_.hasCheckpointCommandResult)
+      .getOrElse(throw RuntimeException("No CheckpointCommandResult in response"))
+    val cachedRelation = result.getCheckpointCommandResult.getRelation
+    session.cleaner.register(cachedRelation)
+    DataFrame(
+      session,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+        .setCachedRemoteRelation(cachedRelation)
+        .build()
+    )
 
   def na: DataFrameNaFunctions = DataFrameNaFunctions(this)
 
@@ -450,26 +487,32 @@ final class DataFrame private[sql] (
   def collect(): Array[Row] =
     val plan = Plan.newBuilder().setRoot(relation).build()
     val responses = client.execute(plan)
-    val rows = mutable.ArrayBuffer.empty[Row]
-    val observedMetrics = mutable.ArrayBuffer.empty[(Long, Row)]
-    responses.foreach { resp =>
-      if resp.hasArrowBatch then
-        rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
-      // Process observed metrics from the response
-      resp.getObservedMetricsList.asScala.foreach { om =>
-        val keys = om.getKeysList.asScala.toSeq
-        val values = om.getValuesList.asScala.map(LiteralValueProtoConverter.toScalaValue).toSeq
-        val schema = StructType(
-          keys.zip(om.getValuesList.asScala).map { (key, lit) =>
-            StructField(key, LiteralValueProtoConverter.toDataType(lit))
-          }.toSeq
-        )
-        val row = Row.fromSeqWithSchema(values, schema)
-        observedMetrics += ((om.getPlanId, row))
+    try
+      val rows = mutable.ArrayBuffer.empty[Row]
+      val observedMetrics = mutable.ArrayBuffer.empty[(Long, Row)]
+      responses.foreach { resp =>
+        if resp.hasArrowBatch then
+          rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
+        // Process observed metrics from the response
+        resp.getObservedMetricsList.asScala.foreach { om =>
+          val keys = om.getKeysList.asScala.toSeq
+          val values =
+            om.getValuesList.asScala.map(LiteralValueProtoConverter.toScalaValue).toSeq
+          val schema = StructType(
+            keys.zip(om.getValuesList.asScala).map { (key, lit) =>
+              StructField(key, LiteralValueProtoConverter.toDataType(lit))
+            }.toSeq
+          )
+          val row = Row.fromSeqWithSchema(values, schema)
+          observedMetrics += ((om.getPlanId, row))
+        }
       }
-    }
-    if observedMetrics.nonEmpty then session.processObservedMetrics(observedMetrics.toSeq)
-    rows.toArray
+      if observedMetrics.nonEmpty then session.processObservedMetrics(observedMetrics.toSeq)
+      rows.toArray
+    finally
+      (responses: Any) match
+        case c: AutoCloseable => c.close()
+        case _                => ()
 
   def count(): Long =
     import functions.{count as countFn, lit}
