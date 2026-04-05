@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicLong
   *     .build()
   * }}}
   */
-final class SparkSession private (
+final class SparkSession private[sql] (
     private[sql] val client: SparkConnectClient
 ):
   private val planIdCounter = AtomicLong(0L)

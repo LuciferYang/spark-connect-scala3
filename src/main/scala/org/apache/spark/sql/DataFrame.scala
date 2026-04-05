@@ -305,6 +305,131 @@ final class DataFrame private[sql] (
   def stat: DataFrameStatFunctions = DataFrameStatFunctions(this)
 
   // ---------------------------------------------------------------------------
+  // Advanced Transformations
+  // ---------------------------------------------------------------------------
+
+  /** Unpivot a DataFrame from wide to long format. */
+  def unpivot(
+      ids: Array[Column],
+      values: Array[Column],
+      variableColumnName: String,
+      valueColumnName: String
+  ): DataFrame =
+    val builder = Unpivot.newBuilder()
+      .setInput(relation)
+      .setVariableColumnName(variableColumnName)
+      .setValueColumnName(valueColumnName)
+    ids.foreach(c => builder.addIds(c.expr))
+    val valuesMsg = Unpivot.Values.newBuilder()
+    values.foreach(c => valuesMsg.addValues(c.expr))
+    builder.setValues(valuesMsg.build())
+    withRelation(_.setUnpivot(builder.build()))
+
+  /** Unpivot a DataFrame — all non-id columns become values. */
+  def unpivot(
+      ids: Array[Column],
+      variableColumnName: String,
+      valueColumnName: String
+  ): DataFrame =
+    val builder = Unpivot.newBuilder()
+      .setInput(relation)
+      .setVariableColumnName(variableColumnName)
+      .setValueColumnName(valueColumnName)
+    ids.foreach(c => builder.addIds(c.expr))
+    withRelation(_.setUnpivot(builder.build()))
+
+  /** Alias for unpivot. */
+  def melt(
+      ids: Array[Column],
+      values: Array[Column],
+      variableColumnName: String,
+      valueColumnName: String
+  ): DataFrame = unpivot(ids, values, variableColumnName, valueColumnName)
+
+  /** Alias for unpivot (all non-id columns become values). */
+  def melt(
+      ids: Array[Column],
+      variableColumnName: String,
+      valueColumnName: String
+  ): DataFrame = unpivot(ids, variableColumnName, valueColumnName)
+
+  /** Rename multiple columns at once. */
+  def withColumnsRenamed(colsMap: Map[String, String]): DataFrame =
+    val builder = WithColumnsRenamed.newBuilder().setInput(relation)
+    colsMap.foreach { (existing, newName) =>
+      builder.addRenames(
+        WithColumnsRenamed.Rename.newBuilder()
+          .setColName(existing)
+          .setNewColName(newName)
+          .build()
+      )
+    }
+    withRelation(_.setWithColumnsRenamed(builder.build()))
+
+  /** Add or replace multiple columns at once. */
+  def withColumns(colsMap: Map[String, Column]): DataFrame =
+    val builder = WithColumns.newBuilder().setInput(relation)
+    colsMap.foreach { (name, col) =>
+      builder.addAliases(
+        Expression.Alias.newBuilder()
+          .setExpr(col.expr)
+          .addName(name)
+          .build()
+      )
+    }
+    withRelation(_.setWithColumns(builder.build()))
+
+  /** Drop columns by Column expression. */
+  def drop(cols: Column*)(using DummyImplicit): DataFrame =
+    val dropBuilder = Drop.newBuilder().setInput(relation)
+    cols.foreach(c => dropBuilder.addColumns(c.expr))
+    withRelation(_.setDrop(dropBuilder.build()))
+
+  /** Observe (collect metrics) on this DataFrame. */
+  def observe(name: String, expr: Column, exprs: Column*): DataFrame =
+    val builder = CollectMetrics.newBuilder()
+      .setInput(relation)
+      .setName(name)
+    builder.addMetrics(expr.expr)
+    exprs.foreach(e => builder.addMetrics(e.expr))
+    withRelation(_.setCollectMetrics(builder.build()))
+
+  /** Explain this plan with a mode string. */
+  def explain(mode: String): Unit =
+    val plan = Plan.newBuilder().setRoot(relation).build()
+    val explainMode = mode.toLowerCase match
+      case "simple"    => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
+      case "extended"  => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_EXTENDED
+      case "codegen"   => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_CODEGEN
+      case "cost"      => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_COST
+      case "formatted" => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_FORMATTED
+      case _           => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
+    val explainStr = client.analyzeExplain(plan, explainMode)
+    println(explainStr)
+
+  /** Randomly split this DataFrame into multiple DataFrames by weights. */
+  def randomSplit(weights: Array[Double], seed: Long = 0L): Array[DataFrame] =
+    val normalizedWeights = {
+      val sum = weights.sum
+      weights.map(_ / sum)
+    }
+    var lowerBound = 0.0
+    normalizedWeights.map { w =>
+      val upper = lowerBound + w
+      val df = withRelation(_.setSample(
+        Sample.newBuilder()
+          .setInput(relation)
+          .setLowerBound(lowerBound)
+          .setUpperBound(upper)
+          .setWithReplacement(false)
+          .setSeed(seed)
+          .build()
+      ))
+      lowerBound = upper
+      df
+    }
+
+  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
@@ -355,6 +480,69 @@ final class DataFrame private[sql] (
     println(explainStr)
 
   def isEmpty: Boolean = limit(1).collect().isEmpty
+
+  /** Check if this DataFrame represents a streaming query. */
+  def isStreaming: Boolean =
+    val resp = client.analyzePlan { b =>
+      b.setIsStreaming(
+        AnalyzePlanRequest.IsStreaming.newBuilder()
+          .setPlan(Plan.newBuilder().setRoot(relation).build())
+          .build()
+      )
+    }
+    resp.getIsStreaming.getIsStreaming
+
+  /** Return the input files that were used to create this DataFrame. */
+  def inputFiles: Array[String] =
+    val resp = client.analyzePlan { b =>
+      b.setInputFiles(
+        AnalyzePlanRequest.InputFiles.newBuilder()
+          .setPlan(Plan.newBuilder().setRoot(relation).build())
+          .build()
+      )
+    }
+    resp.getInputFiles.getFilesList.asScala.toArray
+
+  /** Returns true if the other DataFrame has the same semantic plan. */
+  def sameSemantics(other: DataFrame): Boolean =
+    val resp = client.analyzePlan { b =>
+      b.setSameSemantics(
+        AnalyzePlanRequest.SameSemantics.newBuilder()
+          .setTargetPlan(Plan.newBuilder().setRoot(relation).build())
+          .setOtherPlan(Plan.newBuilder().setRoot(other.relation).build())
+          .build()
+      )
+    }
+    resp.getSameSemantics.getResult
+
+  /** Returns a semantic hash of the logical plan. */
+  def semanticHash: Int =
+    val resp = client.analyzePlan { b =>
+      b.setSemanticHash(
+        AnalyzePlanRequest.SemanticHash.newBuilder()
+          .setPlan(Plan.newBuilder().setRoot(relation).build())
+          .build()
+      )
+    }
+    resp.getSemanticHash.getResult
+
+  /** Get the storage level of this DataFrame. */
+  def storageLevel: StorageLevel =
+    val resp = client.analyzePlan { b =>
+      b.setGetStorageLevel(
+        AnalyzePlanRequest.GetStorageLevel.newBuilder()
+          .setRelation(relation)
+          .build()
+      )
+    }
+    val sl = resp.getGetStorageLevel.getStorageLevel
+    StorageLevel(
+      useDisk = sl.getUseDisk,
+      useMemory = sl.getUseMemory,
+      useOffHeap = sl.getUseOffHeap,
+      deserialized = sl.getDeserialized,
+      replication = sl.getReplication
+    )
 
   // ---------------------------------------------------------------------------
   // Temp Views
@@ -410,15 +598,13 @@ final class DataFrame private[sql] (
 
   /** Resolve schema from the server. */
   private def schemaInternal(): Option[StructType] =
-    try
-      val plan = Plan.newBuilder().setRoot(relation).build()
-      val resp = client.analyzeSchema(plan)
-      if resp.hasSchema && resp.getSchema.hasSchema then
-        DataTypeProtoConverter.fromProto(resp.getSchema.getSchema) match
-          case st: StructType => Some(st)
-          case _              => None
-      else None
-    catch case _: Exception => None
+    val plan = Plan.newBuilder().setRoot(relation).build()
+    val resp = client.analyzeSchema(plan)
+    if resp.hasSchema && resp.getSchema.hasSchema then
+      DataTypeProtoConverter.fromProto(resp.getSchema.getSchema) match
+        case st: StructType => Some(st)
+        case _              => None
+    else None
 
   private[sql] def withRelation(f: Relation.Builder => Relation.Builder): DataFrame =
     val builder = Relation.newBuilder()

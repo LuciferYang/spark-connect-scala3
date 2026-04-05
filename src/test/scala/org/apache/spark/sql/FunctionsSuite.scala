@@ -379,3 +379,114 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.try_to_number(Column("x"), Column("f")), "try_to_number", 2)
     assertFn(functions.try_to_timestamp(Column("x")), "try_to_timestamp", 1)
   }
+
+  // ----- Phase 4 (Task E) tests: Higher-order functions -----
+
+  test("transform with 1-arg lambda") {
+    val c = functions.transform(Column("arr"), x => x + Column.lit(1))
+    c.expr.hasUnresolvedFunction shouldBe true
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "transform"
+    fn.getArgumentsList should have size 2
+    // second arg should be a LambdaFunction
+    fn.getArguments(1).hasLambdaFunction shouldBe true
+    fn.getArguments(1).getLambdaFunction.getArgumentsList should have size 1
+  }
+
+  test("transform with 2-arg lambda") {
+    val c = functions.transform(Column("arr"), (x, i) => x + i)
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "transform"
+    fn.getArguments(1).hasLambdaFunction shouldBe true
+    fn.getArguments(1).getLambdaFunction.getArgumentsList should have size 2
+  }
+
+  test("filter with 1-arg lambda") {
+    val c = functions.filter(Column("arr"), x => x > Column.lit(0))
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "filter"
+    fn.getArguments(1).hasLambdaFunction shouldBe true
+    fn.getArguments(1).getLambdaFunction.getArgumentsList should have size 1
+  }
+
+  test("exists builds lambda") {
+    val c = functions.exists(Column("arr"), x => x > Column.lit(0))
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "exists"
+    fn.getArguments(1).hasLambdaFunction shouldBe true
+  }
+
+  test("forall builds lambda") {
+    val c = functions.forall(Column("arr"), x => x > Column.lit(0))
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "forall"
+    fn.getArguments(1).hasLambdaFunction shouldBe true
+  }
+
+  test("aggregate with finish function") {
+    val c = functions.aggregate(
+      Column("arr"),
+      Column.lit(0),
+      (acc, x) => acc + x,
+      result => result * Column.lit(2)
+    )
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "aggregate"
+    fn.getArgumentsList should have size 4
+    // arg 2 is the merge lambda (2-arg)
+    fn.getArguments(2).hasLambdaFunction shouldBe true
+    fn.getArguments(2).getLambdaFunction.getArgumentsList should have size 2
+    // arg 3 is the finish lambda (1-arg)
+    fn.getArguments(3).hasLambdaFunction shouldBe true
+    fn.getArguments(3).getLambdaFunction.getArgumentsList should have size 1
+  }
+
+  test("aggregate without finish function") {
+    val c = functions.aggregate(
+      Column("arr"),
+      Column.lit(0),
+      (acc, x) => acc + x
+    )
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "aggregate"
+    fn.getArgumentsList should have size 3
+  }
+
+  test("zip_with builds lambda") {
+    val c = functions.zip_with(Column("a"), Column("b"), (x, y) => x + y)
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "zip_with"
+    fn.getArgumentsList should have size 3
+    fn.getArguments(2).hasLambdaFunction shouldBe true
+    fn.getArguments(2).getLambdaFunction.getArgumentsList should have size 2
+  }
+
+  test("map_filter with lambda") {
+    val c = functions.map_filter(Column("m"), (k, v) => v > Column.lit(0))
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "map_filter"
+    fn.getArguments(1).hasLambdaFunction shouldBe true
+  }
+
+  test("transform_keys builds lambda") {
+    val c = functions.transform_keys(Column("m"), (k, v) => functions.upper(k))
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "transform_keys"
+    fn.getArguments(1).hasLambdaFunction shouldBe true
+  }
+
+  test("transform_values builds lambda") {
+    val c = functions.transform_values(Column("m"), (k, v) => v + Column.lit(1))
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "transform_values"
+    fn.getArguments(1).hasLambdaFunction shouldBe true
+  }
+
+  test("array_sort with comparator lambda") {
+    val c = functions.array_sort(Column("arr"), (a, b) => a - b)
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "array_sort"
+    fn.getArgumentsList should have size 2
+    fn.getArguments(1).hasLambdaFunction shouldBe true
+    fn.getArguments(1).getLambdaFunction.getArgumentsList should have size 2
+  }

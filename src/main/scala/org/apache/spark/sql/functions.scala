@@ -592,3 +592,102 @@ object functions:
         Encoder.sparkTypeOf[T5]
       )
     )
+
+  // ---------------------------------------------------------------------------
+  // Higher-order functions (lambda-based)
+  // ---------------------------------------------------------------------------
+
+  /** Apply a transform function to each element of an array. */
+  def transform(col: Column, f: Column => Column): Column =
+    callFn("transform", col, createLambda1(f))
+
+  /** Apply a transform function (element, index) to each element of an array. */
+  def transform(col: Column, f: (Column, Column) => Column): Column =
+    callFn("transform", col, createLambda2(f))
+
+  /** Filter elements of an array using a predicate. */
+  def filter(col: Column, f: Column => Column): Column =
+    callFn("filter", col, createLambda1(f))
+
+  /** Filter elements of an array using a predicate (element, index). */
+  def filter(col: Column, f: (Column, Column) => Column): Column =
+    callFn("filter", col, createLambda2(f))
+
+  /** Return whether any element of the array satisfies the predicate. */
+  def exists(col: Column, f: Column => Column): Column =
+    callFn("exists", col, createLambda1(f))
+
+  /** Return whether all elements of the array satisfy the predicate. */
+  def forall(col: Column, f: Column => Column): Column =
+    callFn("forall", col, createLambda1(f))
+
+  /** Aggregate elements of an array using an accumulator with a finish function. */
+  def aggregate(
+      col: Column,
+      initialValue: Column,
+      merge: (Column, Column) => Column,
+      finish: Column => Column
+  ): Column =
+    callFn("aggregate", col, initialValue, createLambda2(merge), createLambda1(finish))
+
+  /** Aggregate elements of an array using an accumulator (no finish function). */
+  def aggregate(
+      col: Column,
+      initialValue: Column,
+      merge: (Column, Column) => Column
+  ): Column =
+    callFn("aggregate", col, initialValue, createLambda2(merge))
+
+  /** Merge two arrays element-wise using a function. */
+  def zip_with(left: Column, right: Column, f: (Column, Column) => Column): Column =
+    callFn("zip_with", left, right, createLambda2(f))
+
+  /** Filter entries in a map using a predicate on key and value. */
+  def map_filter(col: Column, f: (Column, Column) => Column): Column =
+    callFn("map_filter", col, createLambda2(f))
+
+  /** Transform keys of a map using a function of (key, value). */
+  def transform_keys(col: Column, f: (Column, Column) => Column): Column =
+    callFn("transform_keys", col, createLambda2(f))
+
+  /** Transform values of a map using a function of (key, value). */
+  def transform_values(col: Column, f: (Column, Column) => Column): Column =
+    callFn("transform_values", col, createLambda2(f))
+
+  /** Sort an array using a comparator function. */
+  def array_sort(col: Column, comparator: (Column, Column) => Column): Column =
+    callFn("array_sort", col, createLambda2(comparator))
+
+  // ---------------------------------------------------------------------------
+  // Lambda helpers
+  // ---------------------------------------------------------------------------
+
+  private def createLambda1(f: Column => Column): Column =
+    val x = lambdaVar("x")
+    val xCol = Column(Expression.newBuilder().setUnresolvedNamedLambdaVariable(x).build())
+    val body = f(xCol).expr
+    Column(Expression.newBuilder().setLambdaFunction(
+      Expression.LambdaFunction.newBuilder()
+        .setFunction(body)
+        .addArguments(x)
+        .build()
+    ).build())
+
+  private def createLambda2(f: (Column, Column) => Column): Column =
+    val x = lambdaVar("x")
+    val y = lambdaVar("y")
+    val xCol = Column(Expression.newBuilder().setUnresolvedNamedLambdaVariable(x).build())
+    val yCol = Column(Expression.newBuilder().setUnresolvedNamedLambdaVariable(y).build())
+    val body = f(xCol, yCol).expr
+    Column(Expression.newBuilder().setLambdaFunction(
+      Expression.LambdaFunction.newBuilder()
+        .setFunction(body)
+        .addArguments(x)
+        .addArguments(y)
+        .build()
+    ).build())
+
+  private def lambdaVar(name: String): Expression.UnresolvedNamedLambdaVariable =
+    Expression.UnresolvedNamedLambdaVariable.newBuilder()
+      .addNameParts(name)
+      .build()

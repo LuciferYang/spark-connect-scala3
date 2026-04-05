@@ -9,6 +9,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
+import org.apache.spark.sql.StorageLevel
 
 /** Core gRPC client for communicating with Spark Connect Server.
   *
@@ -20,7 +21,8 @@ final class SparkConnectClient private (
     private val bstub: SparkConnectServiceGrpc.SparkConnectServiceBlockingStub,
     private val asyncStub: SparkConnectServiceGrpc.SparkConnectServiceStub,
     val sessionId: String,
-    val userId: String
+    val userId: String,
+    private val retryHandler: GrpcRetryHandler
 ):
 
   /** Manages uploading artifacts (class files, JARs) to the server. */
@@ -39,7 +41,7 @@ final class SparkConnectClient private (
       .setPlan(plan)
       .setOperationId(UUID.randomUUID().toString)
       .build()
-    retryOnUnavailable(bstub.executePlan(request).asScala)
+    GrpcExceptionConverter.convert(retryHandler.retry(bstub.executePlan(request).asScala))
 
   // ---------------------------------------------------------------------------
   // Analyze
@@ -53,7 +55,7 @@ final class SparkConnectClient private (
       .setUserContext(UserContext.newBuilder().setUserId(userId).build())
       .setSchema(AnalyzePlanRequest.Schema.newBuilder().setPlan(plan).build())
       .build()
-    retryOnUnavailable(bstub.analyzePlan(request))
+    GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(request)))
 
   /** Retrieve the explain string for a plan without executing it. */
   def analyzeExplain(
@@ -68,7 +70,7 @@ final class SparkConnectClient private (
         plan
       ).setExplainMode(mode).build())
       .build()
-    val resp = retryOnUnavailable(bstub.analyzePlan(request))
+    val resp = GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(request)))
     if resp.hasExplain then resp.getExplain.getExplainString
     else "(no explain output)"
 
@@ -79,7 +81,7 @@ final class SparkConnectClient private (
       .setUserContext(UserContext.newBuilder().setUserId(userId).build())
       .setSparkVersion(AnalyzePlanRequest.SparkVersion.getDefaultInstance)
       .build()
-    val resp = retryOnUnavailable(bstub.analyzePlan(request))
+    val resp = GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(request)))
     if resp.hasSparkVersion then resp.getSparkVersion.getVersion
     else "unknown"
 
@@ -95,7 +97,7 @@ final class SparkConnectClient private (
         .setGet(ConfigRequest.Get.newBuilder().addKeys(key).build())
         .build())
       .build()
-    val resp = retryOnUnavailable(bstub.config(request))
+    val resp = GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(request)))
     val pairs = resp.getPairsList.asScala
     pairs.headOption.map(_.getValue).getOrElse("")
 
@@ -109,7 +111,7 @@ final class SparkConnectClient private (
           .build())
         .build())
       .build()
-    retryOnUnavailable(bstub.config(request))
+    GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(request)))
 
   // ---------------------------------------------------------------------------
   // Execute Command
@@ -131,7 +133,7 @@ final class SparkConnectClient private (
       .setUserContext(UserContext.newBuilder().setUserId(userId).build())
       .setInterruptType(InterruptRequest.InterruptType.INTERRUPT_TYPE_ALL)
       .build()
-    try retryOnUnavailable(bstub.interrupt(request))
+    try GrpcExceptionConverter.convert(retryHandler.retry(bstub.interrupt(request)))
     catch case NonFatal(_) => () // best-effort
 
   def close(): Unit =
@@ -142,15 +144,18 @@ final class SparkConnectClient private (
     catch case NonFatal(_) => channel.shutdownNow()
 
   // ---------------------------------------------------------------------------
-  // Retry helper (simple: retry once on UNAVAILABLE)
+  // Generic Analyze helper
   // ---------------------------------------------------------------------------
 
-  private def retryOnUnavailable[T](op: => T): T =
-    try op
-    catch
-      case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.UNAVAILABLE =>
-        Thread.sleep(500)
-        op
+  /** Send an AnalyzePlan request built by the caller. */
+  def analyzePlan(
+      f: AnalyzePlanRequest.Builder => AnalyzePlanRequest.Builder
+  ): AnalyzePlanResponse =
+    val base = AnalyzePlanRequest.newBuilder()
+      .setSessionId(sessionId)
+      .setUserContext(UserContext.newBuilder().setUserId(userId).build())
+    val request = f(base).build()
+    GrpcExceptionConverter.convert(retryHandler.retry(bstub.analyzePlan(request)))
 
 object SparkConnectClient:
 
@@ -203,7 +208,14 @@ object SparkConnectClient:
         (baseStub.withInterceptors(interceptor), baseAsyncStub.withInterceptors(interceptor))
       case None => (baseStub, baseAsyncStub)
 
-    val client = SparkConnectClient(channel, stub, aStub, sessionId, userId)
+    val client = SparkConnectClient(
+      channel,
+      stub,
+      aStub,
+      sessionId,
+      userId,
+      GrpcRetryHandler(RetryPolicy.defaultPolicy())
+    )
 
     configs.foreach((k, v) => client.setConfig(k, v))
     client
