@@ -81,13 +81,23 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
   override def simpleString: String =
     s"struct<${fields.map(f => s"${f.name}:${f.dataType.simpleString}").mkString(",")}>"
 
-  def treeString: String =
+  def treeString: String = treeString(Int.MaxValue)
+
+  /** Print schema tree up to the given nesting depth. */
+  def treeString(maxLevel: Int): String =
     val sb = StringBuilder()
     sb.append("root\n")
-    fields.foreach { f =>
-      val nullStr = if f.nullable then "nullable = true" else "nullable = false"
-      sb.append(s" |-- ${f.name}: ${f.dataType.simpleString} ($nullStr)\n")
-    }
+    def buildTree(fields: Seq[StructField], indent: Int): Unit =
+      if indent < maxLevel then
+        fields.foreach { f =>
+          val prefix = " |" * indent + "-- "
+          val nullStr = if f.nullable then "nullable = true" else "nullable = false"
+          sb.append(s"$prefix${f.name}: ${f.dataType.simpleString} ($nullStr)\n")
+          f.dataType match
+            case st: StructType => buildTree(st.fields, indent + 1)
+            case _              => ()
+        }
+    buildTree(fields, 1)
     sb.toString
 
 object StructType:

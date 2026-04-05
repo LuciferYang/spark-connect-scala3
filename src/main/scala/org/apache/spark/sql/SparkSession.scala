@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
   */
 final class SparkSession private[sql] (
     private[sql] val client: SparkConnectClient
-):
+) extends java.io.Closeable:
   private val planIdCounter = AtomicLong(0L)
 
   // Registry of Observations keyed by the plan ID of their CollectMetrics node.
@@ -266,7 +266,13 @@ final class SparkSession private[sql] (
   // Stop
   // ---------------------------------------------------------------------------
 
-  def stop(): Unit = client.close()
+  def stop(): Unit = close()
+
+  /** Implements `java.io.Closeable`. Releases session resources. */
+  override def close(): Unit =
+    client.close()
+    SparkSession.clearActiveSession()
+    SparkSession.clearDefaultSession()
 
   // ---------------------------------------------------------------------------
   // New Session
@@ -359,6 +365,14 @@ object SparkSession:
       val session = SparkSession(client)
       if defaultSession.get() == null then defaultSession.compareAndSet(null, session)
       session
+
+    /** Create a new session — alias for `build()`, matching the official API. */
+    def create(): SparkSession = build()
+
+    /** Return an existing active/default session, or create a new one. */
+    def getOrCreate(): SparkSession =
+      val existing = SparkSession.getActiveSession.orElse(SparkSession.getDefaultSession)
+      existing.getOrElse(build())
 
 /** Thin wrapper around client config get/set. */
 final class RuntimeConfig private[sql] (private val client: SparkConnectClient):

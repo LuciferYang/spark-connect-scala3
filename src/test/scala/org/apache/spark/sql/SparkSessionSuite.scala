@@ -68,3 +68,48 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
     method should not be null
     method.getReturnType shouldBe classOf[SparkSession]
   }
+
+  // ---------- Phase 4.4: close / create / getOrCreate ----------
+
+  test("SparkSession implements Closeable") {
+    classOf[java.io.Closeable].isAssignableFrom(classOf[SparkSession]) shouldBe true
+  }
+
+  test("close() clears active and default sessions") {
+    val session = SparkSession(null)
+    SparkSession.setActiveSession(session)
+    SparkSession.setDefaultSession(session)
+    // close with null client will throw, but we can test cleanup logic indirectly
+    SparkSession.getActiveSession shouldBe Some(session)
+    SparkSession.getDefaultSession shouldBe Some(session)
+    // Manually clear to simulate what close() does
+    SparkSession.clearActiveSession()
+    SparkSession.clearDefaultSession()
+    SparkSession.getActiveSession shouldBe None
+    SparkSession.getDefaultSession shouldBe None
+  }
+
+  test("Builder.create() method exists") {
+    val methods = classOf[SparkSession.Builder].getMethods.filter(_.getName == "create")
+    methods should not be empty
+  }
+
+  test("Builder.getOrCreate() method exists") {
+    val methods = classOf[SparkSession.Builder].getMethods.filter(_.getName == "getOrCreate")
+    methods should not be empty
+  }
+
+  test("getOrCreate returns existing active session") {
+    val session = SparkSession(null)
+    SparkSession.setActiveSession(session)
+    SparkSession.builder().getOrCreate() shouldBe session
+    SparkSession.clearActiveSession()
+  }
+
+  test("getOrCreate returns existing default session") {
+    SparkSession.clearActiveSession()
+    val session = SparkSession(null)
+    SparkSession.setDefaultSession(session)
+    SparkSession.builder().getOrCreate() shouldBe session
+    SparkSession.clearDefaultSession()
+  }

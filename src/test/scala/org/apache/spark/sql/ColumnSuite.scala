@@ -183,3 +183,57 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     // Inner should also be UpdateFields
     uf.getStructExpression.hasUpdateFields shouldBe true
   }
+
+  // ---------- Phase 4.1 tests ----------
+
+  test("<=> builds null-safe equality function") {
+    val c = Column("a") <=> "hello"
+    c.expr.hasUnresolvedFunction shouldBe true
+    c.expr.getUnresolvedFunction.getFunctionName shouldBe "<=>"
+    c.expr.getUnresolvedFunction.getArgumentsCount shouldBe 2
+  }
+
+  test("eqNullSafe delegates to <=>") {
+    val c = Column("a").eqNullSafe(42)
+    c.expr.hasUnresolvedFunction shouldBe true
+    c.expr.getUnresolvedFunction.getFunctionName shouldBe "<=>"
+  }
+
+  test("cast(DataType) uses Expression.Cast with type proto") {
+    val c = Column("a").cast(types.IntegerType)
+    c.expr.hasCast shouldBe true
+    c.expr.getCast.hasType shouldBe true
+  }
+
+  test("cast(String) uses Expression.Cast with type_str") {
+    val c = Column("a").cast("int")
+    c.expr.hasCast shouldBe true
+    c.expr.getCast.hasTypeStr shouldBe true
+    c.expr.getCast.getTypeStr shouldBe "int"
+  }
+
+  test("try_cast(String) uses EVAL_MODE_TRY") {
+    val c = Column("a").try_cast("int")
+    c.expr.hasCast shouldBe true
+    c.expr.getCast.getEvalMode shouldBe Expression.Cast.EvalMode.EVAL_MODE_TRY
+    c.expr.getCast.hasTypeStr shouldBe true
+  }
+
+  test("try_cast(DataType) uses EVAL_MODE_TRY with type proto") {
+    val c = Column("a").try_cast(types.LongType)
+    c.expr.hasCast shouldBe true
+    c.expr.getCast.getEvalMode shouldBe Expression.Cast.EvalMode.EVAL_MODE_TRY
+    c.expr.getCast.hasType shouldBe true
+  }
+
+  test("ilike builds case-insensitive like function") {
+    val c = Column("a").ilike("%hello%")
+    c.expr.hasUnresolvedFunction shouldBe true
+    c.expr.getUnresolvedFunction.getFunctionName shouldBe "ilike"
+  }
+
+  test("as[U: Encoder] returns a TypedColumn") {
+    val tc = Column("a").as[Int]
+    tc shouldBe a[TypedColumn[?, ?]]
+    tc.encoder should not be null
+  }

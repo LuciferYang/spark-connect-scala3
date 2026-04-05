@@ -90,11 +90,34 @@ final class DataFrame private[sql] (
         .build()
     ))
 
+  /** Join with no condition (implicit cross join). */
+  def join(right: DataFrame): DataFrame =
+    withRelation(_.setJoin(
+      Join.newBuilder()
+        .setLeft(relation)
+        .setRight(right.relation)
+        .setJoinType(Join.JoinType.JOIN_TYPE_INNER)
+        .build()
+    ))
+
+  /** Equi-join using a single column name. */
+  def join(right: DataFrame, usingColumn: String): DataFrame =
+    join(right, Seq(usingColumn))
+
   def join(right: DataFrame, usingColumns: Seq[String]): DataFrame =
     val joinBuilder = Join.newBuilder()
       .setLeft(relation)
       .setRight(right.relation)
       .setJoinType(Join.JoinType.JOIN_TYPE_INNER)
+    usingColumns.foreach(joinBuilder.addUsingColumns)
+    withRelation(_.setJoin(joinBuilder.build()))
+
+  /** Equi-join using column names with a specified join type. */
+  def join(right: DataFrame, usingColumns: Seq[String], joinType: String): DataFrame =
+    val joinBuilder = Join.newBuilder()
+      .setLeft(relation)
+      .setRight(right.relation)
+      .setJoinType(toJoinType(joinType))
     usingColumns.foreach(joinBuilder.addUsingColumns)
     withRelation(_.setJoin(joinBuilder.build()))
 
@@ -230,6 +253,15 @@ final class DataFrame private[sql] (
     val toDfBuilder = ToDF.newBuilder().setInput(relation)
     colNames.foreach(toDfBuilder.addColumnNames)
     withRelation(_.setToDf(toDfBuilder.build()))
+
+  /** Returns a new DataFrame where each column is reconciled to match the specified schema. */
+  def to(schema: types.StructType): DataFrame =
+    withRelation(_.setToSchema(
+      ToSchema.newBuilder()
+        .setInput(relation)
+        .setSchema(DataTypeProtoConverter.toProto(schema))
+        .build()
+    ))
 
   /** Hint the optimizer (e.g., broadcast). */
   def hint(name: String, parameters: Any*): DataFrame =
@@ -601,10 +633,31 @@ final class DataFrame private[sql] (
     val s = schema
     println(s.treeString)
 
+  /** Print the schema up to the given nesting depth. */
+  def printSchema(level: Int): Unit =
+    val s = schema
+    println(s.treeString(level))
+
   def schema: StructType =
     schemaInternal().getOrElse(StructType.empty)
 
   def columns: Array[String] = schema.fieldNames
+
+  /** Return an array of (column name, data type string) pairs. */
+  def dtypes: Array[(String, String)] =
+    schema.fields.map(f => (f.name, f.dataType.simpleString)).toArray
+
+  /** Select a column by name, bound to this DataFrame. */
+  def col(colName: String): Column =
+    Column(Expression.newBuilder()
+      .setUnresolvedAttribute(Expression.UnresolvedAttribute.newBuilder()
+        .setUnparsedIdentifier(colName)
+        .setPlanId(relation.getCommon.getPlanId)
+        .build())
+      .build())
+
+  /** Select a column by name — alias for `col`. */
+  def apply(colName: String): Column = col(colName)
 
   def explain(extended: Boolean = false): Unit =
     val plan = Plan.newBuilder().setRoot(relation).build()

@@ -266,9 +266,25 @@ final class Dataset[T: ClassTag] private[sql] (
 
   def union(other: Dataset[T]): Dataset[T] = Dataset(df.union(other.df), encoder)
 
+  def unionByName(other: Dataset[T], allowMissingColumns: Boolean = false): Dataset[T] =
+    Dataset(df.unionByName(other.df, allowMissingColumns), encoder)
+
   def intersect(other: Dataset[T]): Dataset[T] = Dataset(df.intersect(other.df), encoder)
 
+  def intersectAll(other: Dataset[T]): Dataset[T] = Dataset(df.intersectAll(other.df), encoder)
+
   def except(other: Dataset[T]): Dataset[T] = Dataset(df.except(other.df), encoder)
+
+  def exceptAll(other: Dataset[T]): Dataset[T] = Dataset(df.exceptAll(other.df), encoder)
+
+  /** Set an alias for this Dataset (useful for self-joins). */
+  def as(alias: String): Dataset[T] = Dataset(df.alias(alias), encoder)
+
+  /** Set an alias for this Dataset. */
+  def alias(alias: String): Dataset[T] = as(alias)
+
+  /** Pipeline-style transformation. */
+  def transform[U](t: Dataset[T] => Dataset[U]): Dataset[U] = t(this)
 
   def cache(): Dataset[T] =
     df.cache()

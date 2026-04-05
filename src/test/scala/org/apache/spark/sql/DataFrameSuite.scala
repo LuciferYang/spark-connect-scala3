@@ -441,3 +441,75 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     // Tags should start empty (client is null but tag methods use InheritableThreadLocal)
     // We can't call getTags on null client, so skip this for null-client tests
   }
+
+  // ---------- Phase 4: col / apply / dtypes / to / join overloads ----------
+
+  test("col(name) produces UnresolvedAttribute with planId") {
+    val df = testDf()
+    val c = df.col("age")
+    c.expr.hasUnresolvedAttribute shouldBe true
+    c.expr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "age"
+    c.expr.getUnresolvedAttribute.getPlanId shouldBe df.relation.getCommon.getPlanId
+  }
+
+  test("apply(name) delegates to col") {
+    val df = testDf()
+    val c = df("name")
+    c.expr.hasUnresolvedAttribute shouldBe true
+    c.expr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "name"
+  }
+
+  test("dtypes returns column name and type pairs") {
+    // dtypes depends on schema which requires a live server, so test the method exists
+    val method = classOf[DataFrame].getMethod("dtypes")
+    method should not be null
+    method.getReturnType shouldBe classOf[Array[(String, String)]]
+  }
+
+  test("to(schema) builds ToSchema proto") {
+    val df = testDf()
+    val targetSchema = types.StructType(Seq(
+      types.StructField("id", types.LongType),
+      types.StructField("name", types.StringType)
+    ))
+    val result = df.to(targetSchema)
+    result.relation.hasToSchema shouldBe true
+    result.relation.getToSchema.hasSchema shouldBe true
+  }
+
+  test("printSchema(level) method exists") {
+    val method = classOf[DataFrame].getMethod("printSchema", classOf[Int])
+    method should not be null
+  }
+
+  test("join(right) builds Join with no condition") {
+    val df1 = testDf()
+    val df2 = testDf()
+    val joined = df1.join(df2)
+    joined.relation.hasJoin shouldBe true
+    val j = joined.relation.getJoin
+    j.getJoinType shouldBe Join.JoinType.JOIN_TYPE_INNER
+    j.hasJoinCondition shouldBe false
+    j.getUsingColumnsCount shouldBe 0
+  }
+
+  test("join(right, usingColumn) builds Join with single using column") {
+    val df1 = testDf()
+    val df2 = testDf()
+    val joined = df1.join(df2, "id")
+    val j = joined.relation.getJoin
+    j.getUsingColumnsCount shouldBe 1
+    j.getUsingColumns(0) shouldBe "id"
+    j.getJoinType shouldBe Join.JoinType.JOIN_TYPE_INNER
+  }
+
+  test("join(right, usingColumns, joinType) builds correct proto") {
+    val df1 = testDf()
+    val df2 = testDf()
+    val joined = df1.join(df2, Seq("id", "name"), "left")
+    val j = joined.relation.getJoin
+    j.getUsingColumnsCount shouldBe 2
+    j.getUsingColumns(0) shouldBe "id"
+    j.getUsingColumns(1) shouldBe "name"
+    j.getJoinType shouldBe Join.JoinType.JOIN_TYPE_LEFT_OUTER
+  }

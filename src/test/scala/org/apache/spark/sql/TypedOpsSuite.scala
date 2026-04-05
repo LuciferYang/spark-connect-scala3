@@ -285,3 +285,50 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     )
     methods should not be empty
   }
+
+  // ---------- Phase 4.2: Dataset.as(alias), transform ----------
+
+  test("Dataset.as(alias) returns aliased Dataset") {
+    val ds = testDataset[Long]()
+    val aliased = ds.as("t1")
+    aliased.df.relation.hasSubqueryAlias shouldBe true
+    aliased.df.relation.getSubqueryAlias.getAlias shouldBe "t1"
+  }
+
+  test("Dataset.alias(alias) returns aliased Dataset") {
+    val ds = testDataset[Long]()
+    val aliased = ds.alias("t2")
+    aliased.df.relation.hasSubqueryAlias shouldBe true
+    aliased.df.relation.getSubqueryAlias.getAlias shouldBe "t2"
+  }
+
+  test("Dataset.transform applies function") {
+    val ds = testDataset[Long]()
+    val result = ds.transform(d => d.limit(5))
+    result.df.relation.hasLimit shouldBe true
+    result.df.relation.getLimit.getLimit shouldBe 5
+  }
+
+  test("Dataset.unionByName delegates to DataFrame") {
+    val ds1 = testDataset[Long]()
+    val ds2 = testDataset[Long]()
+    val result = ds1.unionByName(ds2)
+    result.df.relation.hasSetOp shouldBe true
+    result.df.relation.getSetOp.getByName shouldBe true
+  }
+
+  test("Dataset.intersectAll delegates to DataFrame") {
+    val ds1 = testDataset[Long]()
+    val ds2 = testDataset[Long]()
+    val result = ds1.intersectAll(ds2)
+    result.df.relation.hasSetOp shouldBe true
+    result.df.relation.getSetOp.getIsAll shouldBe true
+  }
+
+  test("Dataset.exceptAll delegates to DataFrame") {
+    val ds1 = testDataset[Long]()
+    val ds2 = testDataset[Long]()
+    val result = ds1.exceptAll(ds2)
+    result.df.relation.hasSetOp shouldBe true
+    result.df.relation.getSetOp.getIsAll shouldBe true
+  }

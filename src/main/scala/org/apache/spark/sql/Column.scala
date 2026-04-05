@@ -1,6 +1,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.{Expression, DataType as ProtoDataType}
+import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 
 import scala.jdk.CollectionConverters.*
 
@@ -28,6 +29,12 @@ class Column private[sql] (private[sql] val expr: Expression):
 
   def ===(other: Column): Column = fn("==", other)
   def =!=(other: Column): Column = fn("!=", other)
+
+  /** Null-safe equality (NULL <=> NULL is true). */
+  def <=>(other: Any): Column = fn("<=>", Column.lit(other))
+
+  /** Java alias for `<=>`. */
+  def eqNullSafe(other: Any): Column = <=>(other)
   def >(other: Column): Column = fn(">", other)
   def >=(other: Column): Column = fn(">=", other)
   def <(other: Column): Column = fn("<", other)
@@ -88,6 +95,9 @@ class Column private[sql] (private[sql] val expr: Expression):
 
   def like(literal: String): Column = fn("like", Column.lit(literal))
   def rlike(literal: String): Column = fn("rlike", Column.lit(literal))
+
+  /** Case-insensitive LIKE. */
+  def ilike(literal: String): Column = fn("ilike", Column.lit(literal))
 
   def isin(values: Any*): Column =
     val args = values.map(v => Column.lit(v).expr)
@@ -198,6 +208,35 @@ class Column private[sql] (private[sql] val expr: Expression):
         .build()
     ).build())
 
+  /** Cast to the specified DataType. */
+  def cast(to: types.DataType): Column =
+    Column(Expression.newBuilder().setCast(
+      Expression.Cast.newBuilder()
+        .setExpr(expr)
+        .setType(DataTypeProtoConverter.toProto(to))
+        .build()
+    ).build())
+
+  /** Try-cast to the specified type string; returns null on failure. */
+  def try_cast(to: String): Column =
+    Column(Expression.newBuilder().setCast(
+      Expression.Cast.newBuilder()
+        .setExpr(expr)
+        .setTypeStr(to)
+        .setEvalMode(Expression.Cast.EvalMode.EVAL_MODE_TRY)
+        .build()
+    ).build())
+
+  /** Try-cast to the specified DataType; returns null on failure. */
+  def try_cast(to: types.DataType): Column =
+    Column(Expression.newBuilder().setCast(
+      Expression.Cast.newBuilder()
+        .setExpr(expr)
+        .setType(DataTypeProtoConverter.toProto(to))
+        .setEvalMode(Expression.Cast.EvalMode.EVAL_MODE_TRY)
+        .build()
+    ).build())
+
   def alias(name: String): Column = as(name)
 
   def as(name: String): Column =
@@ -209,6 +248,10 @@ class Column private[sql] (private[sql] val expr: Expression):
     ).build())
 
   def name(n: String): Column = as(n)
+
+  /** Provide a type hint to generate a TypedColumn for Dataset operations. */
+  def as[U: Encoder]: TypedColumn[Any, U] =
+    TypedColumn(expr, summon[Encoder[U]])
 
   // ---------------------------------------------------------------------------
   // Sort
