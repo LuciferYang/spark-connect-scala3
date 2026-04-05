@@ -7,6 +7,7 @@ import org.apache.spark.connect.proto.{
   ScalarScalaUDF
 }
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.*
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.UdfPacket
@@ -81,16 +82,20 @@ final class UserDefinedFunction private[sql] (
 
   /** Map a Spark DataType to the corresponding AgnosticEncoder for UdfPacket serialization. */
   private def encoderForType(dt: DataType): AgnosticEncoder[?] = dt match
-    case IntegerType => PrimitiveIntEncoder
-    case LongType    => PrimitiveLongEncoder
-    case DoubleType  => PrimitiveDoubleEncoder
-    case FloatType   => PrimitiveFloatEncoder
-    case ShortType   => PrimitiveShortEncoder
-    case ByteType    => PrimitiveByteEncoder
-    case BooleanType => PrimitiveBooleanEncoder
-    case StringType  => StringEncoder
-    case BinaryType  => BinaryEncoder
-    case _           => StringEncoder // fallback
+    case IntegerType    => PrimitiveIntEncoder
+    case LongType       => PrimitiveLongEncoder
+    case DoubleType     => PrimitiveDoubleEncoder
+    case FloatType      => PrimitiveFloatEncoder
+    case ShortType      => PrimitiveShortEncoder
+    case ByteType       => PrimitiveByteEncoder
+    case BooleanType    => PrimitiveBooleanEncoder
+    case StringType     => StringEncoder
+    case BinaryType     => BinaryEncoder
+    case DateType       => AgnosticEncoders.STRICT_DATE_ENCODER
+    case TimestampType  => AgnosticEncoders.STRICT_TIMESTAMP_ENCODER
+    case d: DecimalType => AgnosticEncoders.ScalaDecimalEncoder(d)
+    case NullType       => NullEncoder
+    case _              => StringEncoder // fallback
 
 object UserDefinedFunction:
   /** Create a UserDefinedFunction. Used by inline udf() factory methods. */

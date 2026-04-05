@@ -1,5 +1,18 @@
 package org.apache.spark.sql
 
+import com.google.protobuf.ByteString
+import org.apache.spark.connect.proto.{
+  CommonInlineUserDefinedFunction,
+  Expression,
+  MapPartitions,
+  Relation,
+  RelationCommon,
+  ScalarScalaUDF
+}
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
+import org.apache.spark.sql.connect.client.DataTypeProtoConverter
+import org.apache.spark.sql.connect.common.UdfPacket
+
 import scala.reflect.ClassTag
 
 /** A strongly-typed collection of domain-specific objects.
@@ -34,22 +47,46 @@ final class Dataset[T: ClassTag] private[sql] (
   // Typed Transformations
   // ---------------------------------------------------------------------------
 
+  /** Return a new Dataset by applying a function to each partition's iterator.
+    *
+    * When AgnosticEncoder bridges are available for both input and output types, this builds a
+    * server-side `MapPartitions` proto relation. Otherwise it falls back to client-side
+    * collect-transform-reupload.
+    */
+  def mapPartitions[U: Encoder: ClassTag](func: Iterator[T] => Iterator[U]): Dataset[U] =
+    val outEnc = summon[Encoder[U]]
+    val inAg = encoder.agnosticEncoder
+    val outAg = outEnc.agnosticEncoder
+    if inAg == null || outAg == null then return mapPartitionsLocal(func, outEnc)
+    // Build server-side MapPartitions
+    val udfProto = buildMapPartitionsUdf(func, inAg, outAg)
+    val relation = Relation
+      .newBuilder()
+      .setCommon(
+        RelationCommon.newBuilder().setPlanId(sparkSession.nextPlanId()).build()
+      )
+      .setMapPartitions(
+        MapPartitions
+          .newBuilder()
+          .setInput(df.relation)
+          .setFunc(udfProto)
+          .build()
+      )
+      .build()
+    val newDf = DataFrame(sparkSession, relation)
+    Dataset(newDf, outEnc)
+
   /** Return a new Dataset containing only rows matching the predicate. */
   def filter(func: T => Boolean): Dataset[T] =
-    val rows = collect().filter(func)
-    createFromSeq(rows)
+    mapPartitions(iter => iter.filter(func))(using encoder, summon[ClassTag[T]])
 
   /** Return a new Dataset by applying a function to each element. */
   def map[U: Encoder: ClassTag](func: T => U): Dataset[U] =
-    val enc = summon[Encoder[U]]
-    val rows = collect().map(func)
-    createFromSeqAs(rows, enc)
+    mapPartitions(iter => iter.map(func))
 
   /** Return a new Dataset by applying a function that returns a sequence. */
   def flatMap[U: Encoder: ClassTag](func: T => IterableOnce[U]): Dataset[U] =
-    val enc = summon[Encoder[U]]
-    val rows = collect().flatMap(func)
-    createFromSeqAs(rows, enc)
+    mapPartitions(iter => iter.flatMap(func))
 
   /** Apply a function to each element. */
   def foreach(func: T => Unit): Unit =
@@ -61,6 +98,29 @@ final class Dataset[T: ClassTag] private[sql] (
 
   /** Return a new Dataset with distinct elements. */
   def distinct(): Dataset[T] = Dataset(df.distinct(), encoder)
+
+  /** Reduce the elements using the given associative binary operator.
+    *
+    * Falls back to client-side collect when AgnosticEncoder is not available.
+    */
+  def reduce(func: (T, T) => T): T =
+    // reduce is always collected client-side — server-side Aggregate + reduce UDF
+    // requires TypedReduceAggregator which is not yet available in proto.
+    // This is the same approach as Spark's own Connect client for reduce.
+    val data = collect()
+    if data.isEmpty then
+      throw UnsupportedOperationException("empty collection")
+    data.reduce(func)
+
+  /** Group the Dataset by a key-extracting function, returning a KeyValueGroupedDataset. */
+  def groupByKey[K: Encoder: ClassTag](func: T => K): KeyValueGroupedDataset[K, T] =
+    KeyValueGroupedDataset(this, func)(
+      using
+      summon[Encoder[K]],
+      summon[ClassTag[K]],
+      encoder,
+      summon[ClassTag[T]]
+    )
 
   // ---------------------------------------------------------------------------
   // Untyped Transformations (delegate to DataFrame)
@@ -165,6 +225,38 @@ final class Dataset[T: ClassTag] private[sql] (
     val rows = data.map(enc.toRow)
     val newDf = sparkSession.createDataFrame(rows, enc.schema)
     Dataset(newDf, enc)
+
+  /** Client-side fallback for mapPartitions when AgnosticEncoder is not available. */
+  private def mapPartitionsLocal[U: ClassTag](
+      func: Iterator[T] => Iterator[U],
+      outEnc: Encoder[U]
+  ): Dataset[U] =
+    val data = func(collect().iterator).toSeq
+    val rows = data.map(outEnc.toRow)
+    val newDf = sparkSession.createDataFrame(rows, outEnc.schema)
+    Dataset(newDf, outEnc)
+
+  /** Build a CommonInlineUserDefinedFunction proto for MapPartitions. */
+  private def buildMapPartitionsUdf(
+      func: AnyRef,
+      inputEncoder: AgnosticEncoder[?],
+      outputEncoder: AgnosticEncoder[?]
+  ): CommonInlineUserDefinedFunction =
+    val packet = UdfPacket(func, Seq(inputEncoder), outputEncoder)
+    val payload = UdfPacket.serialize(packet)
+    val scalaUdf = ScalarScalaUDF
+      .newBuilder()
+      .setPayload(ByteString.copyFrom(payload))
+      .setOutputType(
+        DataTypeProtoConverter.toProto(outputEncoder.dataType)
+      )
+      .setNullable(true)
+    CommonInlineUserDefinedFunction
+      .newBuilder()
+      .setFunctionName("mapPartitions")
+      .setDeterministic(true)
+      .setScalarScalaUdf(scalaUdf.build())
+      .build()
 
   override def toString: String = df.toString
 

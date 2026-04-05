@@ -1,5 +1,6 @@
 package org.apache.spark.sql
 
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
 import org.apache.spark.sql.types.*
 import scala.compiletime.*
 import scala.deriving.Mirror
@@ -19,6 +20,14 @@ trait Encoder[T]:
   /** Convert T to a Row. */
   def toRow(value: T): Row
 
+  /** The corresponding AgnosticEncoder for server-side typed operations.
+    *
+    * Returns `null` when no AgnosticEncoder is available (e.g. for derived case class encoders
+    * before ProductEncoder is implemented). Typed operations fall back to client-side
+    * implementation in this case.
+    */
+  def agnosticEncoder: AgnosticEncoder[?] = null
+
 object Encoder:
 
   // ---------------------------------------------------------------------------
@@ -29,41 +38,93 @@ object Encoder:
     def schema = StructType(Seq(StructField("value", IntegerType)))
     def fromRow(row: Row) = row.getInt(0)
     def toRow(value: Int) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.PrimitiveIntEncoder
 
   given Encoder[Long] with
     def schema = StructType(Seq(StructField("value", LongType)))
     def fromRow(row: Row) = row.getLong(0)
     def toRow(value: Long) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.PrimitiveLongEncoder
 
   given Encoder[Double] with
     def schema = StructType(Seq(StructField("value", DoubleType)))
     def fromRow(row: Row) = row.getDouble(0)
     def toRow(value: Double) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.PrimitiveDoubleEncoder
 
   given Encoder[Float] with
     def schema = StructType(Seq(StructField("value", FloatType)))
     def fromRow(row: Row) = row.getFloat(0)
     def toRow(value: Float) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.PrimitiveFloatEncoder
 
   given Encoder[Short] with
     def schema = StructType(Seq(StructField("value", ShortType)))
     def fromRow(row: Row) = row.getShort(0)
     def toRow(value: Short) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.PrimitiveShortEncoder
 
   given Encoder[Byte] with
     def schema = StructType(Seq(StructField("value", ByteType)))
     def fromRow(row: Row) = row.getByte(0)
     def toRow(value: Byte) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.PrimitiveByteEncoder
 
   given Encoder[Boolean] with
     def schema = StructType(Seq(StructField("value", BooleanType)))
     def fromRow(row: Row) = row.getBoolean(0)
     def toRow(value: Boolean) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.PrimitiveBooleanEncoder
 
   given Encoder[String] with
     def schema = StructType(Seq(StructField("value", StringType)))
     def fromRow(row: Row) = row.getString(0)
     def toRow(value: String) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.StringEncoder
+
+  // ---------------------------------------------------------------------------
+  // Extended Type Encoders (Date, Timestamp, Decimal, Binary, LocalDate, Instant)
+  // ---------------------------------------------------------------------------
+
+  given Encoder[java.sql.Date] with
+    def schema = StructType(Seq(StructField("value", DateType)))
+    def fromRow(row: Row) = row.get(0).asInstanceOf[java.sql.Date]
+    def toRow(value: java.sql.Date) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.STRICT_DATE_ENCODER
+
+  given Encoder[java.sql.Timestamp] with
+    def schema = StructType(Seq(StructField("value", TimestampType)))
+    def fromRow(row: Row) = row.get(0).asInstanceOf[java.sql.Timestamp]
+    def toRow(value: java.sql.Timestamp) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.STRICT_TIMESTAMP_ENCODER
+
+  given Encoder[java.time.LocalDate] with
+    def schema = StructType(Seq(StructField("value", DateType)))
+    def fromRow(row: Row) = row.get(0).asInstanceOf[java.time.LocalDate]
+    def toRow(value: java.time.LocalDate) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.STRICT_LOCAL_DATE_ENCODER
+
+  given Encoder[java.time.Instant] with
+    def schema = StructType(Seq(StructField("value", TimestampType)))
+    def fromRow(row: Row) = row.get(0).asInstanceOf[java.time.Instant]
+    def toRow(value: java.time.Instant) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.STRICT_INSTANT_ENCODER
+
+  given Encoder[BigDecimal] with
+    def schema = StructType(Seq(StructField("value", DecimalType.DEFAULT)))
+    def fromRow(row: Row) = row.get(0) match
+      case d: BigDecimal           => d
+      case d: java.math.BigDecimal => BigDecimal(d)
+      case n: Number               => BigDecimal(n.doubleValue())
+      case other                   => BigDecimal(other.toString)
+    def toRow(value: BigDecimal) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.DEFAULT_SCALA_DECIMAL_ENCODER
+
+  given Encoder[Array[Byte]] with
+    def schema = StructType(Seq(StructField("value", BinaryType)))
+    def fromRow(row: Row) = row.get(0).asInstanceOf[Array[Byte]]
+    def toRow(value: Array[Byte]) = Row(value)
+    override def agnosticEncoder = AgnosticEncoders.BinaryEncoder
 
   // ---------------------------------------------------------------------------
   // Scala type -> Spark DataType mapping (compile time)
@@ -72,20 +133,22 @@ object Encoder:
   /** Map a Scala type to its corresponding Spark DataType. */
   inline def sparkTypeOf[T]: DataType =
     inline erasedValue[T] match
-      case _: Boolean            => BooleanType
-      case _: Byte               => ByteType
-      case _: Short              => ShortType
-      case _: Int                => IntegerType
-      case _: Long               => LongType
-      case _: Float              => FloatType
-      case _: Double             => DoubleType
-      case _: String             => StringType
-      case _: BigDecimal         => DecimalType.DEFAULT
-      case _: java.sql.Date      => DateType
-      case _: java.sql.Timestamp => TimestampType
-      case _: Array[Byte]        => BinaryType
-      case _: Option[t]          => sparkTypeOf[t] // nullable wrapper
-      case _: Seq[t]             => ArrayType(sparkTypeOf[t], containsNull = true)
+      case _: Boolean             => BooleanType
+      case _: Byte                => ByteType
+      case _: Short               => ShortType
+      case _: Int                 => IntegerType
+      case _: Long                => LongType
+      case _: Float               => FloatType
+      case _: Double              => DoubleType
+      case _: String              => StringType
+      case _: BigDecimal          => DecimalType.DEFAULT
+      case _: java.sql.Date       => DateType
+      case _: java.sql.Timestamp  => TimestampType
+      case _: java.time.LocalDate => DateType
+      case _: java.time.Instant   => TimestampType
+      case _: Array[Byte]         => BinaryType
+      case _: Option[t]           => sparkTypeOf[t] // nullable wrapper
+      case _: Seq[t]              => ArrayType(sparkTypeOf[t], containsNull = true)
       case _: Map[k, v] => MapType(sparkTypeOf[k], sparkTypeOf[v], valueContainsNull = true)
 
   /** Check if a type is Option[_] at compile time. */
