@@ -19,7 +19,7 @@ This project provides that Scala 3 client.
 - **DataFrameReader / Writer** — read and write Parquet, JSON, CSV, ORC, text, and tables
 - **DataStreamReader / Writer** — structured streaming read / write with trigger support
 - **StreamingQuery / Manager** — streaming query lifecycle management
-- **Catalog** — listDatabases, listTables, listColumns, listFunctions, existence checks, cache management
+- **Catalog** — full Catalog API: list/get/create/drop databases, tables, views, functions; cache management; table properties; partitions; analyze/truncate
 - **UDF** — register and use JVM lambda UDFs (1–5 arguments)
 - **DataFrameNaFunctions** — drop / fill / replace null values
 - **DataFrameStatFunctions** — statistical functions (crosstab, freqItems, approxQuantile, etc.)
@@ -145,11 +145,23 @@ src/
 │       ├── DataFrameStatFunctions.scala # Statistical functions
 │       ├── StorageLevel.scala           # Cache storage levels
 │       ├── ArrowSerializer.scala        # Row → Arrow IPC encoding
+│       ├── KeyValueGroupedDataset.scala # Typed grouped operations
+│       ├── implicits.scala              # Implicit conversions
+│       ├── SparkException.scala         # Spark exception hierarchy
+│       ├── Artifact.scala               # Artifact management
 │       ├── types/DataType.scala         # Spark SQL type system
+│       ├── catalyst/encoders/
+│       │   └── AgnosticEncoder.scala    # Agnostic encoder definitions
 │       ├── connect/client/
 │       │   ├── SparkConnectClient.scala    # gRPC client
 │       │   ├── ArrowDeserializer.scala     # Arrow IPC → Row decoding
-│       │   └── DataTypeProtoConverter.scala # Proto ↔ DataType
+│       │   ├── DataTypeProtoConverter.scala # Proto ↔ DataType
+│       │   ├── ArtifactManager.scala       # Artifact upload/management
+│       │   ├── RetryPolicy.scala           # Retry policy definitions
+│       │   ├── GrpcRetryHandler.scala      # gRPC retry logic
+│       │   └── GrpcExceptionConverter.scala # gRPC → Spark exceptions
+│       ├── connect/common/
+│       │   └── UdfPacket.scala             # UDF serialization
 │       └── examples/
 │           └── QuickStart.scala         # End-to-end example
 └── test/
@@ -166,6 +178,10 @@ src/
         ├── StreamingQueryManagerSuite.scala
         ├── DataFrameStatFunctionsSuite.scala
         ├── UserDefinedFunctionSuite.scala
+        ├── CatalogSuite.scala
+        ├── DataFrameSuite.scala
+        ├── TypedOpsSuite.scala
+        ├── ExpandedEncoderSuite.scala
         ├── ImplicitsSuite.scala
         ├── IntegrationSuite.scala       # Requires running server
         └── connect/client/
@@ -215,6 +231,9 @@ src/
 ### Column Operators
 `===`, `=!=`, `>`, `>=`, `<`, `<=`, `&&`, `||`, `!`, `+`, `-`, `*`, `/`, `%`, `isNull`, `isNotNull`, `isNaN`, `contains`, `startsWith`, `endsWith`, `like`, `rlike`, `isin`, `between`, `substr`, `cast`, `alias`, `as`, `asc`, `desc`, `over`, `when`, `otherwise`, `getItem`, `getField`, `withField`, `dropFields`
 
+### Catalog
+`currentDatabase`, `setCurrentDatabase`, `currentCatalog`, `setCurrentCatalog`, `listDatabases`, `listTables`, `listColumns`, `listFunctions`, `listCatalogs`, `listCachedTables`, `listPartitions`, `listViews`, `getDatabase`, `getTable`, `getFunction`, `getTableProperties`, `getCreateTableString`, `databaseExists`, `tableExists`, `functionExists`, `isCached`, `cacheTable`, `uncacheTable`, `clearCache`, `createTable`, `createExternalTable`, `createDatabase`, `dropDatabase`, `dropTable`, `dropView`, `dropTempView`, `dropGlobalTempView`, `truncateTable`, `analyzeTable`, `refreshTable`, `refreshByPath`, `recoverPartitions`
+
 ### Functions
 130+ functions: aggregates, math, string, date/time, null handling, conditional, collection, map, JSON, regex, window — see [`functions.scala`](src/main/scala/org/apache/spark/sql/functions.scala) for the full list.
 
@@ -224,15 +243,15 @@ src/
 - [x] DataFrame / Dataset[T] API
 - [x] Column expressions + 130+ built-in functions
 - [x] DataFrameReader / Writer
-- [x] Catalog API
+- [x] Catalog API (full coverage — all 37 proto RPCs)
 - [x] Encoder derivation (Scala 3 `derives`)
 - [x] UDF support
 - [x] Structured Streaming
 - [x] Window functions
-- [x] Unit tests (150+ tests)
+- [x] Unit tests (310+ tests)
 - [x] Integration tests (Spark 4.0.2 / 4.1.1)
 - [ ] Publish to Maven Central
-- [ ] Error handling improvements (retry, exception conversion)
+- [x] Error handling (retry policies, gRPC exception conversion)
 - [ ] `foreach` / `foreachBatch` (requires ArtifactManager)
 - [ ] StreamingQueryListener
 

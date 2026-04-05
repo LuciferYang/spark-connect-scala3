@@ -285,6 +285,129 @@ class IntegrationSuite extends org.scalatest.funsuite.AnyFunSuite:
     println(s"Found ${rows.length} database(s)")
   }
 
+  test("catalog listTables") {
+    val tables = spark.catalog.listTables()
+    val rows = tables.collect()
+    // May be empty if no tables exist, but should not throw
+    println(s"Found ${rows.length} table(s) in default database")
+  }
+
+  test("catalog listFunctions") {
+    val funcs = spark.catalog.listFunctions()
+    val rows = funcs.collect()
+    assert(rows.nonEmpty, "Built-in functions should always be present")
+    println(s"Found ${rows.length} function(s)")
+  }
+
+  test("catalog listCatalogs") {
+    val catalogs = spark.catalog.listCatalogs()
+    val rows = catalogs.collect()
+    assert(rows.nonEmpty, "At least one catalog should exist")
+    println(s"Found ${rows.length} catalog(s)")
+  }
+
+  test("catalog currentDatabase and setCurrentDatabase") {
+    val original = spark.catalog.currentDatabase
+    assert(original.nonEmpty, "Current database should not be empty")
+    try
+      // Set to 'default' (always exists) and verify
+      spark.catalog.setCurrentDatabase("default")
+      assert(spark.catalog.currentDatabase == "default")
+    finally
+      // Restore original database
+      spark.catalog.setCurrentDatabase(original)
+  }
+
+  test("catalog currentCatalog") {
+    val catalog = spark.catalog.currentCatalog
+    assert(catalog.nonEmpty, "Current catalog should not be empty")
+    println(s"Current catalog: $catalog")
+  }
+
+  test("catalog tableExists") {
+    val exists = spark.catalog.tableExists("non_existent_table_12345")
+    assert(!exists, "Non-existent table should return false")
+  }
+
+  test("catalog functionExists") {
+    val exists = spark.catalog.functionExists("abs")
+    assert(exists, "Built-in function 'abs' should exist")
+
+    val notExists = spark.catalog.functionExists("non_existent_func_12345")
+    assert(!notExists, "Non-existent function should return false")
+  }
+
+  test("catalog databaseExists") {
+    val exists = spark.catalog.databaseExists("default")
+    assert(exists, "The 'default' database should always exist")
+
+    val notExists = spark.catalog.databaseExists("non_existent_db_12345")
+    assert(!notExists, "Non-existent database should return false")
+  }
+
+  test("catalog createTable and dropTable") {
+    val tableName = "test_catalog_create_table_integration"
+    val tempDir = java.nio.file.Files.createTempDirectory("spark_catalog_test")
+    try
+      // Write a simple parquet file so the table has data
+      spark.range(5).write.mode("overwrite").parquet(tempDir.toString)
+      spark.catalog.createTable(tableName, tempDir.toString, "parquet")
+      assert(spark.catalog.tableExists(tableName), "Table should exist after creation")
+    finally
+      spark.catalog.dropTable(tableName, ifExists = true)
+      // Clean up temp directory
+      java.nio.file.Files.walk(tempDir).sorted(java.util.Comparator.reverseOrder())
+        .forEach(java.nio.file.Files.deleteIfExists(_))
+  }
+
+  test("catalog listViews and dropTempView") {
+    val viewName = "test_catalog_temp_view_integration"
+    try
+      spark.range(3).createOrReplaceTempView(viewName)
+      val views = spark.catalog.listViews().collect()
+      assert(
+        views.exists(r => r.getString(0) == viewName),
+        s"Temp view '$viewName' should appear in listViews"
+      )
+      val dropped = spark.catalog.dropTempView(viewName)
+      assert(dropped, "dropTempView should return true for an existing view")
+    finally
+      // Ensure cleanup even if assertions fail midway
+      spark.catalog.dropTempView(viewName)
+  }
+
+  test("catalog cacheTable and isCached and uncacheTable") {
+    val viewName = "test_catalog_cache_integration"
+    try
+      spark.range(10).createOrReplaceTempView(viewName)
+      assert(!spark.catalog.isCached(viewName), "View should not be cached initially")
+
+      spark.catalog.cacheTable(viewName)
+      assert(spark.catalog.isCached(viewName), "View should be cached after cacheTable")
+
+      spark.catalog.uncacheTable(viewName)
+      assert(!spark.catalog.isCached(viewName), "View should not be cached after uncacheTable")
+    finally
+      spark.catalog.dropTempView(viewName)
+  }
+
+  test("catalog listCachedTables") {
+    val viewName = "test_catalog_list_cached_integration"
+    try
+      spark.range(5).createOrReplaceTempView(viewName)
+      spark.catalog.cacheTable(viewName)
+
+      val cached = spark.catalog.listCachedTables().collect()
+      assert(
+        cached.exists(r => r.getString(0) == viewName),
+        s"Cached view '$viewName' should appear in listCachedTables"
+      )
+    finally
+      try spark.catalog.uncacheTable(viewName)
+      catch case _: Exception => ()
+      spark.catalog.dropTempView(viewName)
+  }
+
   // ---------------------------------------------------------------------------
   // DataFrameNaFunctions
   // ---------------------------------------------------------------------------
