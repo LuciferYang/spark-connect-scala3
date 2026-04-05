@@ -12,7 +12,10 @@ import org.scalatest.matchers.should.Matchers
 class PlanCompressionSuite extends AnyFunSuite with Matchers:
 
   /** Create a client with overridden compression options (no real server). */
-  private def createTestClient(thresholdBytes: Int, algorithm: String = "ZSTD"): SparkConnectClient =
+  private def createTestClient(
+      thresholdBytes: Int,
+      algorithm: String = "ZSTD"
+  ): SparkConnectClient =
     // We can't create a real client without a server, so we'll test the proto construction directly.
     // Instead, we test the compression logic at the proto level.
     null // placeholder — see proto-level tests below
