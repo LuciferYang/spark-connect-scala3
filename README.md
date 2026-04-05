@@ -14,13 +14,13 @@ This project provides that Scala 3 client.
 - **DataFrame** — select, filter, groupBy, join, union, distinct, sort, limit, sample, and more
 - **Dataset[T]** — typed operations with compile-time `Encoder` derivation via `derives Encoder`
 - **Column** — arithmetic, comparison, logical, string, cast, alias, window, sort operators
-- **functions** — 130+ built-in SQL functions (aggregates, math, string, date/time, window, collection, JSON)
+- **functions** — 540+ built-in SQL functions (aggregates, math, string, date/time, window, collection, JSON, XML, URL, variant, datasketch, geospatial, and more)
 - **GroupedDataFrame** — groupBy / rollup / cube / pivot with agg, count, sum, avg, min, max
 - **DataFrameReader / Writer** — read and write Parquet, JSON, CSV, ORC, text, and tables
 - **DataStreamReader / Writer** — structured streaming read / write with trigger support
 - **StreamingQuery / Manager** — streaming query lifecycle management
 - **Catalog** — full Catalog API: list/get/create/drop databases, tables, views, functions; cache management; table properties; partitions; analyze/truncate
-- **UDF** — register and use JVM lambda UDFs (1–5 arguments)
+- **UDF** — register and use JVM lambda UDFs (0–10 arguments)
 - **DataFrameNaFunctions** — drop / fill / replace null values
 - **DataFrameStatFunctions** — statistical functions (crosstab, freqItems, approxQuantile, etc.)
 - **Window** — window specifications with partitionBy, orderBy, rowsBetween, rangeBetween
@@ -235,13 +235,13 @@ src/
 `currentDatabase`, `setCurrentDatabase`, `currentCatalog`, `setCurrentCatalog`, `listDatabases`, `listTables`, `listColumns`, `listFunctions`, `listCatalogs`, `listCachedTables`, `listPartitions`, `listViews`, `getDatabase`, `getTable`, `getFunction`, `getTableProperties`, `getCreateTableString`, `databaseExists`, `tableExists`, `functionExists`, `isCached`, `cacheTable`, `uncacheTable`, `clearCache`, `createTable`, `createExternalTable`, `createDatabase`, `dropDatabase`, `dropTable`, `dropView`, `dropTempView`, `dropGlobalTempView`, `truncateTable`, `analyzeTable`, `refreshTable`, `refreshByPath`, `recoverPartitions`
 
 ### Functions
-130+ functions: aggregates, math, string, date/time, null handling, conditional, collection, map, JSON, regex, window — see [`functions.scala`](src/main/scala/org/apache/spark/sql/functions.scala) for the full list.
+540+ functions: aggregates, math, string, date/time, null handling, conditional, collection, map, JSON, XML, URL, variant, regex, window, datasketch, geospatial — see [`functions.scala`](src/main/scala/org/apache/spark/sql/functions.scala) for the full list. See [API Gaps](docs/API-GAPS.md) for remaining gaps vs official Spark Connect.
 
 ## Roadmap
 
 - [x] SparkSession + gRPC client
 - [x] DataFrame / Dataset[T] API
-- [x] Column expressions + 130+ built-in functions
+- [x] Column expressions + 540+ built-in functions
 - [x] DataFrameReader / Writer
 - [x] Catalog API (full coverage — all 37 proto RPCs)
 - [x] Encoder derivation (Scala 3 `derives`)
@@ -252,6 +252,7 @@ src/
 - [x] Integration tests (Spark 4.0.2 / 4.1.1)
 - [ ] Publish to Maven Central
 - [x] Error handling (retry policies, gRPC exception conversion)
+- [ ] `udaf` — User-Defined Aggregate Function (requires Aggregator + Encoder serialization infrastructure, see [API Gaps](docs/API-GAPS.md))
 - [ ] `foreach` / `foreachBatch` (requires ArtifactManager)
 - [ ] StreamingQueryListener
 
