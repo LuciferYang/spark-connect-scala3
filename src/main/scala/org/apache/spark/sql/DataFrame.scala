@@ -577,6 +577,11 @@ final class DataFrame private[sql] (
 
   def write: DataFrameWriter = DataFrameWriter(this)
 
+  def writeTo(table: String): DataFrameWriterV2 = DataFrameWriterV2(table, this)
+
+  def mergeInto(table: String, condition: Column): MergeIntoWriter =
+    MergeIntoWriter(table, this, condition)
+
   def writeStream: DataStreamWriter = DataStreamWriter(this)
 
   /** Define a watermark on an event-time column for streaming aggregations. */

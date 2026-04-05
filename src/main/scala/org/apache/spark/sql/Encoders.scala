@@ -134,7 +134,7 @@ object Encoders:
     enc match
       case w: AgnosticEncoderWrapper[?] => w.underlying
       case ae: AgnosticEncoder[?]       => ae
-      case other =>
+      case other                        =>
         val ae = other.agnosticEncoder
         require(ae != null, s"Encoder does not provide AgnosticEncoder: $other")
         ae

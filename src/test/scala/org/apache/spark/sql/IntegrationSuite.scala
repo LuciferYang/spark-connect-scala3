@@ -611,3 +611,33 @@ class IntegrationSuite extends org.scalatest.funsuite.AnyFunSuite:
     assert(result(1).getString(0) == "B")
     assert(result(1).getLong(1) == 30L)
   }
+
+  // ---------------------------------------------------------------------------
+  // DataFrameWriterV2
+  // ---------------------------------------------------------------------------
+
+  // Note: Full V2 write/merge integration tests require a V2 catalog (e.g., Delta, Iceberg).
+  // Unit tests in DataFrameWriterV2Suite and MergeIntoWriterSuite verify proto construction.
+
+  test("writeTo returns DataFrameWriterV2 and fluent API works") {
+    val df = spark.range(5)
+    val writer = df.writeTo("any_table")
+      .using("parquet")
+      .option("key", "value")
+      .tableProperty("prop", "val")
+    assert(writer != null)
+  }
+
+  // ---------------------------------------------------------------------------
+  // MergeIntoWriter
+  // ---------------------------------------------------------------------------
+
+  test("mergeInto returns MergeIntoWriter with full fluent chain") {
+    val source = spark.range(5).select(col("id"), lit("name").as("name"))
+    val writer = source.mergeInto("some_table", col("id") === col("id"))
+      .whenMatched().updateAll()
+      .whenNotMatched().insertAll()
+      .whenNotMatchedBySource().delete()
+      .withSchemaEvolution()
+    assert(writer != null)
+  }
