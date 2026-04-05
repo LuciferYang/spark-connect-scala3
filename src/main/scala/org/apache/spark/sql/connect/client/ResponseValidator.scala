@@ -62,7 +62,7 @@ class ResponseValidator:
       val value = msg.getField(fd)
       value match
         case s: String if s.nonEmpty => Some(s)
-        case _ => None
+        case _                       => None
     else None
 
   private def isSessionChanged(e: StatusRuntimeException): Boolean =

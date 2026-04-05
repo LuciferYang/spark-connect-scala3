@@ -10,8 +10,8 @@ import scala.util.control.NonFatal
   * When a cached relation is garbage-collected on the client, the cleaner sends a
   * [[RemoveCachedRemoteRelationCommand]] to the server to release the corresponding resources.
   *
-  * Uses `java.lang.ref.Cleaner` (JDK 9+). The cleaning action captures only the `relationId`
-  * string (not the relation object itself) to avoid preventing GC.
+  * Uses `java.lang.ref.Cleaner` (JDK 9+). The cleaning action captures only the `relationId` string
+  * (not the relation object itself) to avoid preventing GC.
   */
 class SessionCleaner(session: SparkSession):
 

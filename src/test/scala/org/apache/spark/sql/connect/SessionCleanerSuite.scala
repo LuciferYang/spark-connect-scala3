@@ -1,6 +1,8 @@
 package org.apache.spark.sql.connect
 
-import org.apache.spark.connect.proto.{CachedRemoteRelation, Command, RemoveCachedRemoteRelationCommand}
+import org.apache.spark.connect.proto.{
+  CachedRemoteRelation, Command, RemoveCachedRemoteRelationCommand
+}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
