@@ -10,95 +10,37 @@ Last updated: 2026-04-05
 | Metric | Count |
 |--------|-------|
 | Official `functions.scala` unique function names | 542 |
-| SC3 `functions.scala` unique function names | 541 |
-| Coverage | **99.8%** |
+| SC3 `functions.scala` unique function names | 542 |
+| Coverage | **100%** |
 
 ## Remaining Gaps
 
-### 1. `udaf` — User-Defined Aggregate Function
+### Functions
 
-**Status**: Not implemented
-**Difficulty**: High — requires 5 missing infrastructure components
-**Priority**: Medium (niche use case, but part of public API)
+**All 542 official functions are covered.** No function-level gaps remain.
 
-#### What `udaf` Does
+### Structural Gaps (Not Function Gaps)
 
-`udaf` converts a user-defined `Aggregator[IN, BUF, OUT]` object into a `Column` expression
-that can be used in `groupBy(...).agg(...)`. The official implementation:
+These are deeper infrastructure differences that don't affect function coverage:
 
-1. Takes an `Aggregator[IN, BUF, OUT]` instance
-2. Serializes the `Aggregator` + its `Encoder`s to bytes via Java serialization
-3. Wraps the bytes in a `ScalarScalaUDF` proto message
-4. Sends the proto as a `TypedAggregateExpression` to the Spark Connect server
-5. The server deserializes and executes the aggregation
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| `Aggregator.toColumn` | Requires `TypedColumn` + `InvokeInlineUserDefinedFunction` column node layer | Low — typed Dataset path, niche use |
+| `foreach` / `foreachBatch` | Requires ArtifactManager-based serialization of user closures | Medium |
+| `StreamingQueryListener` | Requires server-side listener registration | Low |
 
-#### Required Infrastructure (5 components)
+### UDAF Limitations
 
-Each component builds on the previous:
+The `udaf` function is fully implemented and supports:
+- `Aggregator[IN, BUF, OUT]` with primitive/boxed/string/binary/date/timestamp/decimal types
+- Tuple buffer encoders via `Encoders.tuple(e1, e2, ...)`
+- Case class encoders via `Encoders.product[T]`
+- Registration via `spark.udf.register("name", udaf(agg, enc))`
+- SQL usage after registration
 
-```
-udaf() function
-  └── Aggregator[IN, BUF, OUT] trait
-        └── Encoder[T] (full serialization, not just type inference)
-              └── ExpressionEncoder[T]
-                    └── Catalyst expression tree serialization
-                          └── JVM object serialization for ScalarScalaUDF.payload
-```
-
-| # | Component | Description | Official Location | SC3 Status |
-|---|-----------|-------------|-------------------|------------|
-| 1 | **`Aggregator[IN, BUF, OUT]`** | Abstract class defining `zero`, `reduce`, `merge`, `finish`, `bufferEncoder`, `outputEncoder` | `sql/api: o.a.s.sql.expressions.Aggregator` | Missing |
-| 2 | **`Encoder[T]` (serialization)** | Full encoder that can serialize/deserialize JVM objects to Spark's internal row format. SC3 currently has `Encoder` but only for `sparkTypeOf` (type inference), not actual serde. | `sql/api: o.a.s.sql.Encoder` | Partial — type inference only |
-| 3 | **`ExpressionEncoder[T]`** | Concrete `Encoder` implementation using Catalyst expression trees for encoding/decoding. This is the core serialization mechanism. | `sql/catalyst: o.a.s.sql.catalyst.encoders.ExpressionEncoder` | Missing |
-| 4 | **Catalyst expression tree serde** | Serialization of Catalyst `Expression` nodes used by `ExpressionEncoder`. Needed to build the `ScalarScalaUDF` payload. | `sql/catalyst: o.a.s.sql.catalyst.expressions.*` | Missing |
-| 5 | **`UdfPacket` / JVM serialization** | Java serialization of the `Aggregator` + encoder objects into `bytes` for the `ScalarScalaUDF.payload` proto field. SC3 has `UdfPacket` for simple UDFs but not for aggregators. | `sql/connect/common: UdfPacket` | Partial — UDF only, no aggregator |
-
-#### Proto Support
-
-The proto definition already exists in SC3:
-
-```protobuf
-// expressions.proto
-message TypedAggregateExpression {
-  ScalarScalaUDF scalar_scala_udf = 1;
-}
-
-message ScalarScalaUDF {
-  bytes payload = 1;           // Serialized Aggregator + Encoders
-  repeated DataType inputTypes = 2;
-  DataType outputType = 3;
-  bool nullable = 4;
-  bool aggregate = 5;          // Set to true for udaf
-}
-```
-
-The proto infrastructure is ready. The missing piece is the client-side Scala code to
-populate `ScalarScalaUDF.payload` with a serialized `Aggregator`.
-
-#### Implementation Path
-
-A phased approach to implementing `udaf`:
-
-**Phase 1: `Aggregator` trait** (standalone, no dependencies)
-- Port `o.a.s.sql.expressions.Aggregator` abstract class
-- Define `zero`, `reduce`, `merge`, `finish`, `bufferEncoder`, `outputEncoder`
-- Adapt for Scala 3 (use `derives Encoder` instead of implicit `Encoder`)
-
-**Phase 2: Extend `Encoder` with serialization**
-- Extend the existing SC3 `Encoder[T]` to support actual serialization
-- This is the hardest part — `ExpressionEncoder` depends on Catalyst internals
-- Alternative: implement a simplified serialization using Arrow or Java serialization
-  directly, bypassing `ExpressionEncoder`
-
-**Phase 3: `udaf` function + serialization**
-- Serialize `Aggregator` + encoders into `ScalarScalaUDF.payload`
-- Build `TypedAggregateExpression` proto
-- Wire into `functions.udaf()`
-
-**Alternative approach**: Instead of porting the full `ExpressionEncoder` stack, investigate
-whether the Spark Connect server can accept a simpler serialization format. The server
-already deserializes `UdfPacket` for simple UDFs — extending that mechanism to aggregators
-may be feasible with less infrastructure.
+Not supported:
+- `Aggregator.toColumn` (typed Dataset path — requires `TypedColumn`)
+- `ClosureCleaner` (SC3 UDFs also skip this, consistent behavior)
 
 ## Naming Differences (Not Functional Gaps)
 
@@ -111,15 +53,16 @@ These are internal helper methods with different names but equivalent functional
 | — | `callInternalFn` (private) | SC3 helper for internal functions (`is_internal=true`) |
 | — | `lambdaVar` (private) | SC3 helper for lambda variable creation |
 
-## Resolved Gaps (Completed 2026-04-05)
+## Resolved Gaps
 
 The following gaps were identified and resolved:
 
-| Function | Resolution |
-|----------|-----------|
-| `approxCountDistinct` (2 overloads) | Added as deprecated alias for `approx_count_distinct` |
-| `monotonicallyIncreasingId` | Added as deprecated alias for `monotonically_increasing_id` |
-| `typedlit` | Added as alias for `typedLit` |
-| `unwrap_udt` | Added with `callInternalFn` helper (`is_internal=true`) |
-| `udf` (Function0, Function6–Function10) | Extended from Function1–5 to Function0–10 |
-| ~250 functions (Batch 1+2) | Added across all categories: aggregate, datetime, string, math, collection, JSON, XML, URL, variant, conditional, misc, hash, bitwise, partition transform, datasketch, geospatial |
+| Function | Resolution | Date |
+|----------|-----------|------|
+| `udaf` (2 overloads) | Implemented via `Aggregator` + `Encoders` factory + `UserDefinedFunction.forAggregator` | 2026-04-05 |
+| `approxCountDistinct` (2 overloads) | Added as deprecated alias for `approx_count_distinct` | 2026-04-05 |
+| `monotonicallyIncreasingId` | Added as deprecated alias for `monotonically_increasing_id` | 2026-04-05 |
+| `typedlit` | Added as alias for `typedLit` | 2026-04-05 |
+| `unwrap_udt` | Added with `callInternalFn` helper (`is_internal=true`) | 2026-04-05 |
+| `udf` (Function0, Function6–Function10) | Extended from Function1–5 to Function0–10 | 2026-04-05 |
+| ~250 functions (Batch 1+2) | Added across all categories: aggregate, datetime, string, math, collection, JSON, XML, URL, variant, conditional, misc, hash, bitwise, partition transform, datasketch, geospatial | 2026-04-05 |
