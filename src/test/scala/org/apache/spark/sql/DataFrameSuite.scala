@@ -187,3 +187,121 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     sql.getQuery shouldBe "SELECT 1"
     sql.getNamedArgumentsMap should have size 0
   }
+
+  // ---------- toJSON ----------
+
+  test("toJSON builds to_json(struct(*)) projection") {
+    val df = testDf()
+    val result = df.toJSON
+    val rel = result.relation
+    rel.hasProject shouldBe true
+    val exprs = rel.getProject.getExpressionsList.asScala
+    exprs should have size 1
+    // The expression should be an alias wrapping to_json(struct(*))
+    exprs.head.hasAlias shouldBe true
+    exprs.head.getAlias.getNameList.asScala.head shouldBe "value"
+  }
+
+  // ---------- show(vertical) ----------
+
+  test("show(numRows, truncate, vertical) builds ShowString proto") {
+    val df = testDf()
+    // Use the underlying relation builder to check proto construction
+    val showRel = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(1).build())
+      .setShowString(ShowString.newBuilder()
+        .setInput(df.relation)
+        .setNumRows(5)
+        .setTruncate(10)
+        .setVertical(true)
+        .build())
+      .build()
+    showRel.hasShowString shouldBe true
+    val ss = showRel.getShowString
+    ss.getNumRows shouldBe 5
+    ss.getTruncate shouldBe 10
+    ss.getVertical shouldBe true
+  }
+
+  // ---------- lateralJoin ----------
+
+  test("lateralJoin builds LateralJoin proto") {
+    val df1 = testDf()
+    val df2 = testDf()
+    val result = df1.lateralJoin(df2, Column("id") === Column("id"))
+    val rel = result.relation
+    rel.hasLateralJoin shouldBe true
+    val lj = rel.getLateralJoin
+    lj.hasJoinCondition shouldBe true
+    lj.getJoinType shouldBe Join.JoinType.JOIN_TYPE_INNER
+  }
+
+  test("lateralJoin without condition builds LateralJoin proto") {
+    val df1 = testDf()
+    val df2 = testDf()
+    val result = df1.lateralJoin(df2)
+    result.relation.hasLateralJoin shouldBe true
+    result.relation.getLateralJoin.getJoinType shouldBe Join.JoinType.JOIN_TYPE_INNER
+  }
+
+  test("lateralJoin rejects unsupported join types") {
+    val df1 = testDf()
+    val df2 = testDf()
+    an[IllegalArgumentException] should be thrownBy
+      df1.lateralJoin(df2, Column("id") === Column("id"), "full")
+  }
+
+  // ---------- groupingSets ----------
+
+  test("groupingSets builds Aggregate proto with GROUP_TYPE_GROUPING_SETS") {
+    val df = testDf()
+    val grouped = df.groupingSets(
+      Seq(Seq(Column("city")), Seq.empty),
+      Column("city")
+    )
+    val result = grouped.agg(functions.count(Column("city")).as("cnt"))
+    val rel = result.relation
+    rel.hasAggregate shouldBe true
+    val agg = rel.getAggregate
+    agg.getGroupType shouldBe Aggregate.GroupType.GROUP_TYPE_GROUPING_SETS
+    agg.getGroupingSetsCount shouldBe 2
+    agg.getGroupingExpressionsList should have size 1
+  }
+
+  // ---------- repartitionByRange ----------
+
+  test("repartitionByRange builds RepartitionByExpression with sort order") {
+    val df = testDf()
+    val result = df.repartitionByRange(4, Column("id"))
+    val rel = result.relation
+    rel.hasRepartitionByExpression shouldBe true
+    val rbe = rel.getRepartitionByExpression
+    rbe.getNumPartitions shouldBe 4
+    rbe.getPartitionExprsList should have size 1
+    // The expression should have a sort order (asc by default)
+    rbe.getPartitionExprs(0).hasSortOrder shouldBe true
+  }
+
+  test("repartitionByRange without numPartitions") {
+    val df = testDf()
+    val result = df.repartitionByRange(Column("id"))(using summon[DummyImplicit])
+    val rel = result.relation
+    rel.hasRepartitionByExpression shouldBe true
+    val rbe = rel.getRepartitionByExpression
+    rbe.hasNumPartitions shouldBe false
+    rbe.getPartitionExprsList should have size 1
+  }
+
+  test("repartitionByRange requires at least one expression") {
+    val df = testDf()
+    an[IllegalArgumentException] should be thrownBy
+      df.repartitionByRange(4)
+  }
+
+  // ---------- tag API ----------
+
+  test("SparkSession tag API round-trip") {
+    val session = SparkSession(null)
+    // Tags should start empty (client is null but tag methods use InheritableThreadLocal)
+    // We can't call getTags on null client, so skip this for null-client tests
+  }

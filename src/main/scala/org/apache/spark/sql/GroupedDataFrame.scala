@@ -8,7 +8,8 @@ import org.apache.spark.connect.proto.*
 final class GroupedDataFrame private[sql] (
     private val df: DataFrame,
     private val groupingExprs: Seq[Column],
-    private val groupType: GroupedDataFrame.GroupType
+    private val groupType: GroupedDataFrame.GroupType,
+    private val groupingSetsProto: Option[Seq[Aggregate.GroupingSets]] = None
 ):
 
   def agg(aggExpr: Column, aggExprs: Column*): DataFrame =
@@ -16,12 +17,15 @@ final class GroupedDataFrame private[sql] (
     val aggBuilder = Aggregate.newBuilder()
       .setInput(df.relation)
       .setGroupType(groupType match
-        case GroupedDataFrame.GroupType.GroupBy => Aggregate.GroupType.GROUP_TYPE_GROUPBY
-        case GroupedDataFrame.GroupType.Rollup  => Aggregate.GroupType.GROUP_TYPE_ROLLUP
-        case GroupedDataFrame.GroupType.Cube    => Aggregate.GroupType.GROUP_TYPE_CUBE
-        case GroupedDataFrame.GroupType.Pivot   => Aggregate.GroupType.GROUP_TYPE_PIVOT)
+        case GroupedDataFrame.GroupType.GroupBy      => Aggregate.GroupType.GROUP_TYPE_GROUPBY
+        case GroupedDataFrame.GroupType.Rollup       => Aggregate.GroupType.GROUP_TYPE_ROLLUP
+        case GroupedDataFrame.GroupType.Cube         => Aggregate.GroupType.GROUP_TYPE_CUBE
+        case GroupedDataFrame.GroupType.Pivot        => Aggregate.GroupType.GROUP_TYPE_PIVOT
+        case GroupedDataFrame.GroupType.GroupingSets =>
+          Aggregate.GroupType.GROUP_TYPE_GROUPING_SETS)
     groupingExprs.foreach(c => aggBuilder.addGroupingExpressions(c.expr))
     allAggs.foreach(c => aggBuilder.addAggregateExpressions(c.expr))
+    groupingSetsProto.foreach(_.foreach(gs => aggBuilder.addGroupingSets(gs)))
     DataFrame(
       df.session,
       Relation.newBuilder()
@@ -80,7 +84,7 @@ final class GroupedDataFrame private[sql] (
 
 object GroupedDataFrame:
   enum GroupType:
-    case GroupBy, Rollup, Cube, Pivot
+    case GroupBy, Rollup, Cube, Pivot, GroupingSets
 
   private[sql] def apply(
       df: DataFrame,
@@ -88,3 +92,11 @@ object GroupedDataFrame:
       groupType: GroupType
   ): GroupedDataFrame =
     new GroupedDataFrame(df, groupingExprs, groupType)
+
+  private[sql] def apply(
+      df: DataFrame,
+      groupingExprs: Seq[Column],
+      groupType: GroupType,
+      groupingSetsProto: Option[Seq[Aggregate.GroupingSets]]
+  ): GroupedDataFrame =
+    new GroupedDataFrame(df, groupingExprs, groupType, groupingSetsProto)

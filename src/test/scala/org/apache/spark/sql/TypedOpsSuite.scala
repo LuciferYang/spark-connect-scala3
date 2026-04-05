@@ -193,3 +193,23 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     classOf[java.util.Iterator[?]].isAssignableFrom(retType) ||
     classOf[AutoCloseable].isAssignableFrom(retType) shouldBe true
   }
+
+  // ---------------------------------------------------------------------------
+  // Dataset.toJSON tests
+  // ---------------------------------------------------------------------------
+
+  test("Dataset.toJSON returns Dataset[String]") {
+    val ds = testDataset[Long]()
+    val jsonDs = ds.toJSON
+    jsonDs.encoder should not be null
+    jsonDs.encoder.schema.fields.head.name shouldBe "value"
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dataset.show(vertical) tests
+  // ---------------------------------------------------------------------------
+
+  test("Dataset has show(numRows, truncate, vertical) method") {
+    val method = classOf[Dataset[?]].getMethod("show", classOf[Int], classOf[Int], classOf[Boolean])
+    method should not be null
+  }

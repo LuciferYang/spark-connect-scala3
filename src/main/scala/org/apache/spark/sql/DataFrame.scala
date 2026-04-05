@@ -247,19 +247,9 @@ final class DataFrame private[sql] (
       .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
       .setTail(Tail.newBuilder().setInput(relation).setLimit(n).build())
       .build()
-    val plan = Plan.newBuilder().setRoot(tailRel).build()
-    val responses = client.execute(plan)
-    try
-      val rows = mutable.ArrayBuffer.empty[Row]
-      responses.foreach { resp =>
-        if resp.hasArrowBatch then
-          rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
-      }
-      rows.toArray
-    finally
-      (responses: Any) match
-        case c: AutoCloseable => c.close()
-        case _                => ()
+    val (rows, observed) = executeAndCollect(tailRel)
+    if observed.nonEmpty then session.processObservedMetrics(observed)
+    rows
 
   /** Pipeline-style transformation. */
   def transform(f: DataFrame => DataFrame): DataFrame = f(this)
@@ -345,6 +335,52 @@ final class DataFrame private[sql] (
   // ---------------------------------------------------------------------------
   // Advanced Transformations
   // ---------------------------------------------------------------------------
+
+  /** Lateral join — only inner, left outer, and cross joins are supported. */
+  def lateralJoin(right: DataFrame, condition: Column, joinType: String = "inner"): DataFrame =
+    val jt = toJoinType(joinType)
+    jt match
+      case Join.JoinType.JOIN_TYPE_INNER | Join.JoinType.JOIN_TYPE_LEFT_OUTER |
+          Join.JoinType.JOIN_TYPE_CROSS => // ok
+      case _ => throw IllegalArgumentException(
+          s"Unsupported lateral join type: $joinType. Only inner, left, and cross are supported."
+        )
+    val builder = LateralJoin.newBuilder()
+      .setLeft(relation).setRight(right.relation)
+      .setJoinCondition(condition.expr).setJoinType(jt)
+    withRelation(_.setLateralJoin(builder.build()))
+
+  /** Lateral join without condition (defaults to inner). */
+  def lateralJoin(right: DataFrame): DataFrame =
+    withRelation(_.setLateralJoin(LateralJoin.newBuilder()
+      .setLeft(relation).setRight(right.relation)
+      .setJoinType(Join.JoinType.JOIN_TYPE_INNER).build()))
+
+  /** Group by grouping sets. */
+  def groupingSets(groupingSets: Seq[Seq[Column]], cols: Column*): GroupedDataFrame =
+    val gsProtos = groupingSets.map { gs =>
+      val b = Aggregate.GroupingSets.newBuilder()
+      gs.foreach(c => b.addGroupingSet(c.expr))
+      b.build()
+    }
+    GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.GroupingSets, Some(gsProtos))
+
+  /** Repartition by range using the given partition expressions. */
+  def repartitionByRange(numPartitions: Int, partitionExprs: Column*): DataFrame =
+    require(partitionExprs.nonEmpty, "At least one partition expression is required.")
+    val sortExprs = partitionExprs.map(c => if c.expr.hasSortOrder then c else c.asc)
+    val builder =
+      RepartitionByExpression.newBuilder().setInput(relation).setNumPartitions(numPartitions)
+    sortExprs.foreach(c => builder.addPartitionExprs(c.expr))
+    withRelation(_.setRepartitionByExpression(builder.build()))
+
+  /** Repartition by range with default partition count. */
+  def repartitionByRange(partitionExprs: Column*)(using DummyImplicit): DataFrame =
+    require(partitionExprs.nonEmpty, "At least one partition expression is required.")
+    val sortExprs = partitionExprs.map(c => if c.expr.hasSortOrder then c else c.asc)
+    val builder = RepartitionByExpression.newBuilder().setInput(relation)
+    sortExprs.foreach(c => builder.addPartitionExprs(c.expr))
+    withRelation(_.setRepartitionByExpression(builder.build()))
 
   /** Unpivot a DataFrame from wide to long format. */
   def unpivot(
@@ -481,38 +517,21 @@ final class DataFrame private[sql] (
     }
 
   // ---------------------------------------------------------------------------
+  // Output Format
+  // ---------------------------------------------------------------------------
+
+  /** Return a DataFrame with each row converted to a JSON string. */
+  def toJSON: DataFrame =
+    select(functions.to_json(functions.struct(Column("*"))).as("value"))
+
+  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
   def collect(): Array[Row] =
-    val plan = Plan.newBuilder().setRoot(relation).build()
-    val responses = client.execute(plan)
-    try
-      val rows = mutable.ArrayBuffer.empty[Row]
-      val observedMetrics = mutable.ArrayBuffer.empty[(Long, Row)]
-      responses.foreach { resp =>
-        if resp.hasArrowBatch then
-          rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
-        // Process observed metrics from the response
-        resp.getObservedMetricsList.asScala.foreach { om =>
-          val keys = om.getKeysList.asScala.toSeq
-          val values =
-            om.getValuesList.asScala.map(LiteralValueProtoConverter.toScalaValue).toSeq
-          val schema = StructType(
-            keys.zip(om.getValuesList.asScala).map { (key, lit) =>
-              StructField(key, LiteralValueProtoConverter.toDataType(lit))
-            }.toSeq
-          )
-          val row = Row.fromSeqWithSchema(values, schema)
-          observedMetrics += ((om.getPlanId, row))
-        }
-      }
-      if observedMetrics.nonEmpty then session.processObservedMetrics(observedMetrics.toSeq)
-      rows.toArray
-    finally
-      (responses: Any) match
-        case c: AutoCloseable => c.close()
-        case _                => ()
+    val (rows, observed) = executeAndCollect(relation)
+    if observed.nonEmpty then session.processObservedMetrics(observed)
+    rows
 
   def count(): Long =
     import functions.{count as countFn, lit}
@@ -525,13 +544,40 @@ final class DataFrame private[sql] (
   def take(n: Int): Array[Row] = head(n)
 
   def show(numRows: Int = 20, truncate: Int = 20): Unit =
-    val schemaOpt = schemaInternal()
-    val rows = limit(numRows).collect()
-    val colNames = schemaOpt.map(_.fieldNames.toSeq).getOrElse(
-      if rows.nonEmpty then (0 until rows.head.size).map(i => s"col$i").toSeq
-      else Seq.empty
-    )
-    printTable(colNames, rows, truncate)
+    show(numRows, truncate, vertical = false)
+
+  /** Display the first numRows rows of this DataFrame.
+    *
+    * @param numRows
+    *   number of rows to show
+    * @param truncate
+    *   max width of each column (0 = no truncation)
+    * @param vertical
+    *   if true, display in vertical format (one line per column value)
+    */
+  def show(numRows: Int, truncate: Int, vertical: Boolean): Unit =
+    val showRel = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+      .setShowString(ShowString.newBuilder()
+        .setInput(relation)
+        .setNumRows(numRows)
+        .setTruncate(truncate)
+        .setVertical(vertical)
+        .build())
+      .build()
+    val plan = Plan.newBuilder().setRoot(showRel).build()
+    val responses = client.execute(plan)
+    try
+      responses.foreach { resp =>
+        if resp.hasArrowBatch then
+          ArrowDeserializer
+            .fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
+            .foreach(row => print(row.get(0)))
+      }
+    finally
+      (responses: Any) match
+        case c: AutoCloseable => c.close()
+        case _                => ()
 
   def printSchema(): Unit =
     val s = schema
@@ -700,6 +746,35 @@ final class DataFrame private[sql] (
   // Helpers
   // ---------------------------------------------------------------------------
 
+  /** Execute a relation and collect rows + observed metrics. */
+  private[sql] def executeAndCollect(rel: Relation): (Array[Row], Seq[(Long, Row)]) =
+    val plan = Plan.newBuilder().setRoot(rel).build()
+    val responses = client.execute(plan)
+    try
+      val rows = mutable.ArrayBuffer.empty[Row]
+      val observedMetrics = mutable.ArrayBuffer.empty[(Long, Row)]
+      responses.foreach { resp =>
+        if resp.hasArrowBatch then
+          rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
+        resp.getObservedMetricsList.asScala.foreach { om =>
+          val keys = om.getKeysList.asScala.toSeq
+          val values =
+            om.getValuesList.asScala.map(LiteralValueProtoConverter.toScalaValue).toSeq
+          val schema = StructType(
+            keys.zip(om.getValuesList.asScala).map { (key, lit) =>
+              StructField(key, LiteralValueProtoConverter.toDataType(lit))
+            }.toSeq
+          )
+          val row = Row.fromSeqWithSchema(values, schema)
+          observedMetrics += ((om.getPlanId, row))
+        }
+      }
+      (rows.toArray, observedMetrics.toSeq)
+    finally
+      (responses: Any) match
+        case c: AutoCloseable => c.close()
+        case _                => ()
+
   /** Resolve schema from the server. */
   private def schemaInternal(): Option[StructType] =
     val plan = Plan.newBuilder().setRoot(relation).build()
@@ -743,32 +818,6 @@ final class DataFrame private[sql] (
       case "semi" | "leftsemi"            => Join.JoinType.JOIN_TYPE_LEFT_SEMI
       case "anti" | "leftanti"            => Join.JoinType.JOIN_TYPE_LEFT_ANTI
       case _                              => Join.JoinType.JOIN_TYPE_INNER
-
-  private def printTable(colNames: Seq[String], rows: Array[Row], truncate: Int): Unit =
-    if colNames.isEmpty && rows.isEmpty then
-      println("(empty DataFrame)")
-      return
-
-    def truncStr(s: String): String =
-      if s.length > truncate then s.take(truncate - 3) + "..." else s
-
-    val allRows: Seq[Seq[String]] = colNames.map(truncStr) +: rows.map { row =>
-      (0 until row.size).map { i =>
-        val v = row.get(i)
-        truncStr(if v == null then "null" else v.toString)
-      }.toSeq
-    }.toSeq
-
-    val widths = allRows.transpose.map(col => col.map(_.length).max)
-    val sep = widths.map("-" * _).mkString("+", "+", "+")
-    def fmtRow(row: Seq[String]): String =
-      row.zip(widths).map((s, w) => s.padTo(w, ' ')).mkString("|", "|", "|")
-
-    println(sep)
-    println(fmtRow(allRows.head))
-    println(sep)
-    allRows.tail.foreach(r => println(fmtRow(r)))
-    println(sep)
 
 object DataFrame:
   private[sql] def apply(session: SparkSession, relation: Relation): DataFrame =

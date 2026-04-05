@@ -239,6 +239,14 @@ final class Dataset[T: ClassTag] private[sql] (
   /** Show the first numRows. */
   def show(numRows: Int = 20, truncate: Int = 20): Unit = df.show(numRows, truncate)
 
+  /** Show the first numRows with optional vertical format. */
+  def show(numRows: Int, truncate: Int, vertical: Boolean): Unit =
+    df.show(numRows, truncate, vertical)
+
+  /** Return a Dataset[String] with each row converted to a JSON string. */
+  def toJSON: Dataset[String] =
+    Dataset(df.toJSON, summon[Encoder[String]])
+
   def isEmpty: Boolean = df.isEmpty
 
   /** Return a `java.util.Iterator` that iterates typed elements lazily.

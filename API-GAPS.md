@@ -37,46 +37,18 @@ These features have been implemented:
 | `toLocalIterator` | — | Lazy streaming `java.util.Iterator` on both `DataFrame` and `Dataset` |
 | `newSession()` | — | Creates independent session sharing same server endpoint |
 | `FetchErrorDetails` RPC | — | Enriched error details with exception chain, server stack traces, and message parameters |
+| Operation Tags + Interruption | — | `addTag`/`removeTag`/`getTags`/`clearTags` + `interruptAll`/`interruptTag`/`interruptOperation` |
+| `toJSON` | — | `DataFrame.toJSON` / `Dataset.toJSON` via `to_json(struct(*))` |
+| `show(vertical)` | — | `show(numRows, truncate, vertical)` using server-side `ShowString` proto |
+| `lateralJoin` | — | `DataFrame.lateralJoin` supporting inner/left/cross join types |
+| `groupingSets` | — | `DataFrame.groupingSets` via `Aggregate.GroupingSets` proto |
+| `repartitionByRange` | — | Range-based repartitioning with sort-order expressions |
+| `SparkResult` extract | — | Unified `executeAndCollect` helper with observed metrics extraction |
+| Plan Compression (ZSTD) | — | Server-config-driven ZSTD compression for large plans via `CompressedOperation` proto |
 
 ## Remaining Gaps
 
 ### Medium Priority
-
-#### 6. Operation Tags (`addTag` / `removeTag` / `getTags` / `clearTags`)
-
-**Upstream**: Tag-based operation management on `SparkSession`. Tags propagate to all subsequent operations and can be used with `interruptTag()` for selective cancellation.
-
-**SC3 status**: Not implemented. Only `interrupt()` (all operations) is available.
-
-#### 7. Fine-grained Interruption (`interruptAll` / `interruptTag` / `interruptOperation`)
-
-**Upstream**: `SparkSession.interruptAll()`, `interruptTag(tag)`, `interruptOperation(operationId)` — granular control over running operations.
-
-**SC3 status**: Only `interruptAll` equivalent via `interrupt()`. No tag-based or operation-based interruption.
-
-#### 8. `toJSON`
-
-**Upstream**: `Dataset.toJSON: Dataset[String]` — converts each row to a JSON string.
-
-**SC3 status**: Not implemented.
-
-#### 9. `lateralJoin`
-
-**Upstream**: `Dataset.lateralJoin(right: Dataset[_], condition: Column, joinType: String)` — LATERAL JOIN support for correlated subqueries.
-
-**SC3 status**: Not implemented.
-
-#### 10. `groupingSets`
-
-**Upstream**: `Dataset.groupingSets(groupingSets: Seq[Seq[Column]], cols: Column*)` — GROUPING SETS aggregation.
-
-**SC3 status**: Not implemented.
-
-#### 11. `repartitionByRange`
-
-**Upstream**: `Dataset.repartitionByRange(numPartitions: Int, partitionExprs: Column*)` — range-based repartitioning.
-
-**SC3 status**: Not implemented. Only hash-based `repartition()` is available.
 
 #### 12. Typed `select` with TypedColumn
 
@@ -84,31 +56,13 @@ These features have been implemented:
 
 **SC3 status**: Not implemented. Only untyped `select(cols: Column*)` is available.
 
-#### 13. `show` with Vertical Mode
-
-**Upstream**: `Dataset.show(numRows: Int, truncate: Int, vertical: Boolean)` — vertical display mode for wide tables.
-
-**SC3 status**: Only `show(numRows, truncate)` without vertical mode.
-
 #### 14. `dropDuplicatesWithinWatermark`
 
 **Upstream**: `Dataset.dropDuplicatesWithinWatermark(colNames: Seq[String])` — streaming deduplication within event-time watermark.
 
 **SC3 status**: Not implemented.
 
-#### 15. `SparkResult` Unified Result Handling
-
-**Upstream**: `SparkResult` class manages Arrow batch decoding, metrics collection, and observed metrics in a unified way.
-
-**SC3 status**: Uses simpler `ArrowDeserializer` — functionally equivalent but lacks metrics/observed-metrics extraction from `ExecutePlanResponse`.
-
-#### 16. Plan Compression
-
-**Upstream**: Large protobuf plans are compressed with LZ4 before transmission to reduce network overhead.
-
-**SC3 status**: Not implemented. Plans are sent uncompressed.
-
-#### 17. `cloneSession()`
+#### 15. `cloneSession()`
 
 **Upstream**: `SparkSession.cloneSession(): SparkSession` — clones session with all current configuration.
 
@@ -239,18 +193,24 @@ These features have been implemented:
 4. ~~`newSession()`~~
 5. ~~`FetchErrorDetails` RPC~~
 
-**Phase 2** (Medium Priority — API completeness):
-6. Operation tags + fine-grained interruption
-7. `toJSON` / `show(vertical)`
-8. `lateralJoin` / `groupingSets` / `repartitionByRange`
-9. `SparkResult` / Plan compression
-10. `cloneSession` / `range(numPartitions)` / `emptyDataset[T]`
+**Phase 2** (Medium Priority — ✅ COMPLETED):
+6. ~~Operation tags + fine-grained interruption~~
+7. ~~`toJSON` / `show(vertical)`~~
+8. ~~`lateralJoin` / `groupingSets` / `repartitionByRange`~~
+9. ~~`SparkResult` extract / Plan compression (ZSTD)~~
 
-**Phase 3** (Low Priority — can defer):
-11. Subquery support (`scalar` / `exists`)
-12. Utility APIs (`transpose`, `zipWithIndex`, `sameSemantics`, etc.)
-13. Static session management
-14. Java API overloads
+**Phase 3** (Medium Priority — API completeness):
+10. `cloneSession` / `range(numPartitions)` / `emptyDataset[T]`
+11. Typed `select` with TypedColumn
+12. `dropDuplicatesWithinWatermark`
+13. `collectAsList` / `takeAsList`
+14. `withMetadata` / `colRegex`
+
+**Phase 4** (Low Priority — can defer):
+15. Subquery support (`scalar` / `exists`)
+16. Utility APIs (`transpose`, `zipWithIndex`, `sameSemantics`, etc.)
+17. Static session management
+18. Java API overloads
 
 ## Architecture Differences
 

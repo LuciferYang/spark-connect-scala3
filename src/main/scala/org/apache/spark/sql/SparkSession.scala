@@ -227,6 +227,23 @@ final class SparkSession private[sql] (
     }
 
   // ---------------------------------------------------------------------------
+  // Operation Tags
+  // ---------------------------------------------------------------------------
+
+  def addTag(tag: String): Unit = client.addTag(tag)
+  def removeTag(tag: String): Unit = client.removeTag(tag)
+  def getTags(): Set[String] = client.getTags()
+  def clearTags(): Unit = client.clearTags()
+
+  // ---------------------------------------------------------------------------
+  // Interrupt
+  // ---------------------------------------------------------------------------
+
+  def interruptAll(): Seq[String] = client.interruptAll()
+  def interruptTag(tag: String): Seq[String] = client.interruptTag(tag)
+  def interruptOperation(operationId: String): Seq[String] = client.interruptOperation(operationId)
+
+  // ---------------------------------------------------------------------------
   // Stop
   // ---------------------------------------------------------------------------
 

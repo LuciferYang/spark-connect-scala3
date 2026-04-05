@@ -7,6 +7,7 @@ import org.apache.spark.connect.proto.*
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 import org.apache.spark.sql.StorageLevel
@@ -28,6 +29,28 @@ final class SparkConnectClient private (
 
   /** Manages uploading artifacts (class files, JARs) to the server. */
   val artifactManager: ArtifactManager = ArtifactManager(sessionId, userId, asyncStub)
+
+  // ---------------------------------------------------------------------------
+  // Operation Tags (InheritableThreadLocal — child threads inherit a copy)
+  // ---------------------------------------------------------------------------
+
+  private val tags = new InheritableThreadLocal[mutable.Set[String]]:
+    override def childValue(parent: mutable.Set[String]): mutable.Set[String] =
+      if parent == null then mutable.HashSet.empty[String] else parent.clone()
+    override protected def initialValue(): mutable.Set[String] = mutable.HashSet.empty[String]
+
+  def addTag(tag: String): Unit =
+    require(tag != null && tag.nonEmpty, "Tag cannot be null or empty")
+    require(!tag.contains(","), "Tag cannot contain ','")
+    tags.get.add(tag)
+
+  def removeTag(tag: String): Unit =
+    require(tag != null && tag.nonEmpty, "Tag cannot be null or empty")
+    tags.get.remove(tag)
+
+  def getTags(): Set[String] = tags.get.toSet
+
+  def clearTags(): Unit = tags.get.clear()
 
   /** Validates server-side session ID consistency across all responses. */
   private val responseValidator = ResponseValidator()
@@ -51,6 +74,68 @@ final class SparkConnectClient private (
     serverSideSessionId.foreach(setFn)
 
   // ---------------------------------------------------------------------------
+  // Plan Compression (ZSTD)
+  // ---------------------------------------------------------------------------
+
+  private[client] case class PlanCompressionOptions(thresholdBytes: Int, algorithm: String)
+
+  /** Cached compression options. None = not yet fetched; Some(None) = disabled. */
+  @volatile private var _planCompressionOptions: Option[Option[PlanCompressionOptions]] = None
+
+  /** Lazily fetch compression options from server config (cached after first call). */
+  private def getPlanCompressionOptions: Option[PlanCompressionOptions] =
+    _planCompressionOptions match
+      case Some(opts) => opts
+      case None       =>
+        val opts =
+          try
+            Some(PlanCompressionOptions(
+              thresholdBytes = getConfig("spark.connect.session.planCompression.threshold").toInt,
+              algorithm = getConfig("spark.connect.session.planCompression.defaultAlgorithm")
+            ))
+          catch case NonFatal(_) => None // server doesn't support → disable
+        _planCompressionOptions = Some(opts)
+        opts
+
+  /** For testing: override the compression options. */
+  private[client] def setPlanCompressionOptions(
+      opts: Option[PlanCompressionOptions]
+  ): Unit =
+    _planCompressionOptions = Some(opts)
+
+  /** Try to compress the plan if it exceeds the threshold. Returns the original plan if compression
+    * is disabled, not needed, or not effective.
+    */
+  private[client] def tryCompressPlan(plan: Plan): Plan =
+    getPlanCompressionOptions match
+      case Some(opts) if opts.algorithm == "ZSTD" && opts.thresholdBytes >= 0 =>
+        val opTypeCase = plan.getOpTypeCase
+        val (innerBytes, opType) = opTypeCase match
+          case Plan.OpTypeCase.ROOT =>
+            (plan.getRoot.toByteArray, Plan.CompressedOperation.OpType.OP_TYPE_RELATION)
+          case Plan.OpTypeCase.COMMAND =>
+            (plan.getCommand.toByteArray, Plan.CompressedOperation.OpType.OP_TYPE_COMMAND)
+          case _ => return plan
+        if innerBytes.length <= opts.thresholdBytes then return plan
+        try
+          import com.github.luben.zstd.Zstd
+          val compressed = Zstd.compress(innerBytes)
+          if compressed.length >= innerBytes.length then return plan
+          Plan.newBuilder().setCompressedOperation(
+            Plan.CompressedOperation.newBuilder()
+              .setData(com.google.protobuf.ByteString.copyFrom(compressed))
+              .setOpType(opType)
+              .setCompressionCodec(CompressionCodec.COMPRESSION_CODEC_ZSTD)
+              .build()
+          ).build()
+        catch
+          case _: NoClassDefFoundError | _: ClassNotFoundException =>
+            _planCompressionOptions = Some(None); plan
+          case NonFatal(_) =>
+            _planCompressionOptions = Some(None); plan
+      case _ => plan
+
+  // ---------------------------------------------------------------------------
   // Execute
   // ---------------------------------------------------------------------------
 
@@ -62,9 +147,11 @@ final class SparkConnectClient private (
     val rb = ExecutePlanRequest.newBuilder()
       .setSessionId(sessionId)
       .setUserContext(userContext)
-      .setPlan(plan)
+      .setPlan(tryCompressPlan(plan))
       .setOperationId(UUID.randomUUID().toString)
     addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
+    val currentTags = tags.get
+    if currentTags.nonEmpty then currentTags.foreach(rb.addTags)
     val inner =
       ExecutePlanResponseReattachableIterator(rb.build(), channel, retryHandler)
     val validated = responseValidator.wrapIterator(inner)
@@ -187,17 +274,43 @@ final class SparkConnectClient private (
   // Interrupt / Close / New Client
   // ---------------------------------------------------------------------------
 
-  def interrupt(): Unit =
+  // ---------------------------------------------------------------------------
+  // Interrupt
+  // ---------------------------------------------------------------------------
+
+  /** Interrupt all running operations (backward-compatible alias). */
+  def interrupt(): Unit = interruptAll()
+
+  /** Interrupt all running operations in this session. */
+  def interruptAll(): Seq[String] =
+    doInterrupt(InterruptRequest.InterruptType.INTERRUPT_TYPE_ALL, None, None)
+
+  /** Interrupt all running operations tagged with the given tag. */
+  def interruptTag(tag: String): Seq[String] =
+    doInterrupt(InterruptRequest.InterruptType.INTERRUPT_TYPE_TAG, Some(tag), None)
+
+  /** Interrupt the running operation with the given operation ID. */
+  def interruptOperation(operationId: String): Seq[String] =
+    doInterrupt(InterruptRequest.InterruptType.INTERRUPT_TYPE_OPERATION_ID, None, Some(operationId))
+
+  private def doInterrupt(
+      intType: InterruptRequest.InterruptType,
+      operationTag: Option[String],
+      opId: Option[String]
+  ): Seq[String] =
     val rb = InterruptRequest.newBuilder()
       .setSessionId(sessionId)
       .setUserContext(userContext)
-      .setInterruptType(InterruptRequest.InterruptType.INTERRUPT_TYPE_ALL)
+      .setInterruptType(intType)
+    operationTag.foreach(rb.setOperationTag)
+    opId.foreach(rb.setOperationId)
     addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
     try
-      responseValidator.verifyResponse(
+      val resp = responseValidator.verifyResponse(
         GrpcExceptionConverter.convert(retryHandler.retry(bstub.interrupt(rb.build())))
       )
-    catch case NonFatal(_) => () // best-effort
+      resp.getInterruptedIdsList.asScala.toSeq
+    catch case NonFatal(_) => Seq.empty
 
   def close(): Unit =
     try
