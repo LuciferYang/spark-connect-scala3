@@ -119,7 +119,9 @@ final class WhenNotMatched private[sql] (writer: MergeIntoWriter, condition: Opt
       writer.buildMergeAction(MergeAction.ActionType.ACTION_TYPE_INSERT, condition, assignments)
     )
 
-/** Actions available when the merge condition is not matched by source (target rows without source match). */
+/** Actions available when the merge condition is not matched by source (target rows without source
+  * match).
+  */
 final class WhenNotMatchedBySource private[sql] (
     writer: MergeIntoWriter,
     condition: Option[Column]
