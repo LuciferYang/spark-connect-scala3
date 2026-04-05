@@ -1,6 +1,11 @@
 package org.apache.spark.sql
 
+import com.google.protobuf.ByteString
 import org.apache.spark.connect.proto.*
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
+import org.apache.spark.sql.connect.client.DataTypeProtoConverter
+import org.apache.spark.sql.connect.common.ForeachWriterPacket
+import org.apache.spark.sql.types.NullType
 
 /** Trigger types for structured streaming queries. */
 sealed trait Trigger
@@ -26,6 +31,8 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
   private var name: String = ""
   private var opts: Map[String, String] = Map.empty
   private var partitionCols: Seq[String] = Seq.empty
+  private var foreachBatchPayload: Option[Array[Byte]] = None
+  private var foreachWriterPayload: Option[Array[Byte]] = None
 
   def format(fmt: String): DataStreamWriter =
     source = fmt
@@ -53,6 +60,19 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
 
   def partitionBy(colNames: String*): DataStreamWriter =
     partitionCols = colNames.toSeq
+    this
+
+  /** Set a function to process each micro-batch DataFrame with its batch ID. */
+  def foreachBatch(func: (DataFrame, Long) => Unit): DataStreamWriter =
+    val packet = ForeachWriterPacket(func.asInstanceOf[AnyRef], AgnosticEncoders.UnboundRowEncoder)
+    foreachBatchPayload = Some(ForeachWriterPacket.serialize(packet))
+    this
+
+  /** Set a ForeachWriter to process each row of the streaming query output. */
+  def foreach(writer: ForeachWriter[?]): DataStreamWriter =
+    val packet =
+      ForeachWriterPacket(writer.asInstanceOf[AnyRef], AgnosticEncoders.UnboundRowEncoder)
+    foreachWriterPayload = Some(ForeachWriterPacket.serialize(packet))
     this
 
   def start(): StreamingQuery = doStart(None, None)
@@ -94,6 +114,18 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
     opts.foreach((k, v) => builder.putOptions(k, v))
     partitionCols.foreach(builder.addPartitioningColumnNames)
     triggerOpt.foreach(setTrigger(builder, _))
+    foreachWriterPayload.foreach { payload =>
+      val scalaWriterBuilder = ScalarScalaUDF
+        .newBuilder()
+        .setPayload(ByteString.copyFrom(payload))
+      builder.getForeachWriterBuilder.setScalaFunction(scalaWriterBuilder)
+    }
+    foreachBatchPayload.foreach { payload =>
+      builder.getForeachBatchBuilder.getScalaFunctionBuilder
+        .setPayload(ByteString.copyFrom(payload))
+        .setOutputType(DataTypeProtoConverter.toProto(NullType))
+        .setNullable(true)
+    }
     builder
 
   private def setTrigger(builder: WriteStreamOperationStart.Builder, t: Trigger): Unit =

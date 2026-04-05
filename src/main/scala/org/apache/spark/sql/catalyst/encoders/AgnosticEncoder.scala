@@ -106,6 +106,13 @@ object AgnosticEncoders:
   case object StringEncoder extends LeafEncoder[String](StringType, "StringEncoder")
   case object BinaryEncoder extends LeafEncoder[Array[Byte]](BinaryType, "BinaryEncoder")
 
+  /** Encoder for unbound Row types used in foreachBatch/foreach. */
+  case object UnboundRowEncoder
+      extends LeafEncoder[org.apache.spark.sql.Row](
+        StructType(Seq.empty),
+        "UnboundRowEncoder"
+      )
+
   // ---------------------------------------------------------------------------
   // Parameterized Encoders (Date, Timestamp, Decimal, etc.)
   // ---------------------------------------------------------------------------
