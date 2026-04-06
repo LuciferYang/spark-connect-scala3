@@ -2,7 +2,7 @@
 
 This document tracks feature gaps between the Spark Connect Scala 3 client (SC3) and the official Spark Connect client (`sql/connect/common/src/main/scala/org/apache/spark/sql/connect/`).
 
-Last updated: 2026-04-06
+Last updated: 2026-04-07
 
 ---
 
@@ -363,6 +363,7 @@ The following bugs were discovered during integration testing and need to be fix
 | 3 | `contains`, `startsWith`, `endsWith` fail | Test assertion was wrong: `endsWith("foo")` on `"foo bar"` returns false because `"foo bar"` ends with `"bar"` | String methods in ColumnIntegrationSuite | FIXED |
 | 4 | `groupBy.pivot` with aggregation fails | `GroupedDataFrame.agg()` did not set `Aggregate.Pivot` proto field with pivot column | pivot in DataFrameIntegrationSuite | FIXED |
 | 5 | `catalog.createTable` / `dropTable` incorrect behavior | `createTable` overloads did not delegate to canonical 5-parameter version; path passed incorrectly | CatalogIntegrationSuite | FIXED |
+| 6 | `Column("*")` produces `UnresolvedAttribute` instead of `UnresolvedStar` | Constructor did not special-case `"*"` and `"xxx.*"` like upstream | toJSON, select(*) in DataFrameIntegrationSuite | FIXED |
 
 ### Bug Details
 
@@ -390,6 +391,67 @@ The following bugs were discovered during integration testing and need to be fix
 - All `createTable` overloads now delegate to canonical 5-parameter version.
 - Path passed via options map instead of deprecated `setPath()`.
 - Integration test now calls `.collect()` to trigger RPC.
+
+**Bug 6: `Column("*")` produces `UnresolvedAttribute` instead of `UnresolvedStar` (FIXED)**
+- File: `src/main/scala/org/apache/spark/sql/Column.scala`, constructor
+- Was: `Column("*")` generated `UnresolvedAttribute("*")` — server treated `*` as literal column name
+- Fixed: `"*"` and `"xxx.*"` patterns now generate `Expression.UnresolvedStar` proto, matching upstream Spark
+- Also fixed `checkpoint`/`localCheckpoint` tests to gracefully `cancel` when server lacks checkpoint directory
+
+---
+
+## Remaining Integration Test Failures
+
+Integration test results (2026-04-07): **260 passed, 15 failed, 1 canceled** across 17 suites.
+
+The 15 remaining failures are grouped by root cause:
+
+### Category 1: StructType DDL Serialization (3 tests)
+
+| Suite | Test | Root Cause |
+|-------|------|-----------|
+| SparkSessionIntegrationSuite | `emptyDataFrame returns zero rows` | `StructType.toString` outputs proto debug string instead of SQL DDL |
+| SparkSessionIntegrationSuite | `emptyDataset[Int] returns zero rows with correct schema` | Same |
+| DataFrameIntegrationSuite | `schema and dtypes and columns` | Same (via emptyDataFrame chain) |
+
+**Fix**: `StructType` (or the code path calling it) needs to produce `"value INT"` DDL format instead of proto `struct { fields { ... } }`.
+
+### Category 2: Scala 3 Lambda Serialization (4 tests)
+
+| Suite | Test | Root Cause |
+|-------|------|-----------|
+| KeyValueGroupedDatasetIntegrationSuite | `reduceGroups reduces within each group` | `$deserializeLambda$` missing — Scala 3 lambda not deserializable on server |
+| KeyValueGroupedDatasetIntegrationSuite | `mapValues transforms values then mapGroups` | `mapValues` grouping function stub called directly |
+| KeyValueGroupedDatasetIntegrationSuite | `flatMapSortedGroups produces sorted iteration` | Same lambda serialization issue |
+| StreamingReadWriteIntegrationSuite | `foreachBatch executes batch function` | foreachBatch lambda serialization |
+
+**Fix**: Scala 3 closures serialized via `addArtifact` may not be compatible with the Scala 2.13 Spark server. Requires investigation into cross-Scala closure serialization.
+
+### Category 3: approxQuantile Result Parsing (2 tests)
+
+| Suite | Test | Root Cause |
+|-------|------|-----------|
+| NaStatIntegrationSuite | `stat.approxQuantile single column` | Return value decoding issue |
+| NaStatIntegrationSuite | `stat.approxQuantile multiple columns` | Same |
+
+**Fix**: Need to check if `approxQuantile` uses a custom proto path or standard collect.
+
+### Category 4: Streaming (3 tests)
+
+| Suite | Test | Root Cause |
+|-------|------|-----------|
+| StreamingReadWriteIntegrationSuite | `streams.awaitAnyTermination with timeout` | Streaming lifecycle issue |
+| StreamingReadWriteIntegrationSuite | `foreachBatch executes batch function` | Lambda serialization (also Cat. 2) |
+| StreamingReadWriteIntegrationSuite | `toTable writes streaming output to a table` | Streaming table write |
+
+### Category 5: Other (3 tests)
+
+| Suite | Test | Root Cause |
+|-------|------|-----------|
+| DataFrameIntegrationSuite | `zipWithIndex` | `distributed_sequence_id` function expects 0 args but got 1 |
+| DatasetTypedOpsIntegrationSuite | `joinWith returns typed tuples` | joinWith result decoding (nested struct) |
+| WindowIntegrationSuite | `rowsBetween sliding window (-1 to +1)` | Window frame result mismatch |
+| CatalogIntegrationSuite | `catalog createTable and dropTable` | `dropTable` proto (field 28) not supported by Spark 4.0.x server |
 
 ---
 
