@@ -107,3 +107,153 @@ class DataStreamWriterSuite extends AnyFunSuite with Matchers:
     import scala.jdk.CollectionConverters.*
     proto.getPartitioningColumnNamesList.asScala shouldBe Seq("key")
   }
+
+  // ---------------------------------------------------------------------------
+  // Stub-based tests (no gRPC required)
+  // ---------------------------------------------------------------------------
+
+  private def stubSession: SparkSession = SparkSession(null)
+
+  private def stubStreamDf: DataFrame =
+    val spark = stubSession
+    val rel = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(spark.nextPlanId()).build())
+      .setLocalRelation(LocalRelation.getDefaultInstance)
+      .build()
+    DataFrame(spark, rel)
+
+  test("format returns the same DataStreamWriter instance (fluent API)") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val result = writer.format("parquet")
+    result should be theSameInstanceAs writer
+  }
+
+  test("outputMode returns the same DataStreamWriter instance") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val result = writer.outputMode("complete")
+    result should be theSameInstanceAs writer
+  }
+
+  test("trigger returns the same DataStreamWriter instance") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val result = writer.trigger(Trigger.Once)
+    result should be theSameInstanceAs writer
+  }
+
+  test("queryName returns the same DataStreamWriter instance") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val result = writer.queryName("q1")
+    result should be theSameInstanceAs writer
+  }
+
+  test("option returns the same DataStreamWriter instance") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val result = writer.option("k", "v")
+    result should be theSameInstanceAs writer
+  }
+
+  test("options returns the same DataStreamWriter instance") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val result = writer.options(Map("k" -> "v"))
+    result should be theSameInstanceAs writer
+  }
+
+  test("partitionBy returns the same DataStreamWriter instance") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val result = writer.partitionBy("col1")
+    result should be theSameInstanceAs writer
+  }
+
+  test("buildWriteStreamOp without any settings produces minimal proto") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.buildWriteStreamOp().build()
+    proto.hasInput shouldBe true
+    proto.getFormat shouldBe ""
+    proto.getOutputMode shouldBe ""
+    proto.getQueryName shouldBe ""
+    proto.getOptionsMap should be(empty)
+  }
+
+  test("multiple options merge correctly") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer
+      .option("a", "1")
+      .option("b", "2")
+      .options(Map("c" -> "3", "d" -> "4"))
+      .buildWriteStreamOp().build()
+    proto.getOptionsMap.get("a") shouldBe "1"
+    proto.getOptionsMap.get("b") shouldBe "2"
+    proto.getOptionsMap.get("c") shouldBe "3"
+    proto.getOptionsMap.get("d") shouldBe "4"
+  }
+
+  test("later option overrides earlier one") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer
+      .option("key", "old")
+      .option("key", "new")
+      .buildWriteStreamOp().build()
+    proto.getOptionsMap.get("key") shouldBe "new"
+  }
+
+  test("partitionBy with multiple columns") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.partitionBy("a", "b", "c").buildWriteStreamOp().build()
+    import scala.jdk.CollectionConverters.*
+    proto.getPartitioningColumnNamesList.asScala shouldBe Seq("a", "b", "c")
+  }
+
+  test("partitionBy with no args produces empty list") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.partitionBy().buildWriteStreamOp().build()
+    import scala.jdk.CollectionConverters.*
+    proto.getPartitioningColumnNamesList.asScala shouldBe empty
+  }
+
+  test("foreachBatch sets the foreach batch payload") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val result = writer.foreachBatch((df: DataFrame, batchId: Long) => ())
+    result should be theSameInstanceAs writer
+    // Verify the payload is set by checking the proto
+    val proto = result.buildWriteStreamOp().build()
+    proto.hasForeachBatch shouldBe true
+    proto.getForeachBatch.hasScalaFunction shouldBe true
+    proto.getForeachBatch.getScalaFunction.getPayload.size() should be > 0
+  }
+
+  test("foreach sets the foreach writer payload") {
+    val testWriter = new ForeachWriter[Row]:
+      def open(partitionId: Long, epochId: Long): Boolean = true
+      def process(value: Row): Unit = ()
+      def close(errorOrNull: Throwable): Unit = ()
+
+    val writer = DataStreamWriter(stubStreamDf)
+    val result = writer.foreach(testWriter)
+    result should be theSameInstanceAs writer
+    val proto = result.buildWriteStreamOp().build()
+    proto.hasForeachWriter shouldBe true
+    proto.getForeachWriter.hasScalaFunction shouldBe true
+    proto.getForeachWriter.getScalaFunction.getPayload.size() should be > 0
+  }
+
+  // ---------------------------------------------------------------------------
+  // Trigger types
+  // ---------------------------------------------------------------------------
+
+  test("Trigger.ProcessingTime stores interval") {
+    val t = Trigger.ProcessingTime(5000)
+    t.intervalMs shouldBe 5000
+  }
+
+  test("Trigger.Continuous stores interval") {
+    val t = Trigger.Continuous(2000)
+    t.intervalMs shouldBe 2000
+  }
+
+  test("Trigger.AvailableNow is a singleton") {
+    Trigger.AvailableNow should be theSameInstanceAs Trigger.AvailableNow
+  }
+
+  test("Trigger.Once is a singleton") {
+    Trigger.Once should be theSameInstanceAs Trigger.Once
+  }

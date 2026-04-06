@@ -92,6 +92,15 @@ lazy val root = (project in file("."))
     Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest,
       "-l", "org.apache.spark.sql.tags.IntegrationTest"),
 
+    // Exclude code that requires a live Spark Connect server (not unit-testable)
+    coverageExcludedPackages := Seq(
+      "org\\.apache\\.spark\\.sql\\.application\\..*",            // ConnectRepl
+      "org\\.apache\\.spark\\.sql\\.connect\\.client\\..*",       // gRPC client internals
+      "org\\.apache\\.spark\\.sql\\.StreamingQuery",              // requires live server
+      "org\\.apache\\.spark\\.sql\\.StreamingQueryManager",       // requires live server
+      "org\\.apache\\.spark\\.sql\\.streaming\\.StreamingQueryListenerBus"  // requires live server
+    ).mkString(";"),
+
     // JVM options for Apache Arrow
     Test / javaOptions ++= Seq(
       "--add-opens=java.base/java.nio=ALL-UNNAMED"

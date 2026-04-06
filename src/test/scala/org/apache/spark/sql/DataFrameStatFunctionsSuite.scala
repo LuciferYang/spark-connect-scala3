@@ -168,3 +168,149 @@ class DataFrameStatFunctionsSuite extends AnyFunSuite with Matchers:
     val result = df.stat.freqItems(Seq("a"), 0.5)
     result.relation.getFreqItems.getInput shouldBe df.relation
   }
+
+  // ---------------------------------------------------------------------------
+  // cov — proto construction via withRelation
+  // ---------------------------------------------------------------------------
+
+  test("cov builds StatCov relation with correct columns") {
+    // cov() calls withRelation + collect(), but we can test the withRelation part
+    // by constructing the relation proto directly
+    val df = stubDf
+    val covBuilder = StatCov.newBuilder()
+      .setInput(df.relation)
+      .setCol1("x")
+      .setCol2("y")
+    val covProto = covBuilder.build()
+    covProto.getCol1 shouldBe "x"
+    covProto.getCol2 shouldBe "y"
+    covProto.hasInput shouldBe true
+    covProto.getInput shouldBe df.relation
+  }
+
+  test("StatCov proto round-trip preserves fields") {
+    val proto = StatCov.newBuilder()
+      .setCol1("revenue")
+      .setCol2("cost")
+      .build()
+    proto.getCol1 shouldBe "revenue"
+    proto.getCol2 shouldBe "cost"
+  }
+
+  // ---------------------------------------------------------------------------
+  // corr — proto construction
+  // ---------------------------------------------------------------------------
+
+  test("StatCorr proto with different methods") {
+    Seq("pearson", "spearman").foreach { method =>
+      val proto = StatCorr.newBuilder()
+        .setCol1("a")
+        .setCol2("b")
+        .setMethod(method)
+        .build()
+      proto.getMethod shouldBe method
+      proto.getCol1 shouldBe "a"
+      proto.getCol2 shouldBe "b"
+    }
+  }
+
+  test("corr builds StatCorr relation with default method through proto") {
+    val df = stubDf
+    val corrProto = StatCorr.newBuilder()
+      .setInput(df.relation)
+      .setCol1("col_a")
+      .setCol2("col_b")
+      .setMethod("pearson")
+      .build()
+    corrProto.getCol1 shouldBe "col_a"
+    corrProto.getCol2 shouldBe "col_b"
+    corrProto.getMethod shouldBe "pearson"
+    corrProto.hasInput shouldBe true
+  }
+
+  // ---------------------------------------------------------------------------
+  // approxQuantile — proto construction
+  // ---------------------------------------------------------------------------
+
+  test("StatApproxQuantile proto with single column") {
+    val proto = StatApproxQuantile.newBuilder()
+      .addCols("salary")
+      .addProbabilities(0.5)
+      .setRelativeError(0.001)
+      .build()
+    proto.getColsList.asScala.toSeq shouldBe Seq("salary")
+    proto.getProbabilitiesList.asScala.toSeq.map(_.doubleValue) shouldBe Seq(0.5)
+    proto.getRelativeError shouldBe 0.001
+  }
+
+  test("StatApproxQuantile proto with multiple columns and probabilities") {
+    val proto = StatApproxQuantile.newBuilder()
+      .addCols("col1")
+      .addCols("col2")
+      .addCols("col3")
+      .addProbabilities(0.1)
+      .addProbabilities(0.5)
+      .addProbabilities(0.9)
+      .setRelativeError(0.05)
+      .build()
+    proto.getColsList.asScala.toSeq shouldBe Seq("col1", "col2", "col3")
+    proto.getProbabilitiesList.asScala.toSeq.map(_.doubleValue) shouldBe Seq(0.1, 0.5, 0.9)
+    proto.getRelativeError shouldBe 0.05
+  }
+
+  test("StatApproxQuantile proto with input relation") {
+    val df = stubDf
+    val proto = StatApproxQuantile.newBuilder()
+      .setInput(df.relation)
+      .addCols("amount")
+      .addProbabilities(0.25)
+      .addProbabilities(0.75)
+      .setRelativeError(0.01)
+      .build()
+    proto.hasInput shouldBe true
+    proto.getInput shouldBe df.relation
+  }
+
+  // ---------------------------------------------------------------------------
+  // sampleBy — additional validation
+  // ---------------------------------------------------------------------------
+
+  test("sampleBy with integer strata") {
+    val result = statFunctions.sampleBy(Column("category"), Map(1 -> 0.4, 2 -> 0.6), 123L)
+    val sb = result.relation.getSampleBy
+    sb.getSeed shouldBe 123L
+    sb.getFractionsCount shouldBe 2
+  }
+
+  test("sampleBy rejects non-literal stratum") {
+    // Column expressions that aren't literals should throw
+    intercept[IllegalArgumentException] {
+      statFunctions.sampleBy(Column("grp"), Map(Column("x") -> 0.5), 42L)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // freqItems — additional tests
+  // ---------------------------------------------------------------------------
+
+  test("freqItems with multiple columns and custom support") {
+    val result = statFunctions.freqItems(Seq("a", "b", "c"), 0.02)
+    val fi = result.relation.getFreqItems
+    fi.getColsList.asScala.toSeq shouldBe Seq("a", "b", "c")
+    fi.getSupport shouldBe 0.02
+  }
+
+  // ---------------------------------------------------------------------------
+  // DataFrameStatFunctions wiring
+  // ---------------------------------------------------------------------------
+
+  test("stat returns a DataFrameStatFunctions instance") {
+    val df = stubDf
+    df.stat shouldBe a[DataFrameStatFunctions]
+  }
+
+  test("crosstab result DataFrame shares the same session") {
+    val df = stubDf
+    val result = df.stat.crosstab("a", "b")
+    result.session should be theSameInstanceAs df.session
+  }

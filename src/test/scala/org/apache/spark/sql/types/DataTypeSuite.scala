@@ -97,3 +97,167 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
     val st = StructType(Seq(StructField("x", IntegerType)))
     an[IllegalArgumentException] should be thrownBy st.fieldIndex("y")
   }
+
+  // ---------------------------------------------------------------------------
+  // SQL representations
+  // ---------------------------------------------------------------------------
+
+  test("primitive type SQL representations") {
+    BooleanType.sql shouldBe "BOOLEAN"
+    ByteType.sql shouldBe "TINYINT"
+    ShortType.sql shouldBe "SMALLINT"
+    IntegerType.sql shouldBe "INT"
+    LongType.sql shouldBe "BIGINT"
+    FloatType.sql shouldBe "FLOAT"
+    DoubleType.sql shouldBe "DOUBLE"
+    StringType.sql shouldBe "STRING"
+    BinaryType.sql shouldBe "BINARY"
+    DateType.sql shouldBe "DATE"
+    TimestampType.sql shouldBe "TIMESTAMP"
+    TimestampNTZType.sql shouldBe "TIMESTAMP_NTZ"
+    NullType.sql shouldBe "VOID"
+  }
+
+  test("DecimalType SQL representation") {
+    DecimalType(10, 2).sql shouldBe "DECIMAL(10,2)"
+    DecimalType.DEFAULT.sql shouldBe "DECIMAL(10,0)"
+  }
+
+  test("ArrayType SQL representation") {
+    ArrayType(IntegerType, containsNull = true).sql shouldBe "ARRAY<INT>"
+    ArrayType(StringType, containsNull = false).sql shouldBe "ARRAY<STRING>"
+  }
+
+  test("MapType SQL representation") {
+    MapType(StringType, IntegerType, valueContainsNull = true).sql shouldBe "MAP<STRING,INT>"
+  }
+
+  // ---------------------------------------------------------------------------
+  // simpleString for more types
+  // ---------------------------------------------------------------------------
+
+  test("primitive types simpleString matches typeName") {
+    BooleanType.simpleString shouldBe "boolean"
+    ByteType.simpleString shouldBe "byte"
+    ShortType.simpleString shouldBe "short"
+    IntegerType.simpleString shouldBe "integer"
+    LongType.simpleString shouldBe "long"
+    FloatType.simpleString shouldBe "float"
+    DoubleType.simpleString shouldBe "double"
+    StringType.simpleString shouldBe "string"
+    BinaryType.simpleString shouldBe "binary"
+    DateType.simpleString shouldBe "date"
+    TimestampType.simpleString shouldBe "timestamp"
+    TimestampNTZType.simpleString shouldBe "timestamp_ntz"
+    NullType.simpleString shouldBe "null"
+  }
+
+  test("nested ArrayType simpleString") {
+    val nested = ArrayType(ArrayType(IntegerType, false), true)
+    nested.simpleString shouldBe "array<array<integer>>"
+  }
+
+  test("nested MapType simpleString") {
+    val nested = MapType(StringType, ArrayType(IntegerType, false), true)
+    nested.simpleString shouldBe "map<string,array<integer>>"
+  }
+
+  // ---------------------------------------------------------------------------
+  // StructType toDDL
+  // ---------------------------------------------------------------------------
+
+  test("StructType toDDL with nullable and non-nullable fields") {
+    val st = StructType(Seq(
+      StructField("id", LongType, nullable = false),
+      StructField("name", StringType, nullable = true)
+    ))
+    st.toDDL shouldBe "id BIGINT NOT NULL, name STRING"
+  }
+
+  test("StructType.empty toDDL is empty string") {
+    StructType.empty.toDDL shouldBe ""
+  }
+
+  test("StructType toDDL with DecimalType") {
+    val st = StructType(Seq(
+      StructField("amount", DecimalType(10, 2))
+    ))
+    st.toDDL shouldBe "amount DECIMAL(10,2)"
+  }
+
+  // ---------------------------------------------------------------------------
+  // StructType treeString with nesting
+  // ---------------------------------------------------------------------------
+
+  test("StructType treeString with nested struct") {
+    val inner = StructType(Seq(
+      StructField("x", IntegerType, nullable = false)
+    ))
+    val st = StructType(Seq(
+      StructField("name", StringType),
+      StructField("nested", inner)
+    ))
+    val tree = st.treeString
+    tree should include("root")
+    tree should include("|-- name: string (nullable = true)")
+    tree should include("|-- nested: struct<x:integer> (nullable = true)")
+    tree should include(" |-- x: integer (nullable = false)")
+  }
+
+  test("StructType treeString with maxLevel limits nesting") {
+    val inner = StructType(Seq(
+      StructField("x", IntegerType, nullable = false)
+    ))
+    val st = StructType(Seq(
+      StructField("nested", inner)
+    ))
+    // maxLevel=2 renders top-level fields (indent 1 < 2) but not nested (indent 2 < 2 = false)
+    val tree = st.treeString(2)
+    tree should include("root")
+    tree should include("|-- nested")
+    // The inner field at level 2 should not be rendered
+    tree should not include " |-- x"
+  }
+
+  // ---------------------------------------------------------------------------
+  // DecimalType DEFAULT
+  // ---------------------------------------------------------------------------
+
+  test("DecimalType.DEFAULT is (10, 0)") {
+    DecimalType.DEFAULT.precision shouldBe 10
+    DecimalType.DEFAULT.scale shouldBe 0
+  }
+
+  // ---------------------------------------------------------------------------
+  // StructField defaults
+  // ---------------------------------------------------------------------------
+
+  test("StructField default nullable is true") {
+    val f = StructField("x", IntegerType)
+    f.nullable shouldBe true
+  }
+
+  test("StructField explicit nullable false") {
+    val f = StructField("x", IntegerType, nullable = false)
+    f.nullable shouldBe false
+  }
+
+  // ---------------------------------------------------------------------------
+  // typeName for complex types
+  // ---------------------------------------------------------------------------
+
+  test("ArrayType typeName") {
+    ArrayType(IntegerType, true).typeName shouldBe "array"
+  }
+
+  test("MapType typeName") {
+    MapType(StringType, IntegerType, true).typeName shouldBe "map"
+  }
+
+  test("StructType typeName") {
+    StructType(Seq.empty).typeName shouldBe "struct"
+  }
+
+  test("DecimalType typeName") {
+    DecimalType(10, 2).typeName shouldBe "decimal"
+  }

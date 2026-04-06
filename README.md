@@ -74,17 +74,62 @@ cd spark-connect-scala3
 build/sbt compile
 ```
 
-### 3. Run the example
+### 3. Try it out
 
-```bash
-build/sbt "runMain org.apache.spark.sql.examples.quickStart"
-```
+```scala
+import org.apache.spark.sql.{SparkSession, Row, functions as F}
+import org.apache.spark.sql.types.*
 
-Override the server URL:
+val spark = SparkSession.builder()
+  .remote("sc://localhost:15002")  // or set SPARK_CONNECT_URL env var
+  .build()
 
-```bash
-SPARK_CONNECT_URL=sc://remote-host:15002 \
-  build/sbt "runMain org.apache.spark.sql.examples.quickStart"
+// SQL query
+spark.sql("SELECT 1 as one, 'hello' as greeting").show()
+
+// Range DataFrame
+spark.range(10).show()
+
+// Transformations: filter, select, withColumn
+spark.range(20)
+  .filter(F.col("id") > F.lit(10))
+  .withColumn("doubled", F.col("id") * F.lit(2))
+  .show()
+
+// Aggregation
+spark.range(100)
+  .withColumn("group", F.col("id") % F.lit(5))
+  .groupBy(F.col("group"))
+  .agg(F.count(F.col("id")).as("cnt"), F.sum(F.col("id")).as("total"))
+  .orderBy(F.col("group"))
+  .show()
+
+// createDataFrame with Arrow serialization
+val schema = StructType(Seq(
+  StructField("name", StringType),
+  StructField("age", IntegerType),
+  StructField("score", DoubleType)
+))
+val rows = Seq(Row("Alice", 30, 95.5), Row("Bob", 25, 88.0), Row("Carol", 35, 92.3))
+val df = spark.createDataFrame(rows, schema)
+df.show()
+df.printSchema()
+
+// Join
+val left = spark.sql("SELECT 1 as id, 'a' as val1 UNION ALL SELECT 2, 'b'")
+val right = spark.sql("SELECT 1 as id, 'x' as val2 UNION ALL SELECT 2, 'y'")
+left.join(right, Seq("id")).show()
+
+// Config
+println(spark.conf.get("spark.sql.shuffle.partitions"))
+
+// Temp View + Catalog
+spark.range(5).createOrReplaceTempView("my_range")
+spark.catalog.tableExists("my_range")  // true
+spark.sql("SELECT * FROM my_range").show()
+spark.catalog.dropTempView("my_range")
+
+spark.stop()
 ```
 
 ### 4. Launch the Scala 3 REPL
@@ -154,7 +199,7 @@ spark.stop()
 ```
 src/
 ├── main/
-│   ├── protobuf/spark/connect/         # Proto definitions (from Spark 4.0)
+│   ├── protobuf/spark/connect/         # Proto definitions (from upstream master)
 │   │   ├── base.proto
 │   │   ├── relations.proto
 │   │   ├── expressions.proto
@@ -232,10 +277,8 @@ src/
 │       │   └── ForeachWriterPacket.scala   # ForeachWriter serialization
 │       ├── connect/
 │       │   └── SessionCleaner.scala        # GC-based CachedRemoteRelation cleanup
-│       ├── application/
-│       │   └── ConnectRepl.scala           # Ammonite-based Scala 3 REPL
-│       └── examples/
-│           └── QuickStart.scala         # End-to-end example
+│       └── application/
+│           └── ConnectRepl.scala           # Ammonite-based Scala 3 REPL
 └── test/
     └── scala/org/apache/spark/sql/
         ├── ColumnSuite.scala

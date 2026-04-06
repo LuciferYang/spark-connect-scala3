@@ -142,3 +142,147 @@ class LiteralValueProtoConverterSuite extends AnyFunSuite with Matchers:
     val proto = Expression.Literal.getDefaultInstance
     LiteralValueProtoConverter.toScalaValue(proto) shouldBe (null: Any)
   }
+
+  // ---------------------------------------------------------------------------
+  // timestamp_ntz literal
+  // ---------------------------------------------------------------------------
+
+  test("timestamp_ntz literal") {
+    val micros = 1_500_000_000_000_000L // some large value in micros
+    val proto = lit.setTimestampNtz(micros).build()
+    val result = LiteralValueProtoConverter.toScalaValue(proto)
+    result shouldBe a[java.time.LocalDateTime]
+    LiteralValueProtoConverter.toDataType(proto) shouldBe TimestampNTZType
+  }
+
+  test("timestamp_ntz with negative micros") {
+    val micros = -1_000_000L // negative micros
+    val proto = lit.setTimestampNtz(micros).build()
+    val result = LiteralValueProtoConverter.toScalaValue(proto)
+    result shouldBe a[java.time.LocalDateTime]
+  }
+
+  // ---------------------------------------------------------------------------
+  // null literal with specific type
+  // ---------------------------------------------------------------------------
+
+  test("null literal with NullType via KIND_NOT_SET returns NullType") {
+    val nullType = ProtoDataType.getDefaultInstance // KIND_NOT_SET
+    val proto = lit.setNull(nullType).build()
+    LiteralValueProtoConverter.toDataType(proto) shouldBe NullType
+  }
+
+  test("null literal with specific data type") {
+    val intType = ProtoDataType.newBuilder()
+      .setInteger(ProtoDataType.Integer.getDefaultInstance).build()
+    val proto = lit.setNull(intType).build()
+    LiteralValueProtoConverter.toDataType(proto) shouldBe IntegerType
+  }
+
+  // ---------------------------------------------------------------------------
+  // decimal without precision/scale
+  // ---------------------------------------------------------------------------
+
+  test("decimal literal without explicit precision/scale uses defaults") {
+    val proto = lit.setDecimal(
+      Expression.Literal.Decimal.newBuilder()
+        .setValue("42")
+        .build()
+    ).build()
+    val dt = LiteralValueProtoConverter.toDataType(proto)
+    dt shouldBe DecimalType(10, 0) // defaults
+  }
+
+  // ---------------------------------------------------------------------------
+  // array data type inference
+  // ---------------------------------------------------------------------------
+
+  test("array toDataType with explicit element type") {
+    val elementType = ProtoDataType.newBuilder()
+      .setString(ProtoDataType.String.getDefaultInstance).build()
+    val arrBuilder = Expression.Literal.Array.newBuilder()
+      .setElementType(elementType)
+    val proto = lit.setArray(arrBuilder.build()).build()
+    LiteralValueProtoConverter.toDataType(proto) shouldBe ArrayType(StringType, containsNull = true)
+  }
+
+  test("array toDataType inferred from elements") {
+    val arrBuilder = Expression.Literal.Array.newBuilder()
+      .addElements(Expression.Literal.newBuilder().setInteger(1).build())
+    val proto = lit.setArray(arrBuilder.build()).build()
+    LiteralValueProtoConverter.toDataType(proto) shouldBe
+      ArrayType(IntegerType, containsNull = true)
+  }
+
+  test("empty array toDataType returns ArrayType(NullType)") {
+    val arrBuilder = Expression.Literal.Array.newBuilder()
+    val proto = lit.setArray(arrBuilder.build()).build()
+    LiteralValueProtoConverter.toDataType(proto) shouldBe ArrayType(NullType, containsNull = true)
+  }
+
+  // ---------------------------------------------------------------------------
+  // map data type inference
+  // ---------------------------------------------------------------------------
+
+  test("map toDataType with explicit key/value types") {
+    val keyType = ProtoDataType.newBuilder()
+      .setString(ProtoDataType.String.getDefaultInstance).build()
+    val valType = ProtoDataType.newBuilder()
+      .setInteger(ProtoDataType.Integer.getDefaultInstance).build()
+    val mapBuilder = Expression.Literal.Map.newBuilder()
+      .setKeyType(keyType)
+      .setValueType(valType)
+    val proto = lit.setMap(mapBuilder.build()).build()
+    LiteralValueProtoConverter.toDataType(proto) shouldBe
+      MapType(StringType, IntegerType, valueContainsNull = true)
+  }
+
+  test("map toDataType inferred from elements") {
+    val mapBuilder = Expression.Literal.Map.newBuilder()
+      .addKeys(Expression.Literal.newBuilder().setString("x").build())
+      .addValues(Expression.Literal.newBuilder().setLong(1L).build())
+    val proto = lit.setMap(mapBuilder.build()).build()
+    LiteralValueProtoConverter.toDataType(proto) shouldBe
+      MapType(StringType, LongType, valueContainsNull = true)
+  }
+
+  test("empty map toDataType returns MapType(NullType, NullType)") {
+    val mapBuilder = Expression.Literal.Map.newBuilder()
+    val proto = lit.setMap(mapBuilder.build()).build()
+    LiteralValueProtoConverter.toDataType(proto) shouldBe
+      MapType(NullType, NullType, valueContainsNull = true)
+  }
+
+  // ---------------------------------------------------------------------------
+  // struct data type inference
+  // ---------------------------------------------------------------------------
+
+  test("struct toDataType with explicit struct_type") {
+    val f1 = ProtoDataType.StructField.newBuilder()
+      .setName("a")
+      .setDataType(ProtoDataType.newBuilder()
+        .setInteger(ProtoDataType.Integer.getDefaultInstance).build())
+      .setNullable(true)
+      .build()
+    val structType = ProtoDataType.newBuilder().setStruct(
+      ProtoDataType.Struct.newBuilder().addFields(f1).build()
+    ).build()
+    val structBuilder = Expression.Literal.Struct.newBuilder()
+      .setStructType(structType)
+      .addElements(Expression.Literal.newBuilder().setInteger(42).build())
+    val proto = lit.setStruct(structBuilder.build()).build()
+    val dt = LiteralValueProtoConverter.toDataType(proto)
+    dt shouldBe StructType(Seq(StructField("a", IntegerType, nullable = true)))
+  }
+
+  test("struct toDataType inferred from elements") {
+    val structBuilder = Expression.Literal.Struct.newBuilder()
+      .addElements(Expression.Literal.newBuilder().setString("hello").build())
+      .addElements(Expression.Literal.newBuilder().setInteger(42).build())
+    val proto = lit.setStruct(structBuilder.build()).build()
+    val dt = LiteralValueProtoConverter.toDataType(proto)
+    dt shouldBe StructType(Seq(
+      StructField("col0", StringType),
+      StructField("col1", IntegerType)
+    ))
+  }

@@ -361,3 +361,421 @@ class StreamingQueryListenerSuite extends AnyFunSuite with Matchers:
 
     result.hasQueryStartedEventJson shouldBe false
   }
+
+  // ---------------------------------------------------------------------------
+  // SimpleJsonParser: escape sequences
+  // ---------------------------------------------------------------------------
+
+  test("SimpleJsonParser handles backslash escape") {
+    val json = """{"path":"C:\\Users\\test"}"""
+    val result = SimpleJsonParser.parse(json)
+    result("path") shouldBe "C:\\Users\\test"
+  }
+
+  test("SimpleJsonParser handles forward slash escape") {
+    val json = """{"url":"http:\/\/example.com"}"""
+    val result = SimpleJsonParser.parse(json)
+    result("url") shouldBe "http://example.com"
+  }
+
+  test("SimpleJsonParser handles newline escape") {
+    val json = """{"text":"line1\nline2"}"""
+    val result = SimpleJsonParser.parse(json)
+    result("text") shouldBe "line1\nline2"
+  }
+
+  test("SimpleJsonParser handles tab escape") {
+    val json = """{"text":"col1\tcol2"}"""
+    val result = SimpleJsonParser.parse(json)
+    result("text") shouldBe "col1\tcol2"
+  }
+
+  test("SimpleJsonParser handles carriage return escape") {
+    val json = """{"text":"line1\rline2"}"""
+    val result = SimpleJsonParser.parse(json)
+    result("text") shouldBe "line1\rline2"
+  }
+
+  test("SimpleJsonParser handles unknown escape sequence") {
+    val json = """{"text":"test\xvalue"}"""
+    val result = SimpleJsonParser.parse(json)
+    result("text") shouldBe "test\\xvalue"
+  }
+
+  // ---------------------------------------------------------------------------
+  // SimpleJsonParser: nested objects
+  // ---------------------------------------------------------------------------
+
+  test("SimpleJsonParser handles nested JSON object as value") {
+    val json = """{"outer":{"inner":"value"}}"""
+    val result = SimpleJsonParser.parse(json)
+    result("outer") shouldBe """{"inner":"value"}"""
+  }
+
+  test("SimpleJsonParser handles deeply nested objects") {
+    val json = """{"a":{"b":{"c":"deep"}}}"""
+    val result = SimpleJsonParser.parse(json)
+    result("a") shouldBe """{"b":{"c":"deep"}}"""
+  }
+
+  // ---------------------------------------------------------------------------
+  // SimpleJsonParser: number, boolean, and array values
+  // ---------------------------------------------------------------------------
+
+  test("SimpleJsonParser handles numeric values") {
+    val json = """{"count":42,"rate":3.14}"""
+    val result = SimpleJsonParser.parse(json)
+    result("count") shouldBe "42"
+    result("rate") shouldBe "3.14"
+  }
+
+  test("SimpleJsonParser handles boolean values") {
+    val json = """{"active":true,"deleted":false}"""
+    val result = SimpleJsonParser.parse(json)
+    result("active") shouldBe "true"
+    result("deleted") shouldBe "false"
+  }
+
+  test("SimpleJsonParser handles array values") {
+    val json = """{"tags":["a","b","c"]}"""
+    val result = SimpleJsonParser.parse(json)
+    result("tags") shouldBe """["a","b","c"]"""
+  }
+
+  test("SimpleJsonParser handles mixed value types") {
+    val json = """{"name":"test","count":5,"flag":true,"data":null}"""
+    val result = SimpleJsonParser.parse(json)
+    result("name") shouldBe "test"
+    result("count") shouldBe "5"
+    result("flag") shouldBe "true"
+    result.get("data") shouldBe None
+  }
+
+  // ---------------------------------------------------------------------------
+  // SimpleJsonParser: error handling
+  // ---------------------------------------------------------------------------
+
+  test("SimpleJsonParser rejects non-JSON input") {
+    an[IllegalArgumentException] shouldBe thrownBy {
+      SimpleJsonParser.parse("not json")
+    }
+  }
+
+  test("SimpleJsonParser rejects array input") {
+    an[IllegalArgumentException] shouldBe thrownBy {
+      SimpleJsonParser.parse("[1,2,3]")
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // SimpleJsonParser: whitespace handling
+  // ---------------------------------------------------------------------------
+
+  test("SimpleJsonParser handles whitespace around keys and values") {
+    val json = """{ "key1" : "value1" , "key2" : "value2" }"""
+    val result = SimpleJsonParser.parse(json)
+    result("key1") shouldBe "value1"
+    result("key2") shouldBe "value2"
+  }
+
+  // ---------------------------------------------------------------------------
+  // QueryProgressEvent fromJson
+  // ---------------------------------------------------------------------------
+
+  test("QueryProgressEvent.fromJson stores the raw JSON") {
+    val rawJson = """{"batchId":5,"numInputRows":200,"inputRowsPerSecond":100.0}"""
+    val event = QueryProgressEvent.fromJson(rawJson)
+    event.progressJson shouldBe rawJson
+  }
+
+  test("QueryProgressEvent json wraps in progress key") {
+    val rawJson = """{"batchId":1}"""
+    val event = QueryProgressEvent(rawJson)
+    event.json shouldBe s"""{"progress":$rawJson}"""
+  }
+
+  // ---------------------------------------------------------------------------
+  // Event sealed trait
+  // ---------------------------------------------------------------------------
+
+  test("all event types are subtypes of Event") {
+    val id = UUID.randomUUID()
+    val runId = UUID.randomUUID()
+
+    val started: Event = QueryStartedEvent(id, runId, "q", "ts")
+    val progress: Event = QueryProgressEvent("{}")
+    val idle: Event = QueryIdleEvent(id, runId, "ts")
+    val terminated: Event = QueryTerminatedEvent(id, runId, None)
+
+    started shouldBe a[Event]
+    progress shouldBe a[Event]
+    idle shouldBe a[Event]
+    terminated shouldBe a[Event]
+  }
+
+  // ---------------------------------------------------------------------------
+  // QueryStartedEvent json output format
+  // ---------------------------------------------------------------------------
+
+  test("QueryStartedEvent json output with non-null name") {
+    val id = UUID.fromString("550e8400-e29b-41d4-a716-446655440000")
+    val runId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001")
+    val event = QueryStartedEvent(id, runId, "myQuery", "2026-04-05T10:00:00.000Z")
+    val json = event.json
+    json should include("\"name\":\"myQuery\"")
+    json should include(s""""id":"$id"""")
+    json should include(s""""runId":"$runId"""")
+    json should include("\"timestamp\":\"2026-04-05T10:00:00.000Z\"")
+  }
+
+  test("QueryStartedEvent json output with null name") {
+    val id = UUID.randomUUID()
+    val runId = UUID.randomUUID()
+    val event = QueryStartedEvent(id, runId, null, "2026-04-05T10:00:00.000Z")
+    event.json should include("\"name\":null")
+  }
+
+  // ---------------------------------------------------------------------------
+  // QueryIdleEvent json output
+  // ---------------------------------------------------------------------------
+
+  test("QueryIdleEvent json output") {
+    val id = UUID.fromString("550e8400-e29b-41d4-a716-446655440000")
+    val runId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001")
+    val event = QueryIdleEvent(id, runId, "2026-04-05T10:00:00.000Z")
+    val json = event.json
+    json should include(s""""id":"$id"""")
+    json should include(s""""runId":"$runId"""")
+    json should include("\"timestamp\":\"2026-04-05T10:00:00.000Z\"")
+  }
+
+  // ---------------------------------------------------------------------------
+  // QueryTerminatedEvent json output
+  // ---------------------------------------------------------------------------
+
+  test("QueryTerminatedEvent json with exception") {
+    val id = UUID.randomUUID()
+    val runId = UUID.randomUUID()
+    val event = QueryTerminatedEvent(id, runId, Some("error msg"), Some("ERR_CLASS"))
+    val json = event.json
+    json should include("\"exception\":\"error msg\"")
+    json should include("\"errorClassOnException\":\"ERR_CLASS\"")
+  }
+
+  test("QueryTerminatedEvent json without exception") {
+    val id = UUID.randomUUID()
+    val runId = UUID.randomUUID()
+    val event = QueryTerminatedEvent(id, runId, None, None)
+    val json = event.json
+    json should include("\"exception\":null")
+    json should include("\"errorClassOnException\":null")
+  }
+
+  // ---------------------------------------------------------------------------
+  // StreamingQueryListenerBus postToAll with actual listeners
+  // ---------------------------------------------------------------------------
+
+  test("StreamingQueryListenerBus postToAll dispatches QueryStartedEvent to listeners") {
+    import org.apache.spark.sql.SparkSession
+
+    val session = SparkSession(null)
+    val bus = StreamingQueryListenerBus(session)
+
+    var receivedEvent: Option[QueryStartedEvent] = None
+    val listener = new StreamingQueryListener:
+      def onQueryStarted(event: QueryStartedEvent): Unit =
+        receivedEvent = Some(event)
+      def onQueryProgress(event: QueryProgressEvent): Unit = ()
+      def onQueryTerminated(event: QueryTerminatedEvent): Unit = ()
+
+    // Directly add the listener to the internal list (bypass gRPC registration)
+    val listenersField = classOf[StreamingQueryListenerBus].getDeclaredField("listeners")
+    listenersField.setAccessible(true)
+    val listeners = listenersField.get(
+      bus
+    ).asInstanceOf[java.util.concurrent.CopyOnWriteArrayList[StreamingQueryListener]]
+    listeners.add(listener)
+
+    val event = QueryStartedEvent(
+      UUID.randomUUID(),
+      UUID.randomUUID(),
+      "test_q",
+      "2026-04-05T10:00:00.000Z"
+    )
+    bus.postToAll(event)
+
+    receivedEvent shouldBe defined
+    receivedEvent.get.name shouldBe "test_q"
+  }
+
+  test("StreamingQueryListenerBus postToAll dispatches QueryProgressEvent to listeners") {
+    import org.apache.spark.sql.SparkSession
+
+    val session = SparkSession(null)
+    val bus = StreamingQueryListenerBus(session)
+
+    var receivedEvent: Option[QueryProgressEvent] = None
+    val listener = new StreamingQueryListener:
+      def onQueryStarted(event: QueryStartedEvent): Unit = ()
+      def onQueryProgress(event: QueryProgressEvent): Unit =
+        receivedEvent = Some(event)
+      def onQueryTerminated(event: QueryTerminatedEvent): Unit = ()
+
+    val listenersField = classOf[StreamingQueryListenerBus].getDeclaredField("listeners")
+    listenersField.setAccessible(true)
+    val listeners = listenersField.get(
+      bus
+    ).asInstanceOf[java.util.concurrent.CopyOnWriteArrayList[StreamingQueryListener]]
+    listeners.add(listener)
+
+    val event = QueryProgressEvent("""{"batchId":1}""")
+    bus.postToAll(event)
+
+    receivedEvent shouldBe defined
+    receivedEvent.get.progressJson shouldBe """{"batchId":1}"""
+  }
+
+  test("StreamingQueryListenerBus postToAll dispatches QueryIdleEvent to listeners") {
+    import org.apache.spark.sql.SparkSession
+
+    val session = SparkSession(null)
+    val bus = StreamingQueryListenerBus(session)
+
+    var receivedEvent: Option[QueryIdleEvent] = None
+    val listener = new StreamingQueryListener:
+      def onQueryStarted(event: QueryStartedEvent): Unit = ()
+      def onQueryProgress(event: QueryProgressEvent): Unit = ()
+      override def onQueryIdle(event: QueryIdleEvent): Unit =
+        receivedEvent = Some(event)
+      def onQueryTerminated(event: QueryTerminatedEvent): Unit = ()
+
+    val listenersField = classOf[StreamingQueryListenerBus].getDeclaredField("listeners")
+    listenersField.setAccessible(true)
+    val listeners = listenersField.get(
+      bus
+    ).asInstanceOf[java.util.concurrent.CopyOnWriteArrayList[StreamingQueryListener]]
+    listeners.add(listener)
+
+    val event = QueryIdleEvent(UUID.randomUUID(), UUID.randomUUID(), "2026-04-05T10:00:00.000Z")
+    bus.postToAll(event)
+
+    receivedEvent shouldBe defined
+  }
+
+  test("StreamingQueryListenerBus postToAll dispatches QueryTerminatedEvent to listeners") {
+    import org.apache.spark.sql.SparkSession
+
+    val session = SparkSession(null)
+    val bus = StreamingQueryListenerBus(session)
+
+    var receivedEvent: Option[QueryTerminatedEvent] = None
+    val listener = new StreamingQueryListener:
+      def onQueryStarted(event: QueryStartedEvent): Unit = ()
+      def onQueryProgress(event: QueryProgressEvent): Unit = ()
+      def onQueryTerminated(event: QueryTerminatedEvent): Unit =
+        receivedEvent = Some(event)
+
+    val listenersField = classOf[StreamingQueryListenerBus].getDeclaredField("listeners")
+    listenersField.setAccessible(true)
+    val listeners = listenersField.get(
+      bus
+    ).asInstanceOf[java.util.concurrent.CopyOnWriteArrayList[StreamingQueryListener]]
+    listeners.add(listener)
+
+    val event = QueryTerminatedEvent(UUID.randomUUID(), UUID.randomUUID(), Some("err"), None)
+    bus.postToAll(event)
+
+    receivedEvent shouldBe defined
+    receivedEvent.get.exception shouldBe Some("err")
+  }
+
+  test("StreamingQueryListenerBus postToAll isolates listener exceptions") {
+    import org.apache.spark.sql.SparkSession
+
+    val session = SparkSession(null)
+    val bus = StreamingQueryListenerBus(session)
+
+    var goodListenerCalled = false
+    val badListener = new StreamingQueryListener:
+      def onQueryStarted(event: QueryStartedEvent): Unit =
+        throw new RuntimeException("boom")
+      def onQueryProgress(event: QueryProgressEvent): Unit = ()
+      def onQueryTerminated(event: QueryTerminatedEvent): Unit = ()
+
+    val goodListener = new StreamingQueryListener:
+      def onQueryStarted(event: QueryStartedEvent): Unit =
+        goodListenerCalled = true
+      def onQueryProgress(event: QueryProgressEvent): Unit = ()
+      def onQueryTerminated(event: QueryTerminatedEvent): Unit = ()
+
+    val listenersField = classOf[StreamingQueryListenerBus].getDeclaredField("listeners")
+    listenersField.setAccessible(true)
+    val listeners = listenersField.get(
+      bus
+    ).asInstanceOf[java.util.concurrent.CopyOnWriteArrayList[StreamingQueryListener]]
+    listeners.add(badListener)
+    listeners.add(goodListener)
+
+    val event = QueryStartedEvent(
+      UUID.randomUUID(),
+      UUID.randomUUID(),
+      "test",
+      "2026-04-05T10:00:00.000Z"
+    )
+
+    noException shouldBe thrownBy(bus.postToAll(event))
+    goodListenerCalled shouldBe true
+  }
+
+  test("StreamingQueryListenerBus list returns registered listeners") {
+    import org.apache.spark.sql.SparkSession
+
+    val session = SparkSession(null)
+    val bus = StreamingQueryListenerBus(session)
+
+    val listener = new StreamingQueryListener:
+      def onQueryStarted(event: QueryStartedEvent): Unit = ()
+      def onQueryProgress(event: QueryProgressEvent): Unit = ()
+      def onQueryTerminated(event: QueryTerminatedEvent): Unit = ()
+
+    val listenersField = classOf[StreamingQueryListenerBus].getDeclaredField("listeners")
+    listenersField.setAccessible(true)
+    val listeners = listenersField.get(
+      bus
+    ).asInstanceOf[java.util.concurrent.CopyOnWriteArrayList[StreamingQueryListener]]
+    listeners.add(listener)
+
+    val listed = bus.list()
+    listed should have length 1
+    listed(0) should be theSameInstanceAs listener
+  }
+
+  test("StreamingQueryListenerBus list returns empty for no listeners") {
+    import org.apache.spark.sql.SparkSession
+
+    val session = SparkSession(null)
+    val bus = StreamingQueryListenerBus(session)
+
+    bus.list() shouldBe empty
+  }
+
+  // ---------------------------------------------------------------------------
+  // SimpleJsonParser: nested object with strings containing braces
+  // ---------------------------------------------------------------------------
+
+  test("SimpleJsonParser handles nested object with string containing braces") {
+    val json = """{"data":{"msg":"hello {world}"}}"""
+    val result = SimpleJsonParser.parse(json)
+    result("data") shouldBe """{"msg":"hello {world}"}"""
+  }
+
+  // ---------------------------------------------------------------------------
+  // QueryTerminatedEvent default parameter
+  // ---------------------------------------------------------------------------
+
+  test("QueryTerminatedEvent default errorClassOnException is None") {
+    val id = UUID.randomUUID()
+    val runId = UUID.randomUUID()
+    val event = QueryTerminatedEvent(id, runId, Some("error"))
+    event.errorClassOnException shouldBe None
+  }
