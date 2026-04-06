@@ -24,11 +24,21 @@ class Column private[sql] (
   // Constructors
   // ---------------------------------------------------------------------------
 
-  /** Reference a column by name. */
+  /** Reference a column by name. Handles `"*"` and `"xxx.*"` as `UnresolvedStar`. */
   def this(name: String) = this(
-    Expression.newBuilder().setUnresolvedAttribute(
-      Expression.UnresolvedAttribute.newBuilder().setUnparsedIdentifier(name).build()
-    ).build(),
+    name match
+      case "*" =>
+        Expression.newBuilder().setUnresolvedStar(
+          Expression.UnresolvedStar.newBuilder().build()
+        ).build()
+      case s if s.endsWith(".*") =>
+        Expression.newBuilder().setUnresolvedStar(
+          Expression.UnresolvedStar.newBuilder().setUnparsedTarget(s).build()
+        ).build()
+      case _ =>
+        Expression.newBuilder().setUnresolvedAttribute(
+          Expression.UnresolvedAttribute.newBuilder().setUnparsedIdentifier(name).build()
+        ).build(),
     Seq.empty
   )
 

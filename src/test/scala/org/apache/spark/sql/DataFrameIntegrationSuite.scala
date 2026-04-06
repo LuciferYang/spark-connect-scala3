@@ -826,17 +826,26 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   }
 
   // --- Checkpoint ---
+  // Note: checkpoint requires SparkContext checkpoint directory to be configured on the server.
 
   test("checkpoint") {
     val df = spark.range(10).select(col("id"))
-    val cp = df.checkpoint()
-    assert(cp.count() == 10L)
+    try
+      val cp = df.checkpoint()
+      assert(cp.count() == 10L)
+    catch
+      case e: SparkException if e.getMessage.contains("Checkpoint directory has not been set") =>
+        cancel("Server does not have checkpoint directory configured")
   }
 
   test("localCheckpoint") {
     val df = spark.range(10).select(col("id"))
-    val cp = df.localCheckpoint()
-    assert(cp.count() == 10L)
+    try
+      val cp = df.localCheckpoint()
+      assert(cp.count() == 10L)
+    catch
+      case e: SparkException if e.getMessage.contains("Checkpoint directory has not been set") =>
+        cancel("Server does not have checkpoint directory configured")
   }
 
   // --- Schema: to ---
