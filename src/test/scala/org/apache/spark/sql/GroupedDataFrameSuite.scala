@@ -265,13 +265,15 @@ class GroupedDataFrameSuite extends AnyFunSuite with Matchers:
 
   // -- pivot after agg --
 
-  test("pivot preserves original grouping expressions plus pivot col") {
+  test("pivot sets Aggregate.Pivot field with pivot column") {
     val pivoted = stubGrouped.pivot(Column("category"))
     val result = pivoted.agg(functions.sum(Column("v1")).as("total"))
     val agg = result.relation.getAggregate
-    // Original "key" grouping expression plus "category" pivot column
-    agg.getGroupingExpressionsCount shouldBe 2
+    // Original "key" grouping expression only (pivot column is in Pivot field)
+    agg.getGroupingExpressionsCount shouldBe 1
     agg.getGroupType shouldBe Aggregate.GroupType.GROUP_TYPE_PIVOT
+    agg.hasPivot shouldBe true
+    agg.getPivot.hasCol shouldBe true
   }
 
   test("pivot then count builds PIVOT aggregate") {

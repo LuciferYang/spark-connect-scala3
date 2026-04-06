@@ -9,7 +9,9 @@ final class GroupedDataFrame private[sql] (
     private val df: DataFrame,
     private val groupingExprs: Seq[Column],
     private val groupType: GroupedDataFrame.GroupType,
-    private val groupingSetsProto: Option[Seq[Aggregate.GroupingSets]] = None
+    private val groupingSetsProto: Option[Seq[Aggregate.GroupingSets]] = None,
+    private val pivotCol: Option[Column] = None,
+    private val pivotValues: Seq[Expression.Literal] = Seq.empty
 ):
 
   def agg(aggExpr: Column, aggExprs: Column*): DataFrame =
@@ -26,7 +28,12 @@ final class GroupedDataFrame private[sql] (
     groupingExprs.foreach(c => aggBuilder.addGroupingExpressions(c.expr))
     allAggs.foreach(c => aggBuilder.addAggregateExpressions(c.expr))
     groupingSetsProto.foreach(_.foreach(gs => aggBuilder.addGroupingSets(gs)))
-    val allCols = groupingExprs ++ allAggs
+    pivotCol.foreach { pc =>
+      val pivotBuilder = Aggregate.Pivot.newBuilder().setCol(pc.expr)
+      pivotValues.foreach(pivotBuilder.addValues)
+      aggBuilder.setPivot(pivotBuilder.build())
+    }
+    val allCols = groupingExprs ++ pivotCol.toSeq ++ allAggs
     df.withRelation(allCols)(_.setAggregate(aggBuilder.build()))
 
   def agg(exprs: Map[String, String]): DataFrame =
@@ -65,7 +72,26 @@ final class GroupedDataFrame private[sql] (
     if cols.isEmpty then df else agg(cols.head, cols.tail*)
 
   def pivot(pivotCol: Column): GroupedDataFrame =
-    GroupedDataFrame(df, groupingExprs :+ pivotCol, GroupedDataFrame.GroupType.Pivot)
+    new GroupedDataFrame(
+      df,
+      groupingExprs,
+      GroupedDataFrame.GroupType.Pivot,
+      groupingSetsProto,
+      pivotCol = Some(pivotCol)
+    )
+
+  def pivot(pivotCol: Column, values: Seq[Any]): GroupedDataFrame =
+    val litValues = values.map { v =>
+      Column.lit(v).expr.getLiteral
+    }
+    new GroupedDataFrame(
+      df,
+      groupingExprs,
+      GroupedDataFrame.GroupType.Pivot,
+      groupingSetsProto,
+      pivotCol = Some(pivotCol),
+      pivotValues = litValues
+    )
 
   private def resolveColNames(colNames: Seq[String], funcName: String): Seq[Column] =
     colNames.map { name =>
@@ -94,4 +120,9 @@ object GroupedDataFrame:
       groupType: GroupType,
       groupingSetsProto: Option[Seq[Aggregate.GroupingSets]]
   ): GroupedDataFrame =
-    new GroupedDataFrame(df, groupingExprs, groupType, groupingSetsProto)
+    new GroupedDataFrame(
+      df,
+      groupingExprs,
+      groupType,
+      groupingSetsProto = groupingSetsProto
+    )

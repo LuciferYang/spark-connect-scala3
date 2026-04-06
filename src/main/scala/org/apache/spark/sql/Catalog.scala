@@ -221,34 +221,17 @@ final class Catalog private[sql] (private val session: SparkSession):
   // ---------------------------------------------------------------------------
 
   def createTable(tableName: String, path: String): DataFrame =
-    catalogDf(_.setCreateTable(
-      CreateTable.newBuilder()
-        .setTableName(tableName)
-        .setPath(path)
-        .build()
-    ))
+    createTable(tableName, "parquet", "", StructType(Seq.empty), Map("path" -> path))
 
   def createTable(tableName: String, path: String, source: String): DataFrame =
-    catalogDf(_.setCreateTable(
-      CreateTable.newBuilder()
-        .setTableName(tableName)
-        .setPath(path)
-        .setSource(source)
-        .build()
-    ))
+    createTable(tableName, source, Map("path" -> path))
 
   def createTable(
       tableName: String,
       source: String,
       options: Map[String, String]
   ): DataFrame =
-    catalogDf(_.setCreateTable(
-      CreateTable.newBuilder()
-        .setTableName(tableName)
-        .setSource(source)
-        .putAllOptions(options.asJava)
-        .build()
-    ))
+    createTable(tableName, source, StructType(Seq.empty), options)
 
   def createTable(
       tableName: String,
@@ -256,14 +239,7 @@ final class Catalog private[sql] (private val session: SparkSession):
       schema: StructType,
       options: Map[String, String]
   ): DataFrame =
-    catalogDf(_.setCreateTable(
-      CreateTable.newBuilder()
-        .setTableName(tableName)
-        .setSource(source)
-        .setSchema(DataTypeProtoConverter.toProto(schema))
-        .putAllOptions(options.asJava)
-        .build()
-    ))
+    createTable(tableName, source, "", schema, options)
 
   def createTable(
       tableName: String,
@@ -272,15 +248,13 @@ final class Catalog private[sql] (private val session: SparkSession):
       schema: StructType,
       options: Map[String, String]
   ): DataFrame =
-    catalogDf(_.setCreateTable(
-      CreateTable.newBuilder()
-        .setTableName(tableName)
-        .setSource(source)
-        .setDescription(description)
-        .setSchema(DataTypeProtoConverter.toProto(schema))
-        .putAllOptions(options.asJava)
-        .build()
-    ))
+    val builder = CreateTable.newBuilder()
+      .setTableName(tableName)
+      .setSource(source)
+      .setSchema(DataTypeProtoConverter.toProto(schema))
+      .setDescription(description)
+    options.foreach((k, v) => builder.putOptions(k, v))
+    catalogDf(_.setCreateTable(builder.build()))
 
   // ---------------------------------------------------------------------------
   // Create external table (deprecated, delegates to createTable)

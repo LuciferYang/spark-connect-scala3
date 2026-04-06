@@ -79,7 +79,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
     try
       // Write a simple parquet file so the table has data
       spark.range(5).write.mode("overwrite").parquet(tempDir.toString)
-      spark.catalog.createTable(tableName, tempDir.toString, "parquet")
+      spark.catalog.createTable(tableName, tempDir.toString, "parquet").collect()
       assert(spark.catalog.tableExists(tableName), "Table should exist after creation")
     finally
       // Use SQL to drop table -- Catalog.dropTable proto (field 28) is not yet

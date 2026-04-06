@@ -115,15 +115,15 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     val cat = extractCatalog(testCatalog.createTable("t1", "/data/path"))
     cat.hasCreateTable shouldBe true
     cat.getCreateTable.getTableName shouldBe "t1"
-    cat.getCreateTable.getPath shouldBe "/data/path"
-    cat.getCreateTable.hasSource shouldBe false
+    cat.getCreateTable.getOptionsMap.get("path") shouldBe "/data/path"
+    cat.getCreateTable.getSource shouldBe "parquet"
   }
 
   test("createTable with tableName, path, and source") {
     val cat = extractCatalog(testCatalog.createTable("t1", "/data/path", "parquet"))
     cat.hasCreateTable shouldBe true
     cat.getCreateTable.getTableName shouldBe "t1"
-    cat.getCreateTable.getPath shouldBe "/data/path"
+    cat.getCreateTable.getOptionsMap.get("path") shouldBe "/data/path"
     cat.getCreateTable.getSource shouldBe "parquet"
   }
 
@@ -176,7 +176,7 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     val cat1 = extractCatalog(testCatalog.createExternalTable("t", "/p"))
     cat1.hasCreateTable shouldBe true
     cat1.getCreateTable.getTableName shouldBe "t"
-    cat1.getCreateTable.getPath shouldBe "/p"
+    cat1.getCreateTable.getOptionsMap.get("path") shouldBe "/p"
   }
 
   // ---------------------------------------------------------------------------
@@ -562,7 +562,7 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     val cat = extractCatalog(testCatalog.createExternalTable("t", "/p", "csv"))
     cat.hasCreateTable shouldBe true
     cat.getCreateTable.getTableName shouldBe "t"
-    cat.getCreateTable.getPath shouldBe "/p"
+    cat.getCreateTable.getOptionsMap.get("path") shouldBe "/p"
     cat.getCreateTable.getSource shouldBe "csv"
   }
 
@@ -799,14 +799,15 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     val df = testCatalog.createTable("t", "/path/to/data")
     val ct = extractCatalog(df).getCreateTable
     ct.getTableName shouldBe "t"
-    ct.getPath shouldBe "/path/to/data"
+    ct.getOptionsMap.get("path") shouldBe "/path/to/data"
+    ct.getSource shouldBe "parquet"
   }
 
   test("createTable(tableName, path, source) method returns correct proto") {
     val df = testCatalog.createTable("t", "/path", "parquet")
     val ct = extractCatalog(df).getCreateTable
     ct.getTableName shouldBe "t"
-    ct.getPath shouldBe "/path"
+    ct.getOptionsMap.get("path") shouldBe "/path"
     ct.getSource shouldBe "parquet"
   }
 
@@ -847,14 +848,14 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     val df = testCatalog.createExternalTable("t", "/p")
     val ct = extractCatalog(df).getCreateTable
     ct.getTableName shouldBe "t"
-    ct.getPath shouldBe "/p"
+    ct.getOptionsMap.get("path") shouldBe "/p"
   }
 
   test("createExternalTable(tableName, path, source) delegates to createTable") {
     val df = testCatalog.createExternalTable("t", "/p", "csv")
     val ct = extractCatalog(df).getCreateTable
     ct.getTableName shouldBe "t"
-    ct.getPath shouldBe "/p"
+    ct.getOptionsMap.get("path") shouldBe "/p"
     ct.getSource shouldBe "csv"
   }
 

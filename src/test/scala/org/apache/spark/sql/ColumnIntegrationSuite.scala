@@ -178,7 +178,7 @@ class ColumnIntegrationSuite extends IntegrationTestBase:
     val df = spark.createDataFrame(rows, schema)
     assert(df.filter(col("s").contains("hello")).count() == 2)
     assert(df.filter(col("s").startsWith("hello")).count() == 2)
-    assert(df.filter(col("s").endsWith("foo")).count() == 2)
+    assert(df.filter(col("s").endsWith("foo")).count() == 1) // only "hello foo"
   }
 
   test("like, rlike, ilike") {
