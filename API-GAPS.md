@@ -352,6 +352,34 @@ No remaining gaps.
 
 ---
 
+## Known Integration Test Bugs
+
+The following bugs were discovered during integration testing and need to be fixed:
+
+| # | Bug | Root Cause | Affected Tests | Priority |
+|---|-----|-----------|----------------|----------|
+| 1 | `=!=` sends function name `!=` to server | SC3 uses `fn("!=", other)` but upstream implements as `!(this === other)` (NOT wrapping equals) | `=!=`, `notEqual` in ColumnIntegrationSuite | FIXED |
+| 2 | `saveAsTable` / `insertInto` fail with `TABLE_SAVE_METHOD_UNSPECIFIED(0)` | `SaveTable` proto enum value not being set in `DataFrameWriter` | saveAsTable, insertInto in ReadWriteIntegrationSuite | FIXED |
+| 3 | `contains`, `startsWith`, `endsWith` fail | Root cause not yet investigated | String methods in ColumnIntegrationSuite | MEDIUM |
+| 4 | `groupBy.pivot` with aggregation fails | Root cause not yet investigated | pivot in DataFrameIntegrationSuite | MEDIUM |
+| 5 | `catalog.createTable` / `dropTable` incorrect behavior | `tableExists` returns false after `createTable` succeeds | CatalogIntegrationSuite | LOW |
+
+### Bug Details
+
+**Bug 1: `=!=` implementation**
+- File: `src/main/scala/org/apache/spark/sql/Column.scala`, line 53
+- Current: `def =!=(other: Column): Column = fn("!=", other)`
+- Fix: `def =!=(other: Column): Column = !(this === other)`
+- Same fix needed for `notEqual` (Java-friendly alias)
+
+**Bug 2: `saveAsTable` / `insertInto` TABLE_SAVE_METHOD_UNSPECIFIED**
+- File: `src/main/scala/org/apache/spark/sql/DataFrameWriter.scala`
+- The `WriteOperation.SaveTable` enum must be explicitly set to `LOCAL_SAVE_TABLE` or `SAVE_TABLE` (not left as default 0)
+
+**Bug 3-5**: Root cause investigation pending.
+
+---
+
 ## Architecture Differences
 
 SC3 intentionally diverges from upstream in several areas:

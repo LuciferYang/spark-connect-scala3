@@ -76,14 +76,34 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
     writeBuilder.setTable(
       WriteOperation.SaveTable.newBuilder()
         .setTableName(tableName)
+        .setSaveMethod(
+          WriteOperation.SaveTable.TableSaveMethod.TABLE_SAVE_METHOD_SAVE_AS_TABLE
+        )
         .build()
     )
-    executeCommand(Command.newBuilder()
-      .setWriteOperation(writeBuilder.build())
-      .build())
+    executeCommand(
+      Command.newBuilder()
+        .setWriteOperation(writeBuilder.build())
+        .build()
+    )
 
   def insertInto(tableName: String): Unit =
-    mode("append").saveAsTable(tableName)
+    val writeBuilder = buildWriteOp()
+    writeBuilder
+      .setMode(WriteOperation.SaveMode.SAVE_MODE_APPEND)
+      .setTable(
+        WriteOperation.SaveTable.newBuilder()
+          .setTableName(tableName)
+          .setSaveMethod(
+            WriteOperation.SaveTable.TableSaveMethod.TABLE_SAVE_METHOD_INSERT_INTO
+          )
+          .build()
+      )
+    executeCommand(
+      Command.newBuilder()
+        .setWriteOperation(writeBuilder.build())
+        .build()
+    )
 
   def json(path: String): Unit = format("json").save(path)
   def parquet(path: String): Unit = format("parquet").save(path)

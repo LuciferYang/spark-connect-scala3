@@ -50,7 +50,7 @@ class Column private[sql] (
   // ---------------------------------------------------------------------------
 
   def ===(other: Column): Column = fn("==", other)
-  def =!=(other: Column): Column = fn("!=", other)
+  def =!=(other: Column): Column = !(this === other)
 
   /** Null-safe equality (NULL <=> NULL is true). */
   def <=>(other: Any): Column = fn("<=>", Column.lit(other))

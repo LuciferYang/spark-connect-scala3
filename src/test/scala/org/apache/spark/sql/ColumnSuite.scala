@@ -293,8 +293,13 @@ class ColumnSuite extends AnyFunSuite with Matchers:
 
   test("=!= with Any literal") {
     val c = Column("a") =!= "hello"
+    // =!= is implemented as !(===), which produces not(==(...))
     c.expr.hasUnresolvedFunction shouldBe true
-    c.expr.getUnresolvedFunction.getFunctionName shouldBe "!="
+    c.expr.getUnresolvedFunction.getFunctionName shouldBe "not"
+    c.expr.getUnresolvedFunction.getArgumentsCount shouldBe 1
+    val inner = c.expr.getUnresolvedFunction.getArguments(0)
+    inner.hasUnresolvedFunction shouldBe true
+    inner.getUnresolvedFunction.getFunctionName shouldBe "=="
   }
 
   test("> with Any literal") {
@@ -326,7 +331,10 @@ class ColumnSuite extends AnyFunSuite with Matchers:
 
   test("notEqual delegates to =!=") {
     val c = Column("a").notEqual(42)
-    c.expr.getUnresolvedFunction.getFunctionName shouldBe "!="
+    // notEqual delegates to =!=, which is !(===), producing not(==(...))
+    c.expr.getUnresolvedFunction.getFunctionName shouldBe "not"
+    val inner = c.expr.getUnresolvedFunction.getArguments(0)
+    inner.getUnresolvedFunction.getFunctionName shouldBe "=="
   }
 
   test("gt delegates to >") {
