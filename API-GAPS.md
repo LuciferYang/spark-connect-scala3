@@ -112,13 +112,13 @@ Last updated: 2026-04-06
 | `groupByKey[K](func)` | Typed grouped dataset | RESOLVED |
 | `lateralJoin` | Lateral join support (inner/left/cross) | RESOLVED |
 | `select[U1](TypedColumn)` | Typed select with 1-5 arity overloads via `Encoders.tuple` | RESOLVED |
+| `scalar()` / `exists()` | Correlated scalar/EXISTS subqueries as Column via `SubqueryExpression` + `WithRelations` | RESOLVED |
 | `rdd` / `toJavaRDD` | Convert to RDD | N/A (not supported in Connect) |
 
 ### DEFERRED (Not Planned)
 
 | API | Description | Reason |
 |-----|-------------|--------|
-| `scalar()` / `exists()` | Correlated scalar/EXISTS subqueries as Column expressions | Requires `WithRelations` architecture restructuring; high complexity, low priority |
 | `isEmpty` optimization | `IsEmpty` AnalyzePlan RPC for efficient emptiness check | Implemented via `limit(1).collect().isEmpty` -- functionally correct; `IsEmpty` variant does not exist in current proto |
 | `map`/`flatMap`/`mapPartitions`/`reduce` with explicit `Encoder` param | Java interop overloads | Scala 3 `derives Encoder` covers the Scala use case |
 
@@ -165,6 +165,7 @@ Last updated: 2026-04-06
 |-----|-------------|--------|
 | `as[U: Encoder]` (TypedColumn) | Typed column conversion | RESOLVED |
 | `substr(Column, Column)` | Overload taking Column args instead of Int | RESOLVED |
+| `isin(Dataset)` | IN subquery: `col IN (SELECT ...)` via `SubqueryExpression` + `WithRelations` | RESOLVED |
 
 ---
 
@@ -278,6 +279,7 @@ No remaining gaps.
 | `ConnectRepl` | Ammonite-based Scala 3 REPL with `SparkConnectClientParser` + `AmmoniteClassFinder` | RESOLVED |
 | `FetchErrorDetails` RPC | Enriched error details with exception chain, server stack traces, message parameters | RESOLVED |
 | Plan Compression (ZSTD) | Server-config-driven ZSTD compression for large plans via `CompressedOperation` proto | RESOLVED |
+| Scalar/Exists/IN Subqueries | `Dataset.scalar()`, `Dataset.exists()`, `Column.isin(Dataset)` via `SubqueryExpression` + `WithRelations` | RESOLVED |
 
 ---
 
@@ -323,12 +325,6 @@ No remaining gaps.
 ---
 
 ## Remaining Gaps (Deferred)
-
-### Scalar / Exists Subquery
-
-**Upstream**: `Dataset.scalar()` and `Dataset.exists()` -- correlated scalar and EXISTS subqueries as Column expressions.
-
-**SC3 status**: Not implemented. Requires `WithRelations` architecture restructuring. High complexity, low priority.
 
 ### `isEmpty` Optimization
 

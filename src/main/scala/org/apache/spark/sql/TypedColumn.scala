@@ -1,6 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.Expression
+import org.apache.spark.connect.proto.{Expression, Relation}
 
 /** A [[Column]] that also holds an [[Encoder]], enabling type-safe aggregation.
   *
@@ -14,9 +14,10 @@ import org.apache.spark.connect.proto.Expression
   */
 final class TypedColumn[-T, U] private[sql] (
     expr: Expression,
-    private[sql] val encoder: Encoder[U]
-) extends Column(expr):
+    private[sql] val encoder: Encoder[U],
+    subqueryRelations: Seq[Relation] = Seq.empty
+) extends Column(expr, subqueryRelations):
 
   /** Gives this TypedColumn a name (alias). Returns a new TypedColumn with the alias applied. */
   override def name(alias: String): TypedColumn[T, U] =
-    TypedColumn(super.as(alias).expr, encoder)
+    TypedColumn(super.as(alias).expr, encoder, subqueryRelations)

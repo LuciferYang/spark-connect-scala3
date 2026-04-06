@@ -26,13 +26,8 @@ final class GroupedDataFrame private[sql] (
     groupingExprs.foreach(c => aggBuilder.addGroupingExpressions(c.expr))
     allAggs.foreach(c => aggBuilder.addAggregateExpressions(c.expr))
     groupingSetsProto.foreach(_.foreach(gs => aggBuilder.addGroupingSets(gs)))
-    DataFrame(
-      df.session,
-      Relation.newBuilder()
-        .setCommon(RelationCommon.newBuilder().setPlanId(df.session.nextPlanId()).build())
-        .setAggregate(aggBuilder.build())
-        .build()
-    )
+    val allCols = groupingExprs ++ allAggs
+    df.withRelation(allCols)(_.setAggregate(aggBuilder.build()))
 
   def agg(exprs: Map[String, String]): DataFrame =
     val aggCols = exprs.map { (colName, funcName) =>

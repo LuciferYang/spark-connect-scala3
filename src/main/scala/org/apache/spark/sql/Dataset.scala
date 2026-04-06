@@ -8,7 +8,8 @@ import org.apache.spark.connect.proto.{
   MapPartitions,
   Relation,
   RelationCommon,
-  ScalarScalaUDF
+  ScalarScalaUDF,
+  SubqueryExpression
 }
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.ProductEncoder
@@ -491,6 +492,55 @@ final class Dataset[T: ClassTag] private[sql] (
       def hasNext: Boolean = javaIter.hasNext
       def next(): T = encoder.fromRow(javaIter.next())
       def close(): Unit = javaIter.close()
+
+  // ---------------------------------------------------------------------------
+  // Subquery expressions
+  // ---------------------------------------------------------------------------
+
+  /** Return this Dataset as a scalar subquery Column.
+    *
+    * The Dataset must return exactly one row and one column.
+    * {{{
+    *   val maxId = ds.select(functions.max("id")).scalar()
+    *   df.filter(Column("id") === maxId)
+    * }}}
+    */
+  def scalar(): Column =
+    val rel = df.relation
+    val planId = rel.getCommon.getPlanId
+    Column(
+      Expression.newBuilder()
+        .setSubqueryExpression(
+          SubqueryExpression.newBuilder()
+            .setPlanId(planId)
+            .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_SCALAR)
+            .build()
+        )
+        .build(),
+      Seq(rel)
+    )
+
+  /** Return this Dataset as an EXISTS subquery Column.
+    *
+    * {{{
+    *   val hasMatch = matchDs.exists()
+    *   df.filter(hasMatch)
+    * }}}
+    */
+  def exists(): Column =
+    val rel = df.relation
+    val planId = rel.getCommon.getPlanId
+    Column(
+      Expression.newBuilder()
+        .setSubqueryExpression(
+          SubqueryExpression.newBuilder()
+            .setPlanId(planId)
+            .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_EXISTS)
+            .build()
+        )
+        .build(),
+      Seq(rel)
+    )
 
   // ---------------------------------------------------------------------------
   // Convert to another type

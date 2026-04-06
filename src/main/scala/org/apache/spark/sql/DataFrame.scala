@@ -31,7 +31,7 @@ final class DataFrame private[sql] (
   def select(cols: Column*): DataFrame =
     val projBuilder = Project.newBuilder().setInput(relation)
     cols.foreach(c => projBuilder.addExpressions(c.expr))
-    withRelation(_.setProject(projBuilder.build()))
+    withRelation(cols.toSeq)(_.setProject(projBuilder.build()))
 
   def select(colNames: String*)(using DummyImplicit): DataFrame =
     select(colNames.map(Column(_))*)
@@ -40,7 +40,7 @@ final class DataFrame private[sql] (
     select(exprs.map(e => functions.expr(e))*)
 
   def filter(condition: Column): DataFrame =
-    withRelation(_.setFilter(
+    withRelation(Seq(condition))(_.setFilter(
       Filter.newBuilder().setInput(relation).setCondition(condition.expr).build()
     ))
 
@@ -63,7 +63,7 @@ final class DataFrame private[sql] (
   def orderBy(cols: Column*): DataFrame =
     val sortBuilder = Sort.newBuilder().setInput(relation).setIsGlobal(true)
     cols.foreach(c => sortBuilder.addOrder(c.toSortOrder))
-    withRelation(_.setSort(sortBuilder.build()))
+    withRelation(cols.toSeq)(_.setSort(sortBuilder.build()))
 
   def groupBy(cols: Column*): GroupedDataFrame =
     GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.GroupBy)
@@ -81,7 +81,7 @@ final class DataFrame private[sql] (
     groupBy(Seq.empty[Column]*).agg(aggExpr, aggExprs*)
 
   def join(right: DataFrame, joinExpr: Column, joinType: String = "inner"): DataFrame =
-    withRelation(_.setJoin(
+    withRelation(Seq(joinExpr))(_.setJoin(
       Join.newBuilder()
         .setLeft(relation)
         .setRight(right.relation)
@@ -131,7 +131,7 @@ final class DataFrame private[sql] (
     ))
 
   def withColumn(name: String, col: Column): DataFrame =
-    withRelation(_.setWithColumns(
+    withRelation(Seq(col))(_.setWithColumns(
       WithColumns.newBuilder()
         .setInput(relation)
         .addAliases(Expression.Alias.newBuilder()
@@ -282,7 +282,7 @@ final class DataFrame private[sql] (
   def sortWithinPartitions(cols: Column*): DataFrame =
     val sortBuilder = Sort.newBuilder().setInput(relation).setIsGlobal(false)
     cols.foreach(c => sortBuilder.addOrder(c.toSortOrder))
-    withRelation(_.setSort(sortBuilder.build()))
+    withRelation(cols.toSeq)(_.setSort(sortBuilder.build()))
 
   def sortWithinPartitions(colNames: String*)(using DummyImplicit): DataFrame =
     sortWithinPartitions(colNames.map(Column(_))*)
@@ -309,13 +309,13 @@ final class DataFrame private[sql] (
         .setInput(relation)
         .setNumPartitions(numPartitions)
       cols.foreach(c => builder.addPartitionExprs(c.expr))
-      withRelation(_.setRepartitionByExpression(builder.build()))
+      withRelation(cols.toSeq)(_.setRepartitionByExpression(builder.build()))
 
   /** Repartition by columns with default partition count. */
   def repartition(cols: Column*)(using DummyImplicit): DataFrame =
     val builder = RepartitionByExpression.newBuilder().setInput(relation)
     cols.foreach(c => builder.addPartitionExprs(c.expr))
-    withRelation(_.setRepartitionByExpression(builder.build()))
+    withRelation(cols.toSeq)(_.setRepartitionByExpression(builder.build()))
 
   /** Cache this DataFrame with the default storage level (MEMORY_AND_DISK). */
   def cache(): DataFrame = persist()
@@ -394,7 +394,7 @@ final class DataFrame private[sql] (
     val builder = LateralJoin.newBuilder()
       .setLeft(relation).setRight(right.relation)
       .setJoinCondition(condition.expr).setJoinType(jt)
-    withRelation(_.setLateralJoin(builder.build()))
+    withRelation(Seq(condition))(_.setLateralJoin(builder.build()))
 
   /** Lateral join without condition (defaults to inner). */
   def lateralJoin(right: DataFrame): DataFrame =
@@ -443,7 +443,7 @@ final class DataFrame private[sql] (
     val valuesMsg = Unpivot.Values.newBuilder()
     values.foreach(c => valuesMsg.addValues(c.expr))
     builder.setValues(valuesMsg.build())
-    withRelation(_.setUnpivot(builder.build()))
+    withRelation(ids.toSeq ++ values.toSeq)(_.setUnpivot(builder.build()))
 
   /** Unpivot a DataFrame — all non-id columns become values. */
   def unpivot(
@@ -497,13 +497,13 @@ final class DataFrame private[sql] (
           .build()
       )
     }
-    withRelation(_.setWithColumns(builder.build()))
+    withRelation(colsMap.values.toSeq)(_.setWithColumns(builder.build()))
 
   /** Drop columns by Column expression. */
   def drop(cols: Column*)(using DummyImplicit): DataFrame =
     val dropBuilder = Drop.newBuilder().setInput(relation)
     cols.foreach(c => dropBuilder.addColumns(c.expr))
-    withRelation(_.setDrop(dropBuilder.build()))
+    withRelation(cols.toSeq)(_.setDrop(dropBuilder.build()))
 
   /** Observe (collect metrics) on this DataFrame. */
   def observe(name: String, expr: Column, exprs: Column*): DataFrame =
@@ -512,7 +512,7 @@ final class DataFrame private[sql] (
       .setName(name)
     builder.addMetrics(expr.expr)
     exprs.foreach(e => builder.addMetrics(e.expr))
-    withRelation(_.setCollectMetrics(builder.build()))
+    withRelation(expr +: exprs)(_.setCollectMetrics(builder.build()))
 
   /** Observe (collect metrics) using an [[Observation]] instance.
     *
@@ -823,7 +823,7 @@ final class DataFrame private[sql] (
 
   /** Transpose this DataFrame from wide to tall format. */
   def transpose(indexColumn: Column): DataFrame =
-    withRelation(_.setTranspose(
+    withRelation(Seq(indexColumn))(_.setTranspose(
       Transpose.newBuilder()
         .setInput(relation).addIndexColumns(indexColumn.expr).build()
     ))
@@ -922,6 +922,28 @@ final class DataFrame private[sql] (
     val builder = Relation.newBuilder()
       .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
     DataFrame(session, f(builder).build())
+
+  /** Build a Relation; if cols contain subquery references, wrap with WithRelations. */
+  private[sql] def withRelation(cols: Seq[Column])(
+      f: Relation.Builder => Relation.Builder
+  ): DataFrame =
+    val allRefs = cols.flatMap(_.subqueryRelations)
+    if allRefs.isEmpty then withRelation(f)
+    else
+      val innerBuilder = Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+      val innerRel = f(innerBuilder).build()
+      val uniqueRefs = allRefs.distinctBy(_.getCommon.getPlanId)
+      val wrRel = Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+        .setWithRelations(
+          WithRelations.newBuilder()
+            .setRoot(innerRel)
+            .addAllReferences(uniqueRefs.asJava)
+            .build()
+        )
+        .build()
+      DataFrame(session, wrRel)
 
   private def setOp(
       other: DataFrame,
