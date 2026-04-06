@@ -122,18 +122,18 @@ class ColumnIntegrationSuite extends IntegrationTestBase:
   // ---------------------------------------------------------------------------
 
   test("bitwiseOR, bitwiseAND, bitwiseXOR") {
-    val rows = Seq(Row(0x0F), Row(0xF0))
+    val rows = Seq(Row(0x0f), Row(0xf0))
     val schema = StructType(Seq(StructField("x", IntegerType)))
     val df = spark.createDataFrame(rows, schema)
     val result = df.select(
-      col("x").bitwiseOR(0xFF).as("or_val"),
-      col("x").bitwiseAND(0x0F).as("and_val"),
-      col("x").bitwiseXOR(0xFF).as("xor_val")
+      col("x").bitwiseOR(0xff).as("or_val"),
+      col("x").bitwiseAND(0x0f).as("and_val"),
+      col("x").bitwiseXOR(0xff).as("xor_val")
     ).orderBy(col("or_val")).collect()
     // x=0x0F: or=0xFF, and=0x0F, xor=0xF0
-    assert(result(0).getInt(0) == 0xFF)
-    assert(result(0).getInt(1) == 0x0F)
-    assert(result(0).getInt(2) == 0xF0)
+    assert(result(0).getInt(0) == 0xff)
+    assert(result(0).getInt(1) == 0x0f)
+    assert(result(0).getInt(2) == 0xf0)
   }
 
   test("| & ^ operators") {
@@ -141,7 +141,7 @@ class ColumnIntegrationSuite extends IntegrationTestBase:
     val result = df.select(
       (col("x") | lit(0x10)).as("or_val"),
       (col("x") & lit(0x01)).as("and_val"),
-      (col("x") ^ lit(0xFF)).as("xor_val")
+      (col("x") ^ lit(0xff)).as("xor_val")
     ).orderBy(col("x")).collect()
     // x=1: |0x10=17, &0x01=1, ^0xFF=254
     assert(result(0).getInt(0) == 17)
