@@ -4,8 +4,8 @@ import org.apache.spark.sql.functions.*
 import org.apache.spark.sql.tags.IntegrationTest
 import org.apache.spark.sql.types.*
 
-/** Integration tests for DataFrame operations: basic connectivity, transformations,
-  * NaFunctions, StatFunctions, Window, join, describe, and explain.
+/** Integration tests for DataFrame operations: basic connectivity, transformations, NaFunctions,
+  * StatFunctions, Window, join, describe, and explain.
   */
 @IntegrationTest
 class DataFrameIntegrationSuite extends IntegrationTestBase:

@@ -4,11 +4,11 @@ import org.apache.spark.sql.tags.IntegrationTest
 
 import java.nio.file.Paths
 
-/** Base trait for integration tests that require a running Spark Connect server
-  * at sc://localhost:15002.
+/** Base trait for integration tests that require a running Spark Connect server at
+  * sc://localhost:15002.
   *
-  * All concrete suites extending this trait must be annotated with
-  * `@IntegrationTest` so that `sbt test` excludes them by tag.
+  * All concrete suites extending this trait must be annotated with `@IntegrationTest` so that
+  * `sbt test` excludes them by tag.
   *
   * Start a Spark Connect server with: $SPARK_HOME/sbin/start-connect-server.sh
   */
