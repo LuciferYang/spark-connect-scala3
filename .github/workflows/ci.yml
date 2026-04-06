@@ -91,7 +91,7 @@ jobs:
           done
 
       - name: Run integration tests
-        run: build/sbt 'testOnly *IntegrationSuite'
+        run: build/sbt 'testOnly -- -n org.apache.spark.sql.tags.IntegrationTest'
 
       - name: Stop Spark Connect Server
         if: always()

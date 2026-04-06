@@ -122,7 +122,7 @@ object DataTypeProtoConverter:
         }
         ProtoDataType.newBuilder().setStruct(structBuilder.build()).build()
 
-      case _ =>
+      case null =>
         ProtoDataType.newBuilder().setString(
           ProtoDataType.String.getDefaultInstance
         ).build() // fallback

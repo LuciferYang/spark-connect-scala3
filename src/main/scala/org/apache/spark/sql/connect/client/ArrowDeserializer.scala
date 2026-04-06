@@ -64,6 +64,12 @@ object ArrowDeserializer:
       case v: TimeStampSecVector =>
         java.sql.Timestamp(v.get(index) * 1000L)
 
+      case v: MapVector =>
+        extractValue(v.getDataVector, index) match
+          case seq: Seq[?] =>
+            seq.collect { case row: Row if row.size == 2 => row.get(0) -> row.get(1) }.toMap
+          case _ => Map.empty
+
       case v: ListVector =>
         val inner = v.getDataVector
         val start = v.getElementStartIndex(index)
@@ -73,12 +79,6 @@ object ArrowDeserializer:
       case v: StructVector =>
         val fields = v.getChildrenFromFields.asScala.toSeq
         Row.fromSeq(fields.map(f => extractValue(f, index)))
-
-      case v: MapVector =>
-        extractValue(v.getDataVector, index) match
-          case seq: Seq[?] =>
-            seq.collect { case row: Row if row.size == 2 => row.get(0) -> row.get(1) }.toMap
-          case _ => Map.empty
 
       case v =>
         try v.getObject(index)

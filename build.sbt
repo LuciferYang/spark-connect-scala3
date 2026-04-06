@@ -89,8 +89,9 @@ lazy val root = (project in file("."))
     // gRPC Java codegen plugin
     libraryDependencies += "io.grpc" % "protoc-gen-grpc-java" % grpcVersion asProtocPlugin(),
 
-    // Exclude IntegrationSuite from unit tests (requires live Spark Connect Server)
-    Test / testOptions += Tests.Filter(name => !name.contains("IntegrationSuite")),
+    // Exclude @IntegrationTest-tagged suites from unit tests (requires live Spark Connect Server)
+    Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest,
+      "-l", "org.apache.spark.sql.tags.IntegrationTest"),
 
     // JVM options for Apache Arrow
     Test / javaOptions ++= Seq(
