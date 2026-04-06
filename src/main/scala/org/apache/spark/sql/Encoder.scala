@@ -185,25 +185,31 @@ object Encoder:
     case Some(v) => v
     case other   => other
 
+  /** Concrete Encoder for derived case classes (avoids anonymous class duplication at inline
+    * sites).
+    */
+  private[sql] class DerivedEncoder[T](
+      _schema: StructType,
+      mirror: Mirror.ProductOf[T]
+  ) extends Encoder[T]:
+    def schema: StructType = _schema
+
+    def fromRow(row: Row): T =
+      val values = (0 until _schema.fields.size).map { i =>
+        val isOpt = _schema.fields(i).nullable && _schema.fields(i).dataType != NullType
+        extractField(row, i, isOpt)
+      }
+      val tuple = Tuple.fromArray(values.toArray)
+      mirror.fromTuple(tuple.asInstanceOf[mirror.MirroredElemTypes])
+
+    def toRow(value: T): Row =
+      val product = value.asInstanceOf[Product]
+      val rowValues = (0 until product.productArity).map { i =>
+        unwrapForRow(product.productElement(i))
+      }
+      Row.fromSeq(rowValues)
+
   /** Derive an Encoder for any case class T using Scala 3 Mirror. */
   inline given derived[T](using m: Mirror.ProductOf[T]): Encoder[T] =
     val fields = fieldsOf[m.MirroredElemTypes, m.MirroredElemLabels]
-    val _schema = StructType(fields)
-
-    new Encoder[T]:
-      def schema: StructType = _schema
-
-      def fromRow(row: Row): T =
-        val values = (0 until fields.size).map { i =>
-          val isOpt = fields(i).nullable && fields(i).dataType != NullType
-          extractField(row, i, isOpt)
-        }
-        val tuple = Tuple.fromArray(values.toArray)
-        m.fromTuple(tuple.asInstanceOf[m.MirroredElemTypes])
-
-      def toRow(value: T): Row =
-        val product = value.asInstanceOf[Product]
-        val rowValues = (0 until product.productArity).map { i =>
-          unwrapForRow(product.productElement(i))
-        }
-        Row.fromSeq(rowValues)
+    DerivedEncoder[T](StructType(fields), m)
