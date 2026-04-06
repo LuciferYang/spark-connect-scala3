@@ -358,9 +358,9 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
   // ---------------------------------------------------------------------------
 
   test("writeTo.create and append") {
-    val tableName = "sc3_test_writer_v2_create"
+    val tableName = "testcat.sc3_test_writer_v2_create"
     try
-      testDf.writeTo(tableName).using("parquet").create()
+      testDf.writeTo(tableName).create()
       val r1 = spark.read.table(tableName).count()
       assert(r1 == 3)
       testDf.writeTo(tableName).append()
@@ -372,16 +372,16 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
   }
 
   test("writeTo.createOrReplace") {
-    val tableName = "sc3_test_writer_v2_cor"
+    val tableName = "testcat.sc3_test_writer_v2_cor"
     try
-      testDf.writeTo(tableName).using("parquet").createOrReplace()
+      testDf.writeTo(tableName).createOrReplace()
       assert(spark.read.table(tableName).count() == 3)
       // createOrReplace again with different data
       val small = spark.createDataFrame(
         Seq(Row(99L, "z", 0.0)),
         testDf.schema
       )
-      small.writeTo(tableName).using("parquet").createOrReplace()
+      small.writeTo(tableName).createOrReplace()
       assert(spark.read.table(tableName).count() == 1)
     finally
       try spark.sql(s"DROP TABLE IF EXISTS $tableName")

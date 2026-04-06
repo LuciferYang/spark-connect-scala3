@@ -64,8 +64,10 @@ jobs:
       - name: Cache Spark distribution
         uses: actions/cache@v4
         with:
-          path: spark-${{ matrix.spark-version }}-bin-hadoop3
-          key: spark-${{ matrix.spark-version }}-bin-hadoop3
+          path: |
+            spark-${{ matrix.spark-version }}-bin-hadoop3
+            spark-catalyst_2.13-${{ matrix.spark-version }}-tests.jar
+          key: spark-${{ matrix.spark-version }}-bin-hadoop3-v2
 
       - name: Download Spark ${{ matrix.spark-version }}
         run: |
@@ -77,9 +79,20 @@ jobs:
           fi
           echo "SPARK_HOME=$(pwd)/spark-${SPARK_VERSION}-bin-hadoop3" >> "$GITHUB_ENV"
 
+      - name: Download test jars (InMemoryTableCatalog for V2 table tests)
+        run: |
+          SPARK_VERSION=${{ matrix.spark-version }}
+          CATALYST_TEST_JAR="spark-catalyst_2.13-${SPARK_VERSION}-tests.jar"
+          if [ ! -f "$CATALYST_TEST_JAR" ]; then
+            wget -q "https://repo1.maven.org/maven2/org/apache/spark/spark-catalyst_2.13/${SPARK_VERSION}/${CATALYST_TEST_JAR}"
+          fi
+          echo "CATALYST_TEST_JAR=$(pwd)/${CATALYST_TEST_JAR}" >> "$GITHUB_ENV"
+
       - name: Start Spark Connect Server
         run: |
-          $SPARK_HOME/sbin/start-connect-server.sh
+          $SPARK_HOME/sbin/start-connect-server.sh \
+            --jars "$CATALYST_TEST_JAR" \
+            --conf spark.sql.catalog.testcat=org.apache.spark.sql.connector.catalog.InMemoryTableCatalog
           # Wait for server to be ready
           for i in $(seq 1 30); do
             if nc -z localhost 15002 2>/dev/null; then
@@ -91,7 +104,7 @@ jobs:
           done
 
       - name: Run integration tests
-        run: build/sbt 'testOnly -- -n org.apache.spark.sql.tags.IntegrationTest'
+        run: build/sbt 'set Test / testOptions := Seq(Tests.Argument(TestFrameworks.ScalaTest, "-n", "org.apache.spark.sql.tags.IntegrationTest"))' 'testOnly *IntegrationSuite *IntegrationTestBase'
 
       - name: Stop Spark Connect Server
         if: always()
