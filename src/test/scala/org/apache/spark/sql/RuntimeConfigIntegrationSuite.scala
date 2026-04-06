@@ -2,8 +2,8 @@ package org.apache.spark.sql
 
 import org.apache.spark.sql.tags.IntegrationTest
 
-/** Integration tests for RuntimeConfig:
-  * set/get/getOption/getAll/unset/isModifiable, type overloads.
+/** Integration tests for RuntimeConfig: set/get/getOption/getAll/unset/isModifiable, type
+  * overloads.
   */
 @IntegrationTest
 class RuntimeConfigIntegrationSuite extends IntegrationTestBase:

@@ -7,8 +7,8 @@ import org.apache.spark.sql.types.*
 import java.nio.file.{Files, Path}
 import java.util.Comparator
 
-/** Integration tests for DataFrameReader and DataFrameWriter:
-  * csv/json/parquet/orc/text round-trip, write modes, partitionBy, saveAsTable, insertInto.
+/** Integration tests for DataFrameReader and DataFrameWriter: csv/json/parquet/orc/text round-trip,
+  * write modes, partitionBy, saveAsTable, insertInto.
   */
 @IntegrationTest
 class ReadWriteIntegrationSuite extends IntegrationTestBase:

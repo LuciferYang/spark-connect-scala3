@@ -4,9 +4,8 @@ import org.apache.spark.sql.functions.*
 import org.apache.spark.sql.tags.IntegrationTest
 import org.apache.spark.sql.types.*
 
-/** Integration tests for SparkSession APIs:
-  * sql with args, emptyDataFrame, emptyDataset, newSession, cloneSession,
-  * version, sessionId, table, tags, createDataset.
+/** Integration tests for SparkSession APIs: sql with args, emptyDataFrame, emptyDataset,
+  * newSession, cloneSession, version, sessionId, table, tags, createDataset.
   */
 @IntegrationTest
 class SparkSessionIntegrationSuite extends IntegrationTestBase:
@@ -41,7 +40,8 @@ class SparkSessionIntegrationSuite extends IntegrationTestBase:
   test("sql with positional arguments (Column varargs)") {
     val result = spark.sql(
       "SELECT ? + ? AS sum",
-      lit(10), lit(20)
+      lit(10),
+      lit(20)
     ).collect()
     assert(result.length == 1)
     assert(result(0).get(0).toString.toInt == 30)
