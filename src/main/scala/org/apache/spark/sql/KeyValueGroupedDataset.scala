@@ -130,7 +130,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   /** Reduce the values in each group using an associative binary operator.
     *
     * Returns a Dataset of (key, reduced_value) pairs. When AgnosticEncoder is available, uses a
-    * server-side [[ReduceAggregator]]; otherwise falls back to client-side mapGroups.
+    * server-side `ReduceAggregator`; otherwise falls back to client-side mapGroups.
     */
   def reduceGroups(func: (V, V) => V)(using
       pairEnc: Encoder[(K, V)],

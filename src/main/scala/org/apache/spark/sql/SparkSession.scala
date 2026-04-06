@@ -220,7 +220,7 @@ final class SparkSession private[sql] (
   /** Upload all `.class` files under a directory. */
   def addClassDir(base: Path): Unit = client.artifactManager.addClassDir(base)
 
-  /** Register a [[ClassFinder]] for automatic class upload before each execution. */
+  /** Register a `ClassFinder` for automatic class upload before each execution. */
   def registerClassFinder(finder: ClassFinder): Unit =
     client.artifactManager.registerClassFinder(finder)
 

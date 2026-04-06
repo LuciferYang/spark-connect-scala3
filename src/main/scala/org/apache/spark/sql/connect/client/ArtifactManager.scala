@@ -20,7 +20,7 @@ import scala.util.control.NonFatal
 trait ClassFinder:
   def findClasses(): Iterator[Artifact]
 
-/** A [[ClassFinder]] that walks a directory tree and collects `.class` files.
+/** A `ClassFinder` that walks a directory tree and collects `.class` files.
   *
   * {{{
   *   val finder = ClassDirFinder("/path/to/classes")
@@ -48,7 +48,7 @@ class ClassDirFinder(rootDir: Path) extends ClassFinder:
 /** Manages uploading artifacts (class files, JARs) to the Spark Connect server via the
   * `AddArtifacts` client-streaming gRPC.
   *
-  * Call [[addArtifact]] or [[addClassDir]] to upload explicitly. Register a [[ClassFinder]] via
+  * Call [[addArtifact]] or [[addClassDir]] to upload explicitly. Register a `ClassFinder` via
   * [[registerClassFinder]] for automatic upload before every plan execution.
   */
 final class ArtifactManager private[client] (
@@ -62,7 +62,7 @@ final class ArtifactManager private[client] (
 
   private val classFinders = CopyOnWriteArrayList[ClassFinder]()
 
-  /** Register a [[ClassFinder]] whose classes are uploaded before every plan execution. */
+  /** Register a `ClassFinder` whose classes are uploaded before every plan execution. */
   def registerClassFinder(finder: ClassFinder): Unit = classFinders.add(finder)
 
   /** Upload a JAR or class file from the local filesystem. */
@@ -96,7 +96,7 @@ final class ArtifactManager private[client] (
     finally stream.close()
     addArtifacts(builder.result())
 
-  /** Upload all class files discovered by registered [[ClassFinder]]s. Called automatically before
+  /** Upload all class files discovered by registered `ClassFinder`s. Called automatically before
     * every plan execution.
     */
   private[client] def uploadAllClassFileArtifacts(): Unit =

@@ -1582,7 +1582,7 @@ object functions:
   // User-Defined Aggregate Functions (UDAF)
   // ---------------------------------------------------------------------------
 
-  /** Create a UDAF from an [[Aggregator]] with an implicit input encoder.
+  /** Create a UDAF from an `Aggregator` with an implicit input encoder.
     *
     * {{{
     *   val myUdaf = udaf(myAggregator)
@@ -1596,7 +1596,7 @@ object functions:
     val outputEnc = extractAgnosticEncoder(agg.outputEncoder)
     UserDefinedFunction.forAggregator(agg, inputEnc, outputEnc)
 
-  /** Create a UDAF from an [[Aggregator]] with an explicit input encoder.
+  /** Create a UDAF from an `Aggregator` with an explicit input encoder.
     *
     * {{{
     *   val myUdaf = udaf(myAggregator, Encoders.scalaLong)

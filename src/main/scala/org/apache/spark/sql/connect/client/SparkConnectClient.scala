@@ -140,7 +140,7 @@ final class SparkConnectClient private (
   // ---------------------------------------------------------------------------
 
   /** Execute a plan and return a lazy iterator of responses. The returned iterator is
-    * [[AutoCloseable]] — callers should close it after use to release server-side resources.
+    * `AutoCloseable` — callers should close it after use to release server-side resources.
     */
   def execute(plan: Plan): Iterator[ExecutePlanResponse] & AutoCloseable =
     artifactManager.uploadAllClassFileArtifacts()

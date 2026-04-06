@@ -8,7 +8,7 @@ import java.util.UUID
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 
-/** An iterator over [[ExecutePlanResponse]] that supports reattaching to an in-progress execution
+/** An iterator over `ExecutePlanResponse` that supports reattaching to an in-progress execution
   * after a transient gRPC failure. Ported from the upstream Spark Connect client and adapted for
   * Scala 3.
   *

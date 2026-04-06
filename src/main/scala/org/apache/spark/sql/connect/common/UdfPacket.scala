@@ -16,7 +16,7 @@ import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
   * standard Scala 2.13 case class that uses `defaultWriteObject`/`defaultReadObject`.
   *
   * This class uses `defaultWriteObject()` to produce the same wire format. The `AgnosticEncoder`
-  * instances use `writeReplace` to substitute an [[EncoderSerializationProxy]] that, on the server
+  * instances use `writeReplace` to substitute an `EncoderSerializationProxy` that, on the server
   * side, resolves to the server's own encoder singletons via reflection. This avoids
   * serialVersionUID mismatches between Scala 3 and Scala 2.13 classes.
   */

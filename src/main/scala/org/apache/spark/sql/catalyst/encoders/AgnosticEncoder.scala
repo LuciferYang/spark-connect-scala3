@@ -9,7 +9,7 @@ import scala.reflect.ClassTag
 /** Minimal stub of upstream Spark's `AgnosticEncoder` hierarchy.
   *
   * The server-side `SparkConnectPlanner` deserializes `UdfPacket` which contains `AgnosticEncoder`
-  * instances. These stubs use `writeReplace` to substitute a [[EncoderSerializationProxy]] that
+  * instances. These stubs use `writeReplace` to substitute an `EncoderSerializationProxy` that
   * carries only a type name. On the server side, the proxy's `readResolve` uses reflection to look
   * up the real encoder singleton from the server's own `AgnosticEncoders` object (loaded by the
   * parent classloader). This avoids all serialVersionUID and class-structure mismatches between our
@@ -333,7 +333,7 @@ final class EncoderSerializationProxy(val encoderName: String) extends Serializa
 
 /** Serialization proxy for parameterized [[AgnosticEncoder]] instances.
   *
-  * Unlike [[EncoderSerializationProxy]] which only handles singletons (`case object`), this proxy
+  * Unlike `EncoderSerializationProxy` which only handles singletons (`case object`), this proxy
   * carries constructor arguments to reconstruct parameterized encoders (e.g., `DateEncoder(false)`,
   * `InstantEncoder(true)`) on the server side.
   */
