@@ -4,8 +4,7 @@ import org.apache.spark.sql.functions.*
 import org.apache.spark.sql.tags.IntegrationTest
 import org.apache.spark.sql.types.*
 
-/** Integration tests for GroupedDataFrame:
-  * count, mean/avg, max, min, sum, agg(Map), pivot.
+/** Integration tests for GroupedDataFrame: count, mean/avg, max, min, sum, agg(Map), pivot.
   */
 @IntegrationTest
 class GroupedDataFrameIntegrationSuite extends IntegrationTestBase:

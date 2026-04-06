@@ -4,9 +4,8 @@ import org.apache.spark.sql.functions.*
 import org.apache.spark.sql.tags.IntegrationTest
 import org.apache.spark.sql.types.*
 
-/** Integration tests for KeyValueGroupedDataset:
-  * groupByKey, keys, count, mapGroups, flatMapGroups, reduceGroups, cogroup,
-  * mapValues, flatMapSortedGroups.
+/** Integration tests for KeyValueGroupedDataset: groupByKey, keys, count, mapGroups, flatMapGroups,
+  * reduceGroups, cogroup, mapValues, flatMapSortedGroups.
   */
 @IntegrationTest
 class KeyValueGroupedDatasetIntegrationSuite extends IntegrationTestBase:
@@ -54,7 +53,7 @@ class KeyValueGroupedDatasetIntegrationSuite extends IntegrationTestBase:
     import Encoder.given
     val result = recordDs
       .groupByKey(_.group)
-      .mapGroups { (key, iter) => (key, iter.map(_.value).sum) }
+      .mapGroups((key, iter) => (key, iter.map(_.value).sum))
       .collect()
     assert(result.toSet == Set(("A", 60), ("B", 90)))
   }
@@ -104,7 +103,7 @@ class KeyValueGroupedDatasetIntegrationSuite extends IntegrationTestBase:
     val result = recordDs
       .groupByKey(_.group)
       .mapValues(_.value)
-      .mapGroups { (key, iter) => (key, iter.sum) }
+      .mapGroups((key, iter) => (key, iter.sum))
       .collect()
     assert(result.toSet == Set(("A", 60), ("B", 90)))
   }
@@ -150,4 +149,3 @@ class KeyValueGroupedDatasetIntegrationSuite extends IntegrationTestBase:
     assert(result.toSet.contains("A:60:1.0"))
     assert(result.toSet.contains("B:90:2.0"))
   }
-

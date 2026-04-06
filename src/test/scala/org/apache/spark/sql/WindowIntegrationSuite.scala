@@ -4,9 +4,8 @@ import org.apache.spark.sql.functions.*
 import org.apache.spark.sql.tags.IntegrationTest
 import org.apache.spark.sql.types.*
 
-/** Integration tests for Window functions:
-  * rowsBetween, rangeBetween, rank, dense_rank, lead, lag, ntile,
-  * percent_rank, cume_dist, first_value, last_value, nth_value.
+/** Integration tests for Window functions: rowsBetween, rangeBetween, rank, dense_rank, lead, lag,
+  * ntile, percent_rank, cume_dist, first_value, last_value, nth_value.
   */
 @IntegrationTest
 class WindowIntegrationSuite extends IntegrationTestBase:
@@ -76,7 +75,10 @@ class WindowIntegrationSuite extends IntegrationTestBase:
 
   test("rank and dense_rank") {
     val rows = Seq(
-      Row("A", 100), Row("A", 200), Row("A", 200), Row("A", 300)
+      Row("A", 100),
+      Row("A", 200),
+      Row("A", 200),
+      Row("A", 300)
     )
     val schema = StructType(Seq(
       StructField("grp", StringType),
@@ -131,7 +133,9 @@ class WindowIntegrationSuite extends IntegrationTestBase:
     val w = Window.partitionBy(col("group")).orderBy(col("seq"))
     val result = windowTestDf
       .select(
-        col("group"), col("seq"), col("value"),
+        col("group"),
+        col("seq"),
+        col("value"),
         lead(col("value"), 1).over(w).as("next_val"),
         lag(col("value"), 1).over(w).as("prev_val")
       )
@@ -179,7 +183,8 @@ class WindowIntegrationSuite extends IntegrationTestBase:
       .rowsBetween(Window.unboundedPreceding, Window.unboundedFollowing)
     val result = windowTestDf
       .select(
-        col("group"), col("seq"),
+        col("group"),
+        col("seq"),
         first_value(col("value")).over(w).as("first"),
         last_value(col("value")).over(w).as("last")
       )

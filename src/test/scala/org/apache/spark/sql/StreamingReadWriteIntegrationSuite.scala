@@ -7,8 +7,8 @@ import org.apache.spark.sql.types.*
 import java.nio.file.{Files, Path}
 import java.util.Comparator
 
-/** Integration tests for Structured Streaming:
-  * DataStreamReader options, Trigger variants, foreachBatch, toTable, outputMode, partitionBy.
+/** Integration tests for Structured Streaming: DataStreamReader options, Trigger variants,
+  * foreachBatch, toTable, outputMode, partitionBy.
   */
 @IntegrationTest
 class StreamingReadWriteIntegrationSuite extends IntegrationTestBase:

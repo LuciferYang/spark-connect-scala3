@@ -4,9 +4,8 @@ import org.apache.spark.sql.functions.*
 import org.apache.spark.sql.tags.IntegrationTest
 import org.apache.spark.sql.types.*
 
-/** Integration tests for typed Dataset operations:
-  * flatMap, mapPartitions, reduce, foreach, foreachPartition, joinWith, toJSON, toLocalIterator,
-  * as[U], transform, randomSplit.
+/** Integration tests for typed Dataset operations: flatMap, mapPartitions, reduce, foreach,
+  * foreachPartition, joinWith, toJSON, toLocalIterator, as[U], transform, randomSplit.
   */
 @IntegrationTest
 class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
@@ -185,4 +184,3 @@ class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
     val arr = personDs.tail(2)
     assert(arr.length == 2)
   }
-
