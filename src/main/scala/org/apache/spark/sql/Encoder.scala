@@ -176,9 +176,18 @@ object Encoder:
       case _: java.time.LocalDate => STRICT_LOCAL_DATE_ENCODER
       case _: java.time.Instant   => STRICT_INSTANT_ENCODER
       case _: Array[Byte]         => BinaryEncoder
-      case _: Option[t]           => OptionEncoder(agnosticEncoderOf[t].asInstanceOf[AgnosticEncoder[Any]])
-      case _: Seq[t]              => IterableEncoder(ClassTag(classOf[Seq[?]]), agnosticEncoderOf[t].asInstanceOf[AgnosticEncoder[Any]], containsNull = true)
-      case _: Map[k, v]           => MapEncoder(ClassTag(classOf[Map[?, ?]]), agnosticEncoderOf[k].asInstanceOf[AgnosticEncoder[Any]], agnosticEncoderOf[v].asInstanceOf[AgnosticEncoder[Any]], valueContainsNull = true)
+      case _: Option[t] => OptionEncoder(agnosticEncoderOf[t].asInstanceOf[AgnosticEncoder[Any]])
+      case _: Seq[t]    => IterableEncoder(
+          ClassTag(classOf[Seq[?]]),
+          agnosticEncoderOf[t].asInstanceOf[AgnosticEncoder[Any]],
+          containsNull = true
+        )
+      case _: Map[k, v] => MapEncoder(
+          ClassTag(classOf[Map[?, ?]]),
+          agnosticEncoderOf[k].asInstanceOf[AgnosticEncoder[Any]],
+          agnosticEncoderOf[v].asInstanceOf[AgnosticEncoder[Any]],
+          valueContainsNull = true
+        )
 
   // ---------------------------------------------------------------------------
   // Product (case class) Encoder derivation via Mirror

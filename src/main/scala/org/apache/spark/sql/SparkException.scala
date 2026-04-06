@@ -9,7 +9,8 @@ import java.io.ObjectStreamException
   * pulling in the full SparkThrowable hierarchy.
   *
   * Implements `Serializable` so that forked test JVMs can send exceptions back to the parent
-  * process. Uses `writeReplace` to strip non-serializable causes (e.g. gRPC StatusRuntimeException).
+  * process. Uses `writeReplace` to strip non-serializable causes (e.g. gRPC
+  * StatusRuntimeException).
   */
 class SparkException(
     message: String,

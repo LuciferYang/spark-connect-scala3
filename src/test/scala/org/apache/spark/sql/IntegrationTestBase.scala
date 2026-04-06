@@ -43,12 +43,14 @@ trait IntegrationTestBase extends org.scalatest.funsuite.AnyFunSuite:
   protected def withLambdaCompat[T](body: => T): T =
     try body
     catch
-      case e: SparkException if e.getMessage != null &&
-        (e.getMessage.contains("deserializeLambda") ||
-         e.getMessage.contains("Failed to unpack scala udf") ||
-         e.getMessage.contains("Failed to load class correctly")) =>
+      case e: SparkException
+          if e.getMessage != null &&
+            (e.getMessage.contains("deserializeLambda") ||
+              e.getMessage.contains("Failed to unpack scala udf") ||
+              e.getMessage.contains("Failed to load class correctly")) =>
         cancel("Scala 3 lambda serialization incompatible with Scala 2.13 server")
-      case e: Exception if e.getMessage != null &&
-        (e.getMessage.contains("deserializeLambda") ||
-         e.getMessage.contains("Failed to unpack scala udf")) =>
+      case e: Exception
+          if e.getMessage != null &&
+            (e.getMessage.contains("deserializeLambda") ||
+              e.getMessage.contains("Failed to unpack scala udf")) =>
         cancel("Scala 3 lambda serialization incompatible with Scala 2.13 server")

@@ -80,7 +80,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
       // Clean up stale table from previous runs
       try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       catch case _: Exception => ()
-      // Write a simple parquet file so the table has data
+        // Write a simple parquet file so the table has data
       spark.range(5).write.mode("overwrite").parquet(tempDir.toString)
       spark.catalog.createTable(tableName, tempDir.toString, "parquet").collect()
       assert(spark.catalog.tableExists(tableName), "Table should exist after creation")
