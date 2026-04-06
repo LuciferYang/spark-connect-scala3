@@ -366,15 +366,16 @@ The following bugs were discovered during integration testing and need to be fix
 
 ### Bug Details
 
-**Bug 1: `=!=` implementation**
+**Bug 1: `=!=` implementation (FIXED)**
 - File: `src/main/scala/org/apache/spark/sql/Column.scala`, line 53
-- Current: `def =!=(other: Column): Column = fn("!=", other)`
-- Fix: `def =!=(other: Column): Column = !(this === other)`
-- Same fix needed for `notEqual` (Java-friendly alias)
+- Was: `def =!=(other: Column): Column = fn("!=", other)` — server returned `ROUTINE_NOT_FOUND`
+- Fixed: `def =!=(other: Column): Column = !(this === other)` — generates `not(==(...))` proto, matching upstream
+- `notEqual` delegates to `=!=`, so automatically fixed
 
-**Bug 2: `saveAsTable` / `insertInto` TABLE_SAVE_METHOD_UNSPECIFIED**
+**Bug 2: `saveAsTable` / `insertInto` TABLE_SAVE_METHOD_UNSPECIFIED (FIXED)**
 - File: `src/main/scala/org/apache/spark/sql/DataFrameWriter.scala`
-- The `WriteOperation.SaveTable` enum must be explicitly set to `LOCAL_SAVE_TABLE` or `SAVE_TABLE` (not left as default 0)
+- Was: `SaveTable` proto built without `save_method` enum → server rejected with `TABLE_SAVE_METHOD_UNSPECIFIED(0)`
+- Fixed: `saveAsTable` sets `TABLE_SAVE_METHOD_SAVE_AS_TABLE`; `insertInto` sets `TABLE_SAVE_METHOD_INSERT_INTO` with its own proto builder
 
 **Bug 3-5**: Root cause investigation pending.
 
