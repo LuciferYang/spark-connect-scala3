@@ -360,9 +360,9 @@ The following bugs were discovered during integration testing and need to be fix
 |---|-----|-----------|----------------|----------|
 | 1 | `=!=` sends function name `!=` to server | SC3 uses `fn("!=", other)` but upstream implements as `!(this === other)` (NOT wrapping equals) | `=!=`, `notEqual` in ColumnIntegrationSuite | FIXED |
 | 2 | `saveAsTable` / `insertInto` fail with `TABLE_SAVE_METHOD_UNSPECIFIED(0)` | `SaveTable` proto enum value not being set in `DataFrameWriter` | saveAsTable, insertInto in ReadWriteIntegrationSuite | FIXED |
-| 3 | `contains`, `startsWith`, `endsWith` fail | Root cause not yet investigated | String methods in ColumnIntegrationSuite | MEDIUM |
-| 4 | `groupBy.pivot` with aggregation fails | Root cause not yet investigated | pivot in DataFrameIntegrationSuite | MEDIUM |
-| 5 | `catalog.createTable` / `dropTable` incorrect behavior | `tableExists` returns false after `createTable` succeeds | CatalogIntegrationSuite | LOW |
+| 3 | `contains`, `startsWith`, `endsWith` fail | Test assertion was wrong: `endsWith("foo")` on `"foo bar"` returns false because `"foo bar"` ends with `"bar"` | String methods in ColumnIntegrationSuite | FIXED |
+| 4 | `groupBy.pivot` with aggregation fails | `GroupedDataFrame.agg()` did not set `Aggregate.Pivot` proto field with pivot column | pivot in DataFrameIntegrationSuite | FIXED |
+| 5 | `catalog.createTable` / `dropTable` incorrect behavior | `createTable` overloads did not delegate to canonical 5-parameter version; path passed incorrectly | CatalogIntegrationSuite | FIXED |
 
 ### Bug Details
 
@@ -377,7 +377,19 @@ The following bugs were discovered during integration testing and need to be fix
 - Was: `SaveTable` proto built without `save_method` enum → server rejected with `TABLE_SAVE_METHOD_UNSPECIFIED(0)`
 - Fixed: `saveAsTable` sets `TABLE_SAVE_METHOD_SAVE_AS_TABLE`; `insertInto` sets `TABLE_SAVE_METHOD_INSERT_INTO` with its own proto builder
 
-**Bug 3-5**: Root cause investigation pending.
+**Bug 3: `contains`, `startsWith`, `endsWith` test assertion (FIXED)**
+- The test assertion was wrong, not a code bug. `endsWith("foo")` on `"foo bar"` returns false because `"foo bar"` ends with `"bar"`.
+- Fixed assertion from `== 2` to `== 1`.
+
+**Bug 4: `groupBy.pivot` aggregation (FIXED)**
+- `GroupedDataFrame.agg()` now sets `Aggregate.Pivot` proto field with the pivot column.
+- Pivot column stored in dedicated field instead of in `groupingExpressions`.
+- Added `pivot(col, values)` overload.
+
+**Bug 5: `catalog.createTable` incorrect behavior (FIXED)**
+- All `createTable` overloads now delegate to canonical 5-parameter version.
+- Path passed via options map instead of deprecated `setPath()`.
+- Integration test now calls `.collect()` to trigger RPC.
 
 ---
 
