@@ -165,11 +165,12 @@ class EncodersSuite extends AnyFunSuite with Matchers:
     val enc = Encoders.tuple(Encoders.scalaInt, Encoders.STRING)
     enc.schema shouldBe StructType(Seq(
       StructField(
-        "value",
-        StructType(Seq(
-          StructField("_1", IntegerType, nullable = false),
-          StructField("_2", StringType)
-        ))
+        "_1",
+        StructType(Seq(StructField("value", IntegerType)))
+      ),
+      StructField(
+        "_2",
+        StructType(Seq(StructField("value", StringType)))
       )
     ))
   }

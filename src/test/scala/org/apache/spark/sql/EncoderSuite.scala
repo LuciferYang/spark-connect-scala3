@@ -1,5 +1,6 @@
 package org.apache.spark.sql
 
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
 import org.apache.spark.sql.types.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -291,9 +292,12 @@ class EncoderSuite extends AnyFunSuite with Matchers:
     enc shouldBe a[Encoder.DerivedEncoder[?]]
   }
 
-  test("derived encoder agnosticEncoder returns null (no AgnosticEncoder for products)") {
+  test("derived encoder agnosticEncoder returns ProductEncoder") {
     val enc = summon[Encoder[Person]]
-    enc.agnosticEncoder shouldBe null
+    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe a[AgnosticEncoders.ProductEncoder[?]]
+    val pe = enc.agnosticEncoder.asInstanceOf[AgnosticEncoders.ProductEncoder[?]]
+    pe.fields.map(_.name) shouldBe Seq("name", "age")
   }
 
   // ---------------------------------------------------------------------------

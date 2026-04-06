@@ -2,7 +2,7 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.{Catalog as _, StorageLevel as _, *}
 import org.apache.spark.sql.connect.SessionCleaner
-import org.apache.spark.sql.connect.client.{ClassFinder, DataTypeProtoConverter, SparkConnectClient}
+import org.apache.spark.sql.connect.client.{ClassFinder, SparkConnectClient}
 
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
@@ -121,19 +121,21 @@ final class SparkSession private[sql] (
 
   def emptyDataset[T: Encoder: scala.reflect.ClassTag]: Dataset[T] =
     val enc = summon[Encoder[T]]
-    val schema = DataTypeProtoConverter.toProto(enc.schema)
     val rel = Relation.newBuilder()
       .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-      .setLocalRelation(LocalRelation.newBuilder().setSchema(schema.toString).build())
+      .setLocalRelation(LocalRelation.newBuilder().setSchema(enc.schema.toDDL).build())
       .build()
     Dataset(DataFrame(this, rel), enc)
 
   def emptyDataFrame: DataFrame =
+    // The server requires a schema string for LocalRelation when no data is provided.
+    // Use JSON format matching upstream: {"type":"struct","fields":[]}
+    val emptySchemaJson = """{"type":"struct","fields":[]}"""
     DataFrame(
       this,
       Relation.newBuilder()
         .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-        .setLocalRelation(LocalRelation.getDefaultInstance)
+        .setLocalRelation(LocalRelation.newBuilder().setSchema(emptySchemaJson).build())
         .build()
     )
 
@@ -143,14 +145,13 @@ final class SparkSession private[sql] (
 
   def createDataFrame(rows: Seq[Row], schema: types.StructType): DataFrame =
     val arrowData = ArrowSerializer.encodeRows(rows, schema)
-    val schemaStr = schema.fields.map(f => s"${f.name} ${f.dataType.simpleString}").mkString(", ")
     DataFrame(
       this,
       Relation.newBuilder()
         .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
         .setLocalRelation(LocalRelation.newBuilder()
           .setData(com.google.protobuf.ByteString.copyFrom(arrowData))
-          .setSchema(schemaStr)
+          .setSchema(schema.toDDL)
           .build())
         .build()
     )

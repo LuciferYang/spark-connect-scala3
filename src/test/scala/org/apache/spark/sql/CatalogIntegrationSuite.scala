@@ -77,6 +77,9 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
     val tableName = "test_catalog_create_table_integration"
     val tempDir = java.nio.file.Files.createTempDirectory("spark_catalog_test")
     try
+      // Clean up stale table from previous runs
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
+      catch case _: Exception => ()
       // Write a simple parquet file so the table has data
       spark.range(5).write.mode("overwrite").parquet(tempDir.toString)
       spark.catalog.createTable(tableName, tempDir.toString, "parquet").collect()
@@ -84,7 +87,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
     finally
       // Use SQL to drop table -- Catalog.dropTable proto (field 28) is not yet
       // supported by released Spark servers (requires SPARK-56221).
-      spark.sql(s"DROP TABLE IF EXISTS $tableName")
+      spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       // Clean up temp directory
       java.nio.file.Files.walk(tempDir).sorted(java.util.Comparator.reverseOrder())
         .forEach(java.nio.file.Files.deleteIfExists(_))

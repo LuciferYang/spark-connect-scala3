@@ -645,7 +645,7 @@ final class DataFrame private[sql] (
 
   /** Return an array of (column name, data type string) pairs. */
   def dtypes: Array[(String, String)] =
-    schema.fields.map(f => (f.name, f.dataType.simpleString)).toArray
+    schema.fields.map(f => (f.name, f.dataType.toString)).toArray
 
   /** Select a column by name, bound to this DataFrame. */
   def col(colName: String): Column =
@@ -877,7 +877,6 @@ final class DataFrame private[sql] (
       .setUnresolvedFunction(Expression.UnresolvedFunction.newBuilder()
         .setFunctionName("distributed_sequence_id")
         .setIsInternal(true)
-        .addArguments(Column.lit(0L).expr)
         .build())
       .build()
     select(Column("*"), Column(seqId).as("index"))

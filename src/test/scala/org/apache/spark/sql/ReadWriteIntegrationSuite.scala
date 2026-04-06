@@ -277,7 +277,7 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
       assert(result.length == 3)
       assert(result(0).getLong(0) == 1L)
     finally
-      try spark.sql(s"DROP TABLE IF EXISTS $tableName")
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       catch case _: Exception => ()
   }
 
@@ -289,7 +289,7 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
       val result = spark.read.table(tableName).count()
       assert(result == 6)
     finally
-      try spark.sql(s"DROP TABLE IF EXISTS $tableName")
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       catch case _: Exception => ()
   }
 
@@ -367,7 +367,7 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
       val r2 = spark.read.table(tableName).count()
       assert(r2 == 6)
     finally
-      try spark.sql(s"DROP TABLE IF EXISTS $tableName")
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       catch case _: Exception => ()
   }
 
@@ -384,6 +384,6 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
       small.writeTo(tableName).createOrReplace()
       assert(spark.read.table(tableName).count() == 1)
     finally
-      try spark.sql(s"DROP TABLE IF EXISTS $tableName")
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       catch case _: Exception => ()
   }

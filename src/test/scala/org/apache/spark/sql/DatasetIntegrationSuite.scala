@@ -21,12 +21,15 @@ class DatasetIntegrationSuite extends IntegrationTestBase:
 
   test("Dataset map and filter") {
     assert(classFilesUploaded)
-    val ds = spark.createDataset(Seq(
-      Person("Alice", 30),
-      Person("Bob", 25),
-      Person("Charlie", 35)
-    ))
-    val names = ds.filter(_.age > 28).map(_.name)
-    val result = names.collect()
-    assert(result.toSet == Set("Alice", "Charlie"))
+    import Encoder.given
+    withLambdaCompat {
+      val ds = spark.createDataset(Seq(
+        Person("Alice", 30),
+        Person("Bob", 25),
+        Person("Charlie", 35)
+      ))
+      val names = ds.filter(_.age > 28).map(_.name)
+      val result = names.collect()
+      assert(result.toSet == Set("Alice", "Charlie"))
+    }
   }

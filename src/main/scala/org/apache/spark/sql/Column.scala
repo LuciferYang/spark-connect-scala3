@@ -575,6 +575,6 @@ object Window:
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setCurrentRow(true).build()
     else
-      val litExpr = Column.lit(value).expr
+      val litExpr = Column.lit(value.toInt).expr
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setValue(litExpr).build()

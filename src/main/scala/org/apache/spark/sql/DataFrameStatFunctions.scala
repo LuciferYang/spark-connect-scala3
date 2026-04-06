@@ -43,10 +43,12 @@ final class DataFrameStatFunctions private[sql] (df: DataFrame):
     cols.foreach(aqBuilder.addCols)
     probabilities.foreach(aqBuilder.addProbabilities)
     val result = df.withRelation(_.setApproxQuantile(aqBuilder.build()))
-    val rows = result.collect()
-    rows.map { row =>
-      (0 until row.size).map(row.getDouble).toArray
-    }
+    val row = result.collect().head
+    // Server returns a single row with one column of type array<array<double>>
+    row.get(0).asInstanceOf[Seq[Seq[Any]]].map(_.map {
+      case n: Number => n.doubleValue()
+      case other     => other.asInstanceOf[Double]
+    }.toArray).toArray
 
   /** Computes approximate quantiles for a single numeric column. */
   def approxQuantile(

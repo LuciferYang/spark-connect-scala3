@@ -38,6 +38,34 @@ object Encoders:
 
   private def wrap[T](ae: AgnosticEncoder[T]): Encoder[T] = AgnosticEncoderWrapper(ae)
 
+  /** Tuple2 encoder that properly implements fromRow/toRow for joinWith results.
+    *
+    * The server returns rows with two struct columns (`_1`, `_2`). Each struct is deserialized as a
+    * nested Row, then passed through the element encoder's `fromRow`.
+    */
+  private class TupleEncoder2[T1, T2](
+      e1: Encoder[T1],
+      e2: Encoder[T2],
+      ae: AgnosticEncoder[(T1, T2)]
+  ) extends Encoder[(T1, T2)]:
+    def schema: StructType = StructType(
+      Seq(
+        StructField("_1", e1.schema),
+        StructField("_2", e2.schema)
+      )
+    )
+    def fromRow(row: Row): (T1, T2) =
+      val v1 = row.get(0) match
+        case r: Row => e1.fromRow(r)
+        case other  => other.asInstanceOf[T1]
+      val v2 = row.get(1) match
+        case r: Row => e2.fromRow(r)
+        case other  => other.asInstanceOf[T2]
+      (v1, v2)
+    def toRow(value: (T1, T2)): Row =
+      Row(e1.toRow(value._1), e2.toRow(value._2))
+    override def agnosticEncoder: AgnosticEncoder[?] = ae
+
   // -- Scala primitive types ------------------------------------------------
 
   def scalaBoolean: Encoder[Boolean] = wrap(PrimitiveBooleanEncoder)
@@ -78,7 +106,8 @@ object Encoders:
       e1: Encoder[T1],
       e2: Encoder[T2]
   ): Encoder[(T1, T2)] =
-    wrap(tupleProductEncoder[(T1, T2)](asAgnostic(e1), asAgnostic(e2)))
+    val ae = tupleProductEncoder[(T1, T2)](asAgnostic(e1), asAgnostic(e2))
+    new TupleEncoder2(e1, e2, ae)
 
   def tuple[T1, T2, T3](
       e1: Encoder[T1],
@@ -125,7 +154,7 @@ object Encoders:
     *
     * Delegates to `Encoder.derived` which uses Scala 3 `Mirror.ProductOf`.
     */
-  inline def product[T <: Product](using Mirror.ProductOf[T]): Encoder[T] =
+  inline def product[T <: Product](using Mirror.ProductOf[T], ClassTag[T]): Encoder[T] =
     Encoder.derived[T]
 
   // -- Internal helpers -----------------------------------------------------

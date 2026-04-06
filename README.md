@@ -48,6 +48,35 @@ Tested against these Spark Connect server versions:
 | Spark 4.0.2 | Supported |
 | Spark 4.1.1 | Supported |
 
+## Known Limitations
+
+### Scala 3 Lambda Serialization on Scala 2.13 Spark Server
+
+Spark 4.0/4.1 servers are built with Scala 2.13. When the SC3 client sends a Scala 3 lambda to the server for execution (e.g., `dataset.map(...)`, `dataset.filter(_.age > 28)`, `groupByKey(_.group).mapGroups(...)`, `foreachBatch { ... }`), the server cannot deserialize the lambda because Scala 3 and Scala 2.13 use different lambda serialization mechanisms — the server cannot find the `$deserializeLambda$` method.
+
+**Affected operations** — any API that sends a JVM lambda to the server:
+
+| Category | Operations |
+|----------|-----------|
+| Dataset typed transforms | `map`, `flatMap`, `mapPartitions`, `filter` (typed lambda), `reduce`, `foreach`, `foreachPartition`, `transform` (with typed lambda) |
+| KeyValueGroupedDataset | `groupByKey`, `mapGroups`, `flatMapGroups`, `flatMapSortedGroups`, `reduceGroups`, `mapValues`, `cogroup` |
+| Streaming | `foreachBatch` (server-side class cast: `classic.Dataset` vs SC3 `DataFrame`) |
+
+**Unaffected operations** — these work correctly because they don't send lambdas:
+
+| Category | Operations |
+|----------|-----------|
+| DataFrame transforms | `select`, `filter(Column)`, `where`, `join`, `joinWith`, `groupBy`, `agg`, `orderBy`, `withColumn`, `drop`, `union`, `distinct`, etc. |
+| DataFrame actions | `collect`, `count`, `show`, `first`, `head`, `take`, `toJSON`, `toLocalIterator`, etc. |
+| SQL | `spark.sql(...)` |
+| UDF/UDAF | `udf.register(...)` and `Aggregator` — these serialize the function via Java ObjectOutputStream, not Scala lambda serialization |
+| Streaming | `readStream`, `writeStream` (trigger, outputMode, format, toTable), `StreamingQuery` lifecycle |
+| Catalog | All catalog operations |
+
+**Integration test status**: 12 tests are canceled (not failed) due to this incompatibility. They will automatically pass once a Scala 3-native Spark server is available.
+
+**Workaround**: Use Column-expression-based APIs instead of typed lambda APIs where possible. For example, use `df.filter(col("age") > 28)` instead of `ds.filter(_.age > 28)`.
+
 ## Requirements
 
 | Component | Version |
@@ -168,8 +197,11 @@ build/sbt test
 ### 6. Run integration tests (requires a running Spark Connect server)
 
 ```bash
-build/sbt 'testOnly *IntegrationSuite'
+# Override the tag exclusion and run only integration suites
+build/sbt 'set Test / testOptions := Seq()' 'testOnly *IntegrationSuite'
 ```
+
+> **Note**: Tests that send Scala 3 lambdas to a Scala 2.13 server will be **canceled** (not failed) with the message _"Scala 3 lambda serialization incompatible with Scala 2.13 server"_. See [Known Limitations](#scala-3-lambda-serialization-on-scala-213-spark-server) for details.
 
 ### 7. Use in your own project
 

@@ -1,9 +1,11 @@
 package org.apache.spark.sql
 
 import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.*
 import org.apache.spark.sql.types.*
 import scala.compiletime.*
 import scala.deriving.Mirror
+import scala.reflect.ClassTag
 
 /** An Encoder provides serialization and deserialization between Scala types and Spark Rows.
   *
@@ -157,9 +159,41 @@ object Encoder:
       case _: Option[_] => true
       case _            => false
 
+  /** Map a Scala type to its corresponding AgnosticEncoder at compile time. */
+  inline def agnosticEncoderOf[T]: AgnosticEncoder[?] =
+    inline erasedValue[T] match
+      case _: Boolean             => PrimitiveBooleanEncoder
+      case _: Byte                => PrimitiveByteEncoder
+      case _: Short               => PrimitiveShortEncoder
+      case _: Int                 => PrimitiveIntEncoder
+      case _: Long                => PrimitiveLongEncoder
+      case _: Float               => PrimitiveFloatEncoder
+      case _: Double              => PrimitiveDoubleEncoder
+      case _: String              => StringEncoder
+      case _: BigDecimal          => DEFAULT_SCALA_DECIMAL_ENCODER
+      case _: java.sql.Date       => STRICT_DATE_ENCODER
+      case _: java.sql.Timestamp  => STRICT_TIMESTAMP_ENCODER
+      case _: java.time.LocalDate => STRICT_LOCAL_DATE_ENCODER
+      case _: java.time.Instant   => STRICT_INSTANT_ENCODER
+      case _: Array[Byte]         => BinaryEncoder
+      case _: Option[t]           => OptionEncoder(agnosticEncoderOf[t].asInstanceOf[AgnosticEncoder[Any]])
+      case _: Seq[t]              => IterableEncoder(ClassTag(classOf[Seq[?]]), agnosticEncoderOf[t].asInstanceOf[AgnosticEncoder[Any]], containsNull = true)
+      case _: Map[k, v]           => MapEncoder(ClassTag(classOf[Map[?, ?]]), agnosticEncoderOf[k].asInstanceOf[AgnosticEncoder[Any]], agnosticEncoderOf[v].asInstanceOf[AgnosticEncoder[Any]], valueContainsNull = true)
+
   // ---------------------------------------------------------------------------
   // Product (case class) Encoder derivation via Mirror
   // ---------------------------------------------------------------------------
+
+  /** Build AgnosticEncoder field list from a product's element types and labels. */
+  inline def encoderFieldsOf[Types <: Tuple, Labels <: Tuple]: List[EncoderField] =
+    inline (erasedValue[Types], erasedValue[Labels]) match
+      case (_: EmptyTuple, _: EmptyTuple) => Nil
+      case (_: (t *: ts), _: (l *: ls))   =>
+        val name = constValue[l].toString
+        val enc = agnosticEncoderOf[t]
+        val nullable = isOption[t]
+        EncoderField(name, enc, nullable, Metadata.empty) ::
+          encoderFieldsOf[ts, ls]
 
   /** Build field list from a product's element types and labels at compile time. */
   inline def fieldsOf[Types <: Tuple, Labels <: Tuple]: List[StructField] =
@@ -190,7 +224,8 @@ object Encoder:
     */
   private[sql] class DerivedEncoder[T](
       _schema: StructType,
-      mirror: Mirror.ProductOf[T]
+      mirror: Mirror.ProductOf[T],
+      _agnosticEncoder: AgnosticEncoder[?]
   ) extends Encoder[T]:
     def schema: StructType = _schema
 
@@ -209,7 +244,11 @@ object Encoder:
       }
       Row.fromSeq(rowValues)
 
+    override def agnosticEncoder: AgnosticEncoder[?] = _agnosticEncoder
+
   /** Derive an Encoder for any case class T using Scala 3 Mirror. */
-  inline given derived[T](using m: Mirror.ProductOf[T]): Encoder[T] =
+  inline given derived[T](using m: Mirror.ProductOf[T], ct: ClassTag[T]): Encoder[T] =
     val fields = fieldsOf[m.MirroredElemTypes, m.MirroredElemLabels]
-    DerivedEncoder[T](StructType(fields), m)
+    val encFields = encoderFieldsOf[m.MirroredElemTypes, m.MirroredElemLabels]
+    val pe = ProductEncoder[T](ct, encFields)
+    DerivedEncoder[T](StructType(fields), m, pe)

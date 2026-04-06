@@ -27,10 +27,12 @@ class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
   test("flatMap expands each element") {
     assert(classFilesUploaded)
     import Encoder.given
-    val result = personDs.flatMap(p => Seq(p.name, p.name.toUpperCase)).collect()
-    assert(result.length == 6)
-    assert(result.toSet.contains("Alice"))
-    assert(result.toSet.contains("ALICE"))
+    withLambdaCompat {
+      val result = personDs.flatMap(p => Seq(p.name, p.name.toUpperCase)).collect()
+      assert(result.length == 6)
+      assert(result.toSet.contains("Alice"))
+      assert(result.toSet.contains("ALICE"))
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -40,10 +42,12 @@ class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
   test("mapPartitions transforms partitions") {
     assert(classFilesUploaded)
     import Encoder.given
-    val result = personDs
-      .mapPartitions(iter => iter.map(_.name))
-      .collect()
-    assert(result.toSet == Set("Alice", "Bob", "Charlie"))
+    withLambdaCompat {
+      val result = personDs
+        .mapPartitions(iter => iter.map(_.name))
+        .collect()
+      assert(result.toSet == Set("Alice", "Bob", "Charlie"))
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -53,9 +57,11 @@ class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
   test("reduce combines all elements") {
     assert(classFilesUploaded)
     import Encoder.given
-    val ds = spark.createDataset(Seq(1, 2, 3, 4, 5))
-    val sum = ds.reduce(_ + _)
-    assert(sum == 15)
+    withLambdaCompat {
+      val ds = spark.createDataset(Seq(1, 2, 3, 4, 5))
+      val sum = ds.reduce(_ + _)
+      assert(sum == 15)
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -64,8 +70,10 @@ class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
 
   test("foreach runs without error") {
     assert(classFilesUploaded)
-    // foreach is side-effect only; just verify it completes
-    personDs.foreach(_ => ())
+    withLambdaCompat {
+      // foreach is side-effect only; just verify it completes
+      personDs.foreach(_ => ())
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -74,7 +82,9 @@ class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
 
   test("foreachPartition runs without error") {
     assert(classFilesUploaded)
-    personDs.foreachPartition((_: Iterator[Person]) => ())
+    withLambdaCompat {
+      personDs.foreachPartition((_: Iterator[Person]) => ())
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -83,11 +93,12 @@ class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
 
   test("joinWith returns typed tuples") {
     assert(classFilesUploaded)
+    val persons = personDs
     val depts = spark.createDataset(Seq(
       Dept("Alice", "Eng"),
       Dept("Bob", "Sales")
     ))
-    val joined = personDs.joinWith(depts, personDs("name") === depts("name"))
+    val joined = persons.joinWith(depts, persons("name") === depts("name"))
     val result = joined.collect()
     assert(result.length == 2)
     val alice = result.find(_._1.name == "Alice")
@@ -137,9 +148,12 @@ class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
   // ---------------------------------------------------------------------------
 
   test("transform applies function to Dataset") {
+    assert(classFilesUploaded)
     import Encoder.given
-    val result = personDs.transform(_.filter(_.age > 28))
-    assert(result.count() == 2)
+    withLambdaCompat {
+      val result = personDs.transform(_.filter(_.age > 28))
+      assert(result.count() == 2)
+    }
   }
 
   // ---------------------------------------------------------------------------

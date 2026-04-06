@@ -84,7 +84,7 @@ class SparkSessionIntegrationSuite extends IntegrationTestBase:
       val result = spark.table(tableName).count()
       assert(result == 5)
     finally
-      try spark.sql(s"DROP TABLE IF EXISTS $tableName")
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       catch case _: Exception => ()
   }
 

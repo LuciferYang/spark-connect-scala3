@@ -82,10 +82,10 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     enc.agnosticEncoder shouldBe AgnosticEncoders.BinaryEncoder
   }
 
-  test("derived case class encoder has null agnosticEncoder") {
-    // Product encoders don't have AgnosticEncoder bridge yet (Phase 3)
+  test("derived case class encoder has ProductEncoder agnosticEncoder") {
     val enc = summon[Encoder[Person]]
-    enc.agnosticEncoder shouldBe null
+    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe a[AgnosticEncoders.ProductEncoder[?]]
   }
 
   test("default Encoder trait agnosticEncoder is null") {
