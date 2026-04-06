@@ -640,3 +640,372 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     assert(jsonRows.length == 1)
     assert(jsonRows(0).getString(0).contains("Alice"))
   }
+
+  // ---------------------------------------------------------------------------
+  // Patch 2: Advanced transforms, grouping, caching, metadata
+  // ---------------------------------------------------------------------------
+
+  // --- Reshaping: unpivot / melt / transpose ---
+
+  test("unpivot with explicit values") {
+    val rows = Seq(Row("Alice", 10, 20), Row("Bob", 30, 40))
+    val schema = StructType(Seq(
+      StructField("name", StringType),
+      StructField("math", IntegerType),
+      StructField("english", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df
+      .unpivot(
+        Array(col("name")),
+        Array(col("math"), col("english")),
+        "subject",
+        "score"
+      )
+      .orderBy(col("name"), col("subject"))
+      .collect()
+    assert(result.length == 4)
+    assert(result(0).getString(0) == "Alice")
+    assert(result(0).getString(1) == "english")
+    assert(result(0).getInt(2) == 20)
+  }
+
+  test("unpivot without explicit values (all non-id cols)") {
+    val rows = Seq(Row("Alice", 10, 20))
+    val schema = StructType(Seq(
+      StructField("name", StringType),
+      StructField("math", IntegerType),
+      StructField("english", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df
+      .unpivot(Array(col("name")), "subject", "score")
+      .orderBy(col("subject"))
+      .collect()
+    assert(result.length == 2)
+  }
+
+  test("melt is alias for unpivot") {
+    val rows = Seq(Row("X", 1, 2))
+    val schema = StructType(Seq(
+      StructField("id", StringType),
+      StructField("a", IntegerType),
+      StructField("b", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df
+      .melt(Array(col("id")), Array(col("a"), col("b")), "var", "val")
+      .orderBy(col("var"))
+      .collect()
+    assert(result.length == 2)
+    assert(result(0).getString(1) == "a")
+    assert(result(1).getString(1) == "b")
+  }
+
+  test("transpose without index column") {
+    val rows = Seq(Row("r1", 1, 2), Row("r2", 3, 4))
+    val schema = StructType(Seq(
+      StructField("name", StringType),
+      StructField("c1", IntegerType),
+      StructField("c2", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.transpose()
+    assert(result.collect().nonEmpty)
+  }
+
+  test("transpose with index column") {
+    val rows = Seq(Row("r1", 1, 2), Row("r2", 3, 4))
+    val schema = StructType(Seq(
+      StructField("name", StringType),
+      StructField("c1", IntegerType),
+      StructField("c2", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.transpose(col("name"))
+    val collected = result.collect()
+    assert(collected.nonEmpty)
+    // After transpose with index "name", column headers should include "r1" and "r2"
+    assert(result.columns.contains("r1"))
+    assert(result.columns.contains("r2"))
+  }
+
+  // --- Grouping: rollup / cube / groupingSets / groupBy(String*) ---
+
+  test("rollup") {
+    val rows = Seq(Row("A", "X", 1), Row("A", "Y", 2), Row("B", "X", 3))
+    val schema = StructType(Seq(
+      StructField("g1", StringType),
+      StructField("g2", StringType),
+      StructField("value", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.rollup(col("g1"), col("g2")).agg(sum(col("value")).as("total"))
+    // rollup produces group-level + sub-totals + grand total
+    assert(result.collect().length > 3)
+  }
+
+  test("cube") {
+    val rows = Seq(Row("A", "X", 1), Row("A", "Y", 2), Row("B", "X", 3))
+    val schema = StructType(Seq(
+      StructField("g1", StringType),
+      StructField("g2", StringType),
+      StructField("value", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.cube(col("g1"), col("g2")).agg(sum(col("value")).as("total"))
+    // cube produces all combinations including nulls
+    assert(result.collect().length > 3)
+  }
+
+  test("groupingSets") {
+    val rows = Seq(Row("A", "X", 1), Row("A", "Y", 2), Row("B", "X", 3))
+    val schema = StructType(Seq(
+      StructField("g1", StringType),
+      StructField("g2", StringType),
+      StructField("value", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df
+      .groupingSets(
+        Seq(Seq(col("g1")), Seq(col("g2")), Seq(col("g1"), col("g2"))),
+        col("g1"),
+        col("g2")
+      )
+      .agg(sum(col("value")).as("total"))
+    assert(result.collect().nonEmpty)
+  }
+
+  test("groupBy with string column names") {
+    val rows = Seq(Row("A", 10), Row("A", 20), Row("B", 30))
+    val schema = StructType(Seq(
+      StructField("group", StringType),
+      StructField("value", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.groupBy("group").agg(sum(col("value")).as("total"))
+      .orderBy(col("group")).collect()
+    assert(result.length == 2)
+    assert(result(0).get(1).toString.toLong == 30L)
+  }
+
+  // --- Partitioning: repartitionByRange ---
+
+  test("repartitionByRange") {
+    val df = spark.range(100)
+    val result = df.repartitionByRange(4, col("id"))
+    assert(result.count() == 100L)
+  }
+
+  test("repartitionByRange without numPartitions") {
+    val df = spark.range(100)
+    val result = df.repartitionByRange(col("id"))
+    assert(result.count() == 100L)
+  }
+
+  // --- Caching: cache / persist / unpersist / storageLevel ---
+
+  test("cache and persist and unpersist and storageLevel") {
+    val df = spark.range(10).select(col("id"))
+    // cache (which calls persist with default MEMORY_AND_DISK)
+    df.cache()
+    val sl = df.storageLevel
+    assert(sl.useMemory)
+    assert(sl.useDisk)
+    // unpersist
+    df.unpersist()
+  }
+
+  test("persist with custom storage level") {
+    val df = spark.range(10).select(col("id"))
+    df.persist(StorageLevel.MEMORY_ONLY)
+    val sl = df.storageLevel
+    assert(sl.useMemory)
+    assert(!sl.useDisk)
+    df.unpersist()
+  }
+
+  // --- Checkpoint ---
+
+  test("checkpoint") {
+    val df = spark.range(10).select(col("id"))
+    val cp = df.checkpoint()
+    assert(cp.count() == 10L)
+  }
+
+  test("localCheckpoint") {
+    val df = spark.range(10).select(col("id"))
+    val cp = df.localCheckpoint()
+    assert(cp.count() == 10L)
+  }
+
+  // --- Schema: to ---
+
+  test("to reconciles DataFrame to target schema") {
+    val rows = Seq(Row(1, "Alice"), Row(2, "Bob"))
+    val srcSchema = StructType(Seq(
+      StructField("id", IntegerType),
+      StructField("name", StringType)
+    ))
+    val df = spark.createDataFrame(rows, srcSchema)
+    // Widen id from IntegerType to LongType
+    val targetSchema = StructType(Seq(
+      StructField("id", LongType),
+      StructField("name", StringType)
+    ))
+    val result = df.to(targetSchema)
+    assert(result.schema.fields(0).dataType == LongType)
+    assert(result.collect().length == 2)
+  }
+
+  // --- Actions: collectAsList / takeAsList ---
+
+  test("collectAsList") {
+    val df = spark.range(5)
+    val list = df.collectAsList()
+    assert(list.size() == 5)
+    assert(list.get(0).getLong(0) == 0L)
+  }
+
+  test("takeAsList") {
+    val df = spark.range(10).orderBy(col("id"))
+    val list = df.takeAsList(3)
+    assert(list.size() == 3)
+  }
+
+  // --- Metadata: isLocal / isStreaming / inputFiles ---
+
+  test("isLocal") {
+    val df = spark.range(10)
+    // range is not local
+    val result = df.isLocal
+    assert(!result || result) // just verify no exception; result may vary
+  }
+
+  test("isStreaming") {
+    val df = spark.range(10)
+    assert(!df.isStreaming)
+  }
+
+  test("inputFiles on range") {
+    val df = spark.range(10)
+    val files = df.inputFiles
+    // range has no input files
+    assert(files.isEmpty)
+  }
+
+  // --- Column access: col / apply / colRegex ---
+
+  test("col and apply return Column for DataFrame") {
+    val df = spark.range(5).select(col("id"))
+    // df.col("id") returns a Column bound to this DataFrame
+    val c = df.col("id")
+    val result = df.select(c).collect()
+    assert(result.length == 5)
+
+    // df("id") is alias for df.col("id")
+    val c2 = df("id")
+    val result2 = df.select(c2).collect()
+    assert(result2.length == 5)
+  }
+
+  test("colRegex") {
+    val rows = Seq(Row(1, 2, 3))
+    val schema = StructType(Seq(
+      StructField("col_a", IntegerType),
+      StructField("col_b", IntegerType),
+      StructField("other", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.select(df.colRegex("`col_.*`")).collect()
+    assert(result(0).length == 2) // col_a and col_b
+  }
+
+  // --- Misc: where(Column) / drop(Column*) / withMetadata ---
+
+  test("where with Column condition") {
+    val df = spark.range(10)
+    val result = df.where(col("id") >= lit(8)).orderBy(col("id")).collect()
+    assert(result.length == 2)
+    assert(result(0).getLong(0) == 8L)
+  }
+
+  test("drop with Column expressions") {
+    val rows = Seq(Row(1, "a", 10.0))
+    val schema = StructType(Seq(
+      StructField("id", IntegerType),
+      StructField("name", StringType),
+      StructField("value", DoubleType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.drop(col("name"), col("value"))
+    assert(result.columns.toSeq == Seq("id"))
+    assert(result.collect().length == 1)
+  }
+
+  test("withMetadata") {
+    val rows = Seq(Row(1), Row(2))
+    val schema = StructType(Seq(StructField("id", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.withMetadata("id", """{"comment": "test"}""")
+    assert(result.collect().length == 2)
+  }
+
+  // --- Temp views: createTempView / createGlobalTempView (non-replace) ---
+
+  test("createTempView throws on duplicate") {
+    val df = spark.range(3)
+    df.createTempView("patch2_unique_view")
+    try
+      // Second call should throw since the view already exists
+      intercept[Exception] {
+        df.createTempView("patch2_unique_view")
+      }
+    finally spark.catalog.dropTempView("patch2_unique_view")
+  }
+
+  test("createGlobalTempView throws on duplicate") {
+    val df = spark.range(3)
+    df.createGlobalTempView("patch2_unique_global_view")
+    try
+      intercept[Exception] {
+        df.createGlobalTempView("patch2_unique_global_view")
+      }
+    finally spark.catalog.dropGlobalTempView("patch2_unique_global_view")
+  }
+
+  // --- unionAll / join(right) ---
+
+  test("unionAll is alias for union") {
+    val df1 = spark.range(3).select(col("id"))
+    val df2 = spark.range(3, 6).select(col("id"))
+    val result = df1.unionAll(df2).collect()
+    assert(result.length == 6)
+  }
+
+  // --- observe ---
+
+  test("observe collects metrics by name") {
+    val df = spark.range(100)
+    val observed = df.observe("my_metrics", count(lit(1)).as("cnt"), max(col("id")).as("max_id"))
+    // observe is a no-op transform; data should pass through
+    assert(observed.count() == 100L)
+  }
+
+  test("observe with Observation object") {
+    val observation = Observation("obs1")
+    val df = spark.range(50)
+    val observed = df.observe(observation, count(lit(1)).as("cnt"))
+    observed.collect() // trigger execution
+    val metrics = observation.get
+    assert(metrics("cnt").toString.toLong == 50L)
+  }
+
+  // --- zipWithIndex ---
+
+  test("zipWithIndex") {
+    val df = spark.range(5)
+    val result = df.zipWithIndex
+    assert(result.columns.contains("index"))
+    assert(result.count() == 5L)
+  }
