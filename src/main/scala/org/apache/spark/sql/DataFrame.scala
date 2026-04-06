@@ -811,6 +811,43 @@ final class DataFrame private[sql] (
 
   def writeStream: DataStreamWriter = DataStreamWriter(this)
 
+  // ---------------------------------------------------------------------------
+  // Subquery expressions
+  // ---------------------------------------------------------------------------
+
+  /** Return this DataFrame as a scalar subquery Column.
+    *
+    * The DataFrame must return exactly one row and one column.
+    */
+  def scalar(): Column =
+    val planId = relation.getCommon.getPlanId
+    Column(
+      Expression.newBuilder()
+        .setSubqueryExpression(
+          SubqueryExpression.newBuilder()
+            .setPlanId(planId)
+            .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_SCALAR)
+            .build()
+        )
+        .build(),
+      Seq(relation)
+    )
+
+  /** Return this DataFrame as an EXISTS subquery Column. */
+  def exists(): Column =
+    val planId = relation.getCommon.getPlanId
+    Column(
+      Expression.newBuilder()
+        .setSubqueryExpression(
+          SubqueryExpression.newBuilder()
+            .setPlanId(planId)
+            .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_EXISTS)
+            .build()
+        )
+        .build(),
+      Seq(relation)
+    )
+
   /** Define a watermark on an event-time column for streaming aggregations. */
   def withWatermark(eventTime: String, delayThreshold: String): DataFrame =
     withRelation(_.setWithWatermark(

@@ -12,7 +12,7 @@ This project provides that Scala 3 client.
 
 - **SparkSession** — `builder().remote("sc://host:port").build()`, static session management (`getActiveSession`, `getDefaultSession`, `active`), `cloneSession()`, `executeCommand` (DeveloperApi)
 - **DataFrame** — select, filter, groupBy, join, union, distinct, sort, limit, sample, and more
-- **Dataset[T]** — typed operations with compile-time `Encoder` derivation via `derives Encoder`, `joinWith` (type-safe join), typed `select(TypedColumn)` (1-5 arity), `toLocalIterator`, `toJSON`
+- **Dataset[T]** — typed operations with compile-time `Encoder` derivation via `derives Encoder`, `joinWith` (type-safe join), typed `select(TypedColumn)` (1-5 arity), `toLocalIterator`, `toJSON`, `scalar()`, `exists()`
 - **Column** — arithmetic, comparison, logical, string, cast, alias, window, sort operators
 - **functions** — 542 built-in SQL functions (aggregates, math, string, date/time, window, collection, JSON, XML, URL, variant, datasketch, geospatial, and more) — **100% coverage** of the official API
 - **GroupedDataFrame** — groupBy / rollup / cube / pivot / groupingSets with agg, count, sum, avg, min, max
@@ -36,6 +36,7 @@ This project provides that Scala 3 client.
 - **Arrow IPC** — createDataFrame with client-side Arrow serialization; server responses deserialized via Arrow
 - **RuntimeConfig** — get / set Spark configuration at runtime
 - **Operation Tags** — `addTag`/`removeTag`/`getTags`/`clearTags` with fine-grained interruption (`interruptAll`/`interruptTag`/`interruptOperation`)
+- **Scalar / Exists / IN Subqueries** — `Dataset.scalar()`, `Dataset.exists()`, `Column.isin(Dataset)` via `SubqueryExpression` + `WithRelations` proto
 - **Plan Compression** — ZSTD compression for large plans, with server-config-driven threshold
 
 ## Compatibility
@@ -257,6 +258,7 @@ src/
         ├── CatalogSuite.scala
         ├── TypedOpsSuite.scala
         ├── SparkSessionSuite.scala
+        ├── SubquerySuite.scala
         ├── ExpandedEncoderSuite.scala
         ├── ImplicitsSuite.scala
         ├── KeyValueGroupedDatasetStatefulSuite.scala
@@ -325,7 +327,7 @@ src/
 `readStream` (DataStreamReader), `writeStream` (DataStreamWriter), `StreamingQuery` (isActive, stop, awaitTermination, recentProgress, explain, exception), `StreamingQueryManager` (active, get, awaitAnyTermination, resetTerminated), `Trigger` (ProcessingTime, AvailableNow, Once, Continuous), `foreachBatch`, `foreach` (ForeachWriter), `mapGroupsWithState`, `flatMapGroupsWithState`, `transformWithState`
 
 ### Column Operators
-`===`, `=!=`, `>`, `>=`, `<`, `<=`, `&&`, `||`, `!`, `+`, `-`, `*`, `/`, `%`, `isNull`, `isNotNull`, `isNaN`, `contains`, `startsWith`, `endsWith`, `like`, `rlike`, `isin`, `between`, `substr`, `cast`, `alias`, `as`, `asc`, `desc`, `over`, `when`, `otherwise`, `getItem`, `getField`, `withField`, `dropFields`
+`===`, `=!=`, `>`, `>=`, `<`, `<=`, `&&`, `||`, `!`, `+`, `-`, `*`, `/`, `%`, `isNull`, `isNotNull`, `isNaN`, `contains`, `startsWith`, `endsWith`, `like`, `rlike`, `isin`, `isin(Dataset)`, `between`, `substr`, `cast`, `alias`, `as`, `asc`, `desc`, `over`, `when`, `otherwise`, `getItem`, `getField`, `withField`, `dropFields`
 
 ### Catalog
 `currentDatabase`, `setCurrentDatabase`, `currentCatalog`, `setCurrentCatalog`, `listDatabases`, `listTables`, `listColumns`, `listFunctions`, `listCatalogs`, `listCachedTables`, `listPartitions`, `listViews`, `getDatabase`, `getTable`, `getFunction`, `getTableProperties`, `getCreateTableString`, `databaseExists`, `tableExists`, `functionExists`, `isCached`, `cacheTable`, `uncacheTable`, `clearCache`, `createTable`, `createExternalTable`, `createDatabase`, `dropDatabase`, `dropTable`, `dropView`, `dropTempView`, `dropGlobalTempView`, `truncateTable`, `analyzeTable`, `refreshTable`, `refreshByPath`, `recoverPartitions`
@@ -353,7 +355,7 @@ src/
 - [x] `foreachBatch` / `foreach` (ForeachWriter)
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
-- [x] Unit tests (533 tests)
+- [x] Unit tests (603 tests)
 - [x] Integration tests (Spark 4.0.2 / 4.1.1)
 - [x] Error handling (retry policies, gRPC exception conversion, reattachable execution, enriched error details via FetchErrorDetails RPC)
 - [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)
@@ -372,6 +374,7 @@ src/
 - [x] `lateralJoin` / `groupingSets` / `repartitionByRange`
 - [x] Plan Compression (ZSTD with server-config-driven threshold)
 - [x] Phase 3 API Completeness: `cloneSession`, `range(numPartitions)`, `emptyDataset[T]`, typed `select(TypedColumn)` (1-5 arity), `dropDuplicatesWithinWatermark`, `collectAsList`/`takeAsList`, `withMetadata`, `colRegex`, `metadataColumn`, `transpose`, `zipWithIndex`, `isLocal`, static session management, `executeCommand`
+- [x] Scalar / Exists / IN Subqueries (`Dataset.scalar()`, `Dataset.exists()`, `Column.isin(Dataset)` via `SubqueryExpression` + `WithRelations`)
 
 See [API-GAPS.md](API-GAPS.md) for a detailed comparison with the official Spark Connect client.
 

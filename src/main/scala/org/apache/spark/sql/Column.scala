@@ -179,6 +179,21 @@ class Column private[sql] (
       .build()
     Column(subExpr, this.subqueryRelations :+ rel)
 
+  /** IN subquery (DataFrame variant): `col IN (SELECT ... FROM ...)`. */
+  def isin(df: DataFrame): Column =
+    val rel = df.relation
+    val planId = rel.getCommon.getPlanId
+    val subExpr = Expression.newBuilder()
+      .setSubqueryExpression(
+        SubqueryExpression.newBuilder()
+          .setPlanId(planId)
+          .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_IN)
+          .addAllInSubqueryValues(java.util.List.of(expr))
+          .build()
+      )
+      .build()
+    Column(subExpr, this.subqueryRelations :+ rel)
+
   // ---------------------------------------------------------------------------
   // when / otherwise (case-when chaining)
   // ---------------------------------------------------------------------------
