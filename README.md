@@ -41,12 +41,10 @@ This project provides that Scala 3 client.
 
 ## Compatibility
 
-Tested against these Spark Connect server versions:
-
 | Server Version | Status |
 |---------------|--------|
-| Spark 4.0.2 | Supported |
-| Spark 4.1.1 | Supported |
+| Spark 4.1.x | Supported |
+| Spark 4.0.x | **Not supported** — incompatible `AgnosticEncoders` serialVersionUID, missing `SubqueryExpression` / `CloneSession` proto/RPC |
 
 ## Known Limitations
 
@@ -84,14 +82,14 @@ Spark 4.0/4.1 servers are built with Scala 2.13. When the SC3 client sends a Sca
 | JDK | 17+ |
 | SBT | 1.10+ |
 | Scala | 3.3.7 LTS |
-| Spark Connect Server | 4.0.2+ |
+| Spark Connect Server | 4.1.x |
 
 ## Quick Start
 
 ### 1. Start a Spark Connect server
 
 ```bash
-# Spark 4.0+
+# Spark 4.1+
 $SPARK_HOME/sbin/start-connect-server.sh
 ```
 
@@ -365,7 +363,7 @@ src/
 ```
 ┌──────────────────────┐          gRPC / Protobuf          ┌─────────────────────┐
 │  Scala 3 Client      │ ──────────────────────────────▶   │  Spark Connect      │
-│                      │                                    │  Server (4.0+)      │
+│                      │                                    │  Server (4.1+)      │
 │  SparkSession        │          Arrow IPC                 │                     │
 │  DataFrame           │ ◀──────────────────────────────── │  Spark SQL Engine   │
 │  Column / functions  │                                    │  Catalyst Optimizer │
@@ -431,7 +429,7 @@ src/
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
 - [x] Unit tests (603 tests)
-- [x] Integration tests (Spark 4.0.2 / 4.1.1)
+- [x] Integration tests (Spark 4.1.1)
 - [x] Error handling (retry policies, gRPC exception conversion, reattachable execution, enriched error details via FetchErrorDetails RPC)
 - [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)
 - [ ] Publish to Maven Central
