@@ -387,3 +387,37 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
       try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       catch case _: Exception => ()
   }
+
+  // ---------------------------------------------------------------------------
+  // bucketBy / sortBy
+  // ---------------------------------------------------------------------------
+
+  test("bucketBy and sortBy") {
+    val tableName = "test_rw_bucket_sort"
+    try
+      spark.range(100).withColumn("group", col("id") % lit(5))
+        .write.mode("overwrite")
+        .bucketBy(4, "group")
+        .sortBy("id")
+        .saveAsTable(tableName)
+      val result = spark.read.table(tableName).count()
+      assert(result == 100)
+    finally
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
+      catch case _: Exception => ()
+  }
+
+  // ---------------------------------------------------------------------------
+  // Multi-path load
+  // ---------------------------------------------------------------------------
+
+  test("load with multiple paths") {
+    withTempDir { dir =>
+      val path1 = dir.resolve("part1").toString
+      val path2 = dir.resolve("part2").toString
+      testDf.write.parquet(path1)
+      testDf.write.parquet(path2)
+      val result = spark.read.parquet(path1, path2).count()
+      assert(result == 6) // 3 rows from each path
+    }
+  }

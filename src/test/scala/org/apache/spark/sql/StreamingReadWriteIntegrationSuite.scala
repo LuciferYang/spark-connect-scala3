@@ -282,3 +282,74 @@ class StreamingReadWriteIntegrationSuite extends IntegrationTestBase:
         catch case _: Exception => ()
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // processAllAvailable
+  // ---------------------------------------------------------------------------
+
+  test("processAllAvailable blocks until all available data is processed") {
+    val df = spark.readStream.format("rate").option("rowsPerSecond", "100").load()
+    val query = df.writeStream
+      .format("console")
+      .outputMode("append")
+      .trigger(Trigger.ProcessingTime(500))
+      .start()
+
+    try
+      // Should not throw — blocks until current data is consumed
+      query.processAllAvailable()
+      assert(query.isActive)
+    finally query.stop()
+  }
+
+  // ---------------------------------------------------------------------------
+  // StreamingQuery.explain
+  // ---------------------------------------------------------------------------
+
+  test("StreamingQuery.explain does not throw") {
+    val df = spark.readStream.format("rate").option("rowsPerSecond", "5").load()
+    val query = df.writeStream
+      .format("console")
+      .outputMode("append")
+      .trigger(Trigger.ProcessingTime(2000))
+      .start()
+
+    try
+      // explain() prints the plan to stdout; verify it does not throw
+      query.explain()
+      query.explain(extended = true)
+      assert(query.isActive)
+    finally query.stop()
+  }
+
+  // ---------------------------------------------------------------------------
+  // readStream.options(Map)
+  // ---------------------------------------------------------------------------
+
+  test("readStream.options(Map) sets multiple options at once") {
+    val optionsMap = Map("rowsPerSecond" -> "10", "numPartitions" -> "1")
+    val df = spark.readStream.format("rate").options(optionsMap).load()
+    assert(df.isStreaming)
+  }
+
+  // ---------------------------------------------------------------------------
+  // writeStream.partitionBy
+  // ---------------------------------------------------------------------------
+
+  test("writeStream.partitionBy sets partitioning columns") {
+    withTempDir { dir =>
+      val checkpoint = dir.resolve("checkpoint").toString
+      val output = dir.resolve("output").toString
+
+      val df = spark.readStream.format("rate").option("rowsPerSecond", "100").load()
+      val query = df.writeStream
+        .format("parquet")
+        .option("checkpointLocation", checkpoint)
+        .partitionBy("value")
+        .trigger(Trigger.AvailableNow)
+        .start(output)
+
+      query.awaitTermination(30000)
+      assert(!query.isActive)
+    }
+  }

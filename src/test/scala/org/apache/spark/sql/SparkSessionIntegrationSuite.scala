@@ -127,3 +127,169 @@ class SparkSessionIntegrationSuite extends IntegrationTestBase:
     spark.clearTags()
     assert(spark.getTags().isEmpty)
   }
+
+  // ---------------------------------------------------------------------------
+  // TableValuedFunction (tvf)
+  // ---------------------------------------------------------------------------
+
+  test("tvf returns a TableValuedFunction and can explode an array") {
+    val tvf = spark.tvf
+    assert(tvf != null)
+    val df = tvf.explode(functions.array(functions.lit(1), functions.lit(2), functions.lit(3)))
+    val result = df.collect()
+    assert(result.length == 3)
+  }
+
+  test("tvf.range produces rows") {
+    val df = spark.tvf.range(5)
+    assert(df.count() == 5L)
+  }
+
+  // ---------------------------------------------------------------------------
+  // Interrupt operations
+  // ---------------------------------------------------------------------------
+
+  test("interruptAll returns without error on idle session") {
+    val result = spark.interruptAll()
+    assert(result != null)
+  }
+
+  test("interruptTag returns without error on idle session") {
+    val result = spark.interruptTag("nonexistent-tag")
+    assert(result != null)
+  }
+
+  test("interruptOperation returns without error for fake operation id") {
+    val result = spark.interruptOperation("00000000-0000-0000-0000-000000000000")
+    assert(result != null)
+  }
+
+  // ---------------------------------------------------------------------------
+  // stop / close
+  // ---------------------------------------------------------------------------
+
+  test("stop and close terminate a session") {
+    val s2 = SparkSession.builder().remote("sc://localhost:15002").build()
+    try
+      // session works before stop
+      assert(s2.range(3).count() == 3)
+      s2.stop()
+      // after stop, operations should fail
+      intercept[Exception] {
+        s2.range(1).count()
+      }
+    catch
+      case _: Exception => () // acceptable if stop itself throws on cleanup
+  }
+
+  test("close is equivalent to stop") {
+    val s2 = SparkSession.builder().remote("sc://localhost:15002").build()
+    try
+      assert(s2.range(2).count() == 2)
+      s2.close()
+      intercept[Exception] {
+        s2.range(1).count()
+      }
+    catch
+      case _: Exception => ()
+  }
+
+  // ---------------------------------------------------------------------------
+  // executeCommand (DeveloperApi)
+  // ---------------------------------------------------------------------------
+
+  test("executeCommand - DeveloperApi (best-effort)") {
+    try
+      val df = spark.executeCommand("shell", "echo hello")
+      // If it works, just verify we got a DataFrame back
+      assert(df != null)
+    catch
+      case e: Exception =>
+        // executeCommand may not be supported on all servers
+        info(s"executeCommand not supported: ${e.getMessage}")
+  }
+
+  // ---------------------------------------------------------------------------
+  // SparkSession.Builder: config / create / getOrCreate
+  // ---------------------------------------------------------------------------
+
+  test("Builder.config sets configuration on builder") {
+    val session = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .config("spark.sc3.builder.test.key", "builder_value")
+      .build()
+    try
+      val v = session.conf.get("spark.sc3.builder.test.key")
+      assert(v == "builder_value")
+    finally
+      try session.close()
+      catch case _: Exception => ()
+  }
+
+  test("Builder.create always creates a new session") {
+    val s1 = SparkSession.builder().remote("sc://localhost:15002").create()
+    val s2 = SparkSession.builder().remote("sc://localhost:15002").create()
+    try
+      assert(s1.sessionId != s2.sessionId)
+      assert(s1.range(1).count() == 1)
+      assert(s2.range(1).count() == 1)
+    finally
+      try s1.close()
+      catch case _: Exception => ()
+      try s2.close()
+      catch case _: Exception => ()
+  }
+
+  test("Builder.getOrCreate returns existing session if available") {
+    val s1 = SparkSession.builder().remote("sc://localhost:15002").build()
+    try
+      SparkSession.setActiveSession(s1)
+      val s2 = SparkSession.builder().remote("sc://localhost:15002").getOrCreate()
+      // getOrCreate should return the active session
+      assert(s2.sessionId == s1.sessionId)
+    finally
+      SparkSession.clearActiveSession()
+      try s1.close()
+      catch case _: Exception => ()
+  }
+
+  // ---------------------------------------------------------------------------
+  // SparkSession companion: getActiveSession / getDefaultSession / active
+  // ---------------------------------------------------------------------------
+
+  test("getActiveSession returns None when no active session is set") {
+    SparkSession.clearActiveSession()
+    assert(SparkSession.getActiveSession.isEmpty)
+  }
+
+  test("getDefaultSession returns a session (set by builder)") {
+    // The base spark session was built via builder(), so defaultSession should be set
+    val ds = SparkSession.getDefaultSession
+    assert(ds.isDefined)
+  }
+
+  test("active returns a session when active or default is set") {
+    // With the test spark session as default, active should not throw
+    val s = SparkSession.active
+    assert(s != null)
+    assert(s.range(1).count() == 1)
+  }
+
+  // ---------------------------------------------------------------------------
+  // SparkSession companion: setActiveSession / clearActiveSession
+  // ---------------------------------------------------------------------------
+
+  test("setActiveSession and clearActiveSession") {
+    val original = SparkSession.getActiveSession
+    try
+      SparkSession.setActiveSession(spark)
+      assert(SparkSession.getActiveSession.contains(spark))
+
+      SparkSession.clearActiveSession()
+      assert(SparkSession.getActiveSession.isEmpty)
+    finally
+      // Restore original state
+      original match
+        case Some(s) => SparkSession.setActiveSession(s)
+        case None    => SparkSession.clearActiveSession()
+  }

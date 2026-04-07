@@ -130,3 +130,51 @@ class UdfIntegrationSuite extends IntegrationTestBase:
     assert(result(1).getString(0) == "B")
     assert(result(1).getLong(1) == 30L)
   }
+
+  // ---------------------------------------------------------------------------
+  // UDF modifiers: withName, asNonNullable, asNondeterministic
+  // ---------------------------------------------------------------------------
+
+  test("UDF withName sets display name") {
+    assert(classFilesUploaded)
+    val doubler = udf((x: Int) => x * 2).withName("myDoubler")
+    assert(doubler.name.contains("myDoubler"))
+
+    val rows = Seq(Row(5), Row(10))
+    val schema = StructType(Seq(StructField("value", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+
+    val result = df.select(doubler(col("value")).as("doubled")).collect()
+    assert(result.length == 2)
+    assert(result(0).get(0).toString.toInt == 10)
+    assert(result(1).get(0).toString.toInt == 20)
+  }
+
+  test("UDF asNonNullable marks UDF as non-nullable") {
+    assert(classFilesUploaded)
+    val addTen = udf((x: Int) => x + 10).asNonNullable()
+
+    val rows = Seq(Row(1), Row(2), Row(3))
+    val schema = StructType(Seq(StructField("value", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+
+    val result = df.select(addTen(col("value")).as("plus_ten")).collect()
+    assert(result.length == 3)
+    assert(result(0).get(0).toString.toInt == 11)
+    assert(result(1).get(0).toString.toInt == 12)
+    assert(result(2).get(0).toString.toInt == 13)
+  }
+
+  test("UDF asNondeterministic marks UDF as nondeterministic") {
+    assert(classFilesUploaded)
+    val tripler = udf((x: Int) => x * 3).asNondeterministic()
+
+    val rows = Seq(Row(2), Row(4))
+    val schema = StructType(Seq(StructField("value", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+
+    val result = df.select(tripler(col("value")).as("tripled")).collect()
+    assert(result.length == 2)
+    assert(result(0).get(0).toString.toInt == 6)
+    assert(result(1).get(0).toString.toInt == 12)
+  }

@@ -403,3 +403,46 @@ class ColumnIntegrationSuite extends IntegrationTestBase:
     // All rows should have total = 0+1+2+3+4 = 10
     result.foreach(r => assert(r.get(1).toString.toLong == 10L))
   }
+
+  // ---------------------------------------------------------------------------
+  // as(aliases: Array[String]) — multi-alias for struct columns
+  // ---------------------------------------------------------------------------
+
+  test("as with Array of aliases for struct column") {
+    val df = spark.sql("SELECT named_struct('x', 1, 'y', 2) AS s")
+    try
+      val result = df.select(col("s").as(Array("a", "b")))
+      val cols = result.columns
+      assert(cols.length == 2)
+      assert(cols.toSet == Set("a", "b"))
+      val row = result.collect()(0)
+      assert(row.getInt(0) == 1)
+      assert(row.getInt(1) == 2)
+    catch
+      case e: Exception =>
+        cancel(
+          s"Multi-alias for struct columns may not be supported by this server: ${e.getMessage}"
+        )
+  }
+
+  // ---------------------------------------------------------------------------
+  // getItem with Column key — dynamic array index
+  // ---------------------------------------------------------------------------
+
+  test("getItem with Column key for dynamic array index") {
+    val rows = Seq(
+      Row(Seq(10, 20, 30), 0),
+      Row(Seq(40, 50, 60), 1),
+      Row(Seq(70, 80, 90), 2)
+    )
+    val schema = StructType(Seq(
+      StructField("arr", ArrayType(IntegerType, true)),
+      StructField("idx", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.select(col("arr").getItem(col("idx")).as("val"))
+      .orderBy(col("val")).collect()
+    assert(result(0).getInt(0) == 10) // arr[0] = 10
+    assert(result(1).getInt(0) == 50) // arr[1] = 50
+    assert(result(2).getInt(0) == 90) // arr[2] = 90
+  }

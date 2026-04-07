@@ -145,14 +145,14 @@ final class SparkSession private[sql] (
 
   def createDataFrame(rows: Seq[Row], schema: types.StructType): DataFrame =
     val arrowData = ArrowSerializer.encodeRows(rows, schema)
+    val localRelBuilder = LocalRelation.newBuilder().setSchema(schema.toDDL)
+    if arrowData.nonEmpty then
+      localRelBuilder.setData(com.google.protobuf.ByteString.copyFrom(arrowData))
     DataFrame(
       this,
       Relation.newBuilder()
         .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-        .setLocalRelation(LocalRelation.newBuilder()
-          .setData(com.google.protobuf.ByteString.copyFrom(arrowData))
-          .setSchema(schema.toDDL)
-          .build())
+        .setLocalRelation(localRelBuilder.build())
         .build()
     )
 
@@ -272,8 +272,8 @@ final class SparkSession private[sql] (
   /** Implements `java.io.Closeable`. Releases session resources. */
   override def close(): Unit =
     client.close()
-    SparkSession.clearActiveSession()
-    SparkSession.clearDefaultSession()
+    if SparkSession.getActiveSession.contains(this) then SparkSession.clearActiveSession()
+    if SparkSession.getDefaultSession.contains(this) then SparkSession.clearDefaultSession()
 
   // ---------------------------------------------------------------------------
   // New Session

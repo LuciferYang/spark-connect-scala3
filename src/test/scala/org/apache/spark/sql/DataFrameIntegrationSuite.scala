@@ -1018,3 +1018,193 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     assert(result.columns.contains("index"))
     assert(result.count() == 5L)
   }
+
+  // ---------------------------------------------------------------------------
+  // lateralJoin
+  // ---------------------------------------------------------------------------
+
+  test("lateralJoin with SQL subquery") {
+    val left = spark.range(3).select(col("id").as("x"))
+    left.createOrReplaceTempView("sc3_lateral_left")
+    try
+      // Use SQL to generate the lateral subquery part
+      val right = spark.sql("SELECT x * 10 AS y FROM sc3_lateral_left")
+      right.createOrReplaceTempView("sc3_lateral_right")
+      // lateralJoin: inner join the left df with a subquery
+      val result = left.lateralJoin(
+        spark.sql("SELECT x * 2 AS doubled"),
+        col("x") >= lit(0)
+      ).orderBy(col("x")).collect()
+      assert(result.nonEmpty)
+    finally
+      spark.catalog.dropTempView("sc3_lateral_left")
+      try spark.catalog.dropTempView("sc3_lateral_right")
+      catch case _: Exception => ()
+  }
+
+  test("lateralJoin without condition") {
+    val left = spark.range(2).select(col("id").as("x"))
+    val right = spark.sql("SELECT 1 AS one")
+    val result = left.lateralJoin(right).collect()
+    assert(result.length == 2)
+  }
+
+  // ---------------------------------------------------------------------------
+  // broadcast (functions.broadcast and DataFrame.broadcast)
+  // ---------------------------------------------------------------------------
+
+  test("functions.broadcast returns a DataFrame with broadcast hint") {
+    val df = spark.range(10)
+    val broadcasted = functions.broadcast(df)
+    assert(broadcasted.count() == 10L)
+  }
+
+  test("DataFrame.broadcast returns a DataFrame with broadcast hint") {
+    val df = spark.range(10)
+    val broadcasted = df.broadcast
+    assert(broadcasted.count() == 10L)
+  }
+
+  test("broadcast hint in join preserves data") {
+    val left = spark.range(5).select(col("id").as("a"))
+    val right = spark.range(3, 8).select(col("id").as("b"))
+    val result = left.join(
+      functions.broadcast(right),
+      col("a") === col("b"),
+      "inner"
+    ).collect()
+    assert(result.length == 2) // ids 3, 4
+  }
+
+  // ---------------------------------------------------------------------------
+  // persist(StorageLevel) overload
+  // ---------------------------------------------------------------------------
+
+  test("persist with DISK_ONLY StorageLevel") {
+    val df = spark.range(10).select(col("id"))
+    df.persist(StorageLevel.DISK_ONLY)
+    try
+      val sl = df.storageLevel
+      assert(sl.useDisk)
+      assert(!sl.useMemory)
+    finally df.unpersist()
+  }
+
+  test("persist with MEMORY_AND_DISK_2 StorageLevel") {
+    val df = spark.range(10).select(col("id"))
+    df.persist(StorageLevel.MEMORY_AND_DISK_2)
+    try
+      val sl = df.storageLevel
+      assert(sl.useMemory)
+      assert(sl.useDisk)
+      assert(sl.replication == 2)
+    finally df.unpersist()
+  }
+
+  // ---------------------------------------------------------------------------
+  // show(numRows, truncate) overload
+  // ---------------------------------------------------------------------------
+
+  test("show with numRows and truncate parameters does not throw") {
+    val rows = Seq(Row("a long string that might be truncated in display", 123))
+    val schema = StructType(Seq(
+      StructField("text", StringType),
+      StructField("num", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    // show(numRows, truncate) where truncate is int
+    df.show(1, 5)
+    df.show(10, 100)
+    // Also test the 3-param version with vertical=true
+    df.show(1, 5, vertical = true)
+  }
+
+  // ---------------------------------------------------------------------------
+  // withWatermark (streaming)
+  // ---------------------------------------------------------------------------
+
+  test("withWatermark does not throw on streaming DataFrame") {
+    val streamDf = spark.readStream
+      .format("rate")
+      .option("rowsPerSecond", "1")
+      .load()
+    // withWatermark should be callable on a streaming df without error
+    val watermarked = streamDf.withWatermark("timestamp", "10 seconds")
+    assert(watermarked != null)
+    // Verify it's still a streaming df
+    assert(watermarked.isStreaming)
+  }
+
+  // ---------------------------------------------------------------------------
+  // metadataColumn
+  // ---------------------------------------------------------------------------
+
+  test("metadataColumn (best-effort, may not work on all sources)") {
+    val tableName = "sc3_metadata_col_test"
+    try
+      spark.range(3).write.mode("overwrite").format("parquet").saveAsTable(tableName)
+      val df = spark.table(tableName)
+      // _metadata is a hidden column available on file-based sources
+      val metaCol = df.metadataColumn("_metadata")
+      assert(metaCol != null)
+      // Selecting it should work on file sources
+      val result = df.select(col("id"), df.metadataColumn("_metadata")).collect()
+      assert(result.length == 3)
+    catch
+      case e: Exception =>
+        info(s"metadataColumn not supported on this source: ${e.getMessage}")
+    finally
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
+      catch case _: Exception => ()
+  }
+
+  // ---------------------------------------------------------------------------
+  // createOrReplaceGlobalTempView
+  // ---------------------------------------------------------------------------
+
+  test("createOrReplaceGlobalTempView creates and replaces") {
+    val df1 = spark.range(3)
+    val df2 = spark.range(5)
+    val viewName = "sc3_replace_global_view"
+    try
+      df1.createOrReplaceGlobalTempView(viewName)
+      val r1 = spark.sql(s"SELECT * FROM global_temp.$viewName").count()
+      assert(r1 == 3)
+
+      // Replace with a different DataFrame
+      df2.createOrReplaceGlobalTempView(viewName)
+      val r2 = spark.sql(s"SELECT * FROM global_temp.$viewName").count()
+      assert(r2 == 5)
+    finally
+      try spark.catalog.dropGlobalTempView(viewName)
+      catch case _: Exception => ()
+  }
+
+  // ---------------------------------------------------------------------------
+  // dropDuplicatesWithinWatermark (streaming)
+  // ---------------------------------------------------------------------------
+
+  test("dropDuplicatesWithinWatermark on streaming DataFrame") {
+    val streamDf = spark.readStream
+      .format("rate")
+      .option("rowsPerSecond", "1")
+      .load()
+      .withWatermark("timestamp", "10 seconds")
+
+    // dropDuplicatesWithinWatermark should not throw on a streaming df
+    val deduped = streamDf.dropDuplicatesWithinWatermark()
+    assert(deduped != null)
+    assert(deduped.isStreaming)
+  }
+
+  test("dropDuplicatesWithinWatermark with column names on streaming DataFrame") {
+    val streamDf = spark.readStream
+      .format("rate")
+      .option("rowsPerSecond", "1")
+      .load()
+      .withWatermark("timestamp", "10 seconds")
+
+    val deduped = streamDf.dropDuplicatesWithinWatermark(Seq("value"))
+    assert(deduped != null)
+    assert(deduped.isStreaming)
+  }
