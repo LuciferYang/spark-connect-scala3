@@ -59,13 +59,14 @@ jobs:
           path: build/sbt-launch-*.jar
           key: sbt-launcher-${{ hashFiles('project/build.properties') }}
 
-      - name: Cache Spark distribution
+      - name: Cache Spark distribution and test jars
         uses: actions/cache@v4
         with:
           path: |
             spark-${{ env.SPARK_VERSION }}-bin-hadoop3
             spark-catalyst_2.13-${{ env.SPARK_VERSION }}-tests.jar
-          key: spark-${{ env.SPARK_VERSION }}-bin-hadoop3-v2
+            h2-2.2.224.jar
+          key: spark-${{ env.SPARK_VERSION }}-bin-hadoop3-v3
 
       - name: Download Spark ${{ env.SPARK_VERSION }}
         run: |
@@ -84,10 +85,19 @@ jobs:
           fi
           echo "CATALYST_TEST_JAR=$(pwd)/${CATALYST_TEST_JAR}" >> "$GITHUB_ENV"
 
+      - name: Download H2 JDBC driver (for JDBC integration tests)
+        run: |
+          H2_VERSION="2.2.224"
+          H2_JAR="h2-${H2_VERSION}.jar"
+          if [ ! -f "$H2_JAR" ]; then
+            wget -q "https://repo1.maven.org/maven2/com/h2database/h2/${H2_VERSION}/${H2_JAR}"
+          fi
+          echo "H2_JAR=$(pwd)/${H2_JAR}" >> "$GITHUB_ENV"
+
       - name: Start Spark Connect Server
         run: |
           $SPARK_HOME/sbin/start-connect-server.sh \
-            --jars "$CATALYST_TEST_JAR" \
+            --jars "$CATALYST_TEST_JAR,$H2_JAR" \
             --conf spark.sql.catalog.testcat=org.apache.spark.sql.connector.catalog.InMemoryTableCatalog
           # Wait for server to be ready
           for i in $(seq 1 30); do

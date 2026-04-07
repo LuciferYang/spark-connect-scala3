@@ -65,3 +65,75 @@ final class DataFrameReader private[sql] (private val session: SparkSession):
   def orc(paths: String*): DataFrame = format("orc").load(paths)
   def csv(paths: String*): DataFrame = format("csv").load(paths)
   def text(paths: String*): DataFrame = format("text").load(paths)
+
+  /** Load a table from a JDBC data source.
+    *
+    * {{{
+    *   val props = new java.util.Properties()
+    *   props.put("user", "dbuser")
+    *   val df = spark.read.jdbc("jdbc:h2:mem:test", "mytable", props)
+    * }}}
+    */
+  def jdbc(url: String, table: String, properties: java.util.Properties): DataFrame =
+    import scala.jdk.CollectionConverters.*
+    val propsMap = properties.asScala.toMap
+    format("jdbc")
+      .option("url", url)
+      .option("dbtable", table)
+      .options(propsMap)
+      .load()
+
+  /** Load a table from a JDBC data source with range-based partitioning.
+    *
+    * {{{
+    *   val df = spark.read.jdbc("jdbc:h2:mem:test", "mytable",
+    *     "id", 0L, 100L, 4, new java.util.Properties())
+    * }}}
+    */
+  def jdbc(
+      url: String,
+      table: String,
+      columnName: String,
+      lowerBound: Long,
+      upperBound: Long,
+      numPartitions: Int,
+      connectionProperties: java.util.Properties
+  ): DataFrame =
+    option("partitionColumn", columnName)
+      .option("lowerBound", lowerBound.toString)
+      .option("upperBound", upperBound.toString)
+      .option("numPartitions", numPartitions.toString)
+      .jdbc(url, table, connectionProperties)
+
+  /** Load a table from a JDBC data source with predicate-based partitioning.
+    *
+    * Each predicate string becomes a WHERE clause for one partition.
+    * {{{
+    *   val predicates = Array("id < 50", "id >= 50")
+    *   val df = spark.read.jdbc("jdbc:h2:mem:test", "mytable", predicates, props)
+    * }}}
+    */
+  def jdbc(
+      url: String,
+      table: String,
+      predicates: Array[String],
+      connectionProperties: java.util.Properties
+  ): DataFrame =
+    import scala.jdk.CollectionConverters.*
+    val propsMap = connectionProperties.asScala.toMap
+    val dsBuilder = Read.DataSource.newBuilder()
+      .setFormat("jdbc")
+    (opts ++ propsMap ++ Map("url" -> url, "dbtable" -> table)).foreach((k, v) =>
+      dsBuilder.putOptions(k, v)
+    )
+    predicates.foreach(dsBuilder.addPredicates)
+    userSchema.foreach(dsBuilder.setSchema)
+    DataFrame(
+      session,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+        .setRead(Read.newBuilder()
+          .setDataSource(dsBuilder.build())
+          .build())
+        .build()
+    )
