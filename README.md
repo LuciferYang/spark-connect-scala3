@@ -75,6 +75,14 @@ Spark 4.0/4.1 servers are built with Scala 2.13. When the SC3 client sends a Sca
 
 **Workaround**: Use Column-expression-based APIs instead of typed lambda APIs where possible. For example, use `df.filter(col("age") > 28)` instead of `ds.filter(_.age > 28)`.
 
+### Server-Side Hang on `interruptOperation` with Non-Existent Operation ID
+
+The Spark 4.1.x Connect server hangs indefinitely when the client sends an `InterruptRequest` with `INTERRUPT_TYPE_OPERATION_ID` for a non-existent operation id (e.g., a fake UUID). The server appears to wait for the operation to appear rather than returning immediately with an empty list.
+
+`interruptAll()` and `interruptTag(tag)` are unaffected — they return immediately on idle sessions.
+
+**Workaround**: Only call `spark.interruptOperation(id)` with operation ids you have actually observed from the server (e.g., via `addTag` + `getTags`). The integration test for this case is `cancel`ed pending an upstream fix.
+
 ## Requirements
 
 | Component | Version |
