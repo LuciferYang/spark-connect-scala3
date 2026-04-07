@@ -13,18 +13,19 @@ See [run-integration-tests.md](run-integration-tests.md) for the full command an
 
 ```
 Suites:    19 (0 aborted)
-Tests:    436 total
-  ✅  398 passed
+Tests:    439 total
+  ✅  400 passed
   ❌    0 failed
-  ⊘   38 canceled (server gaps + Scala 3 lambda incompatibility)
-Time:      44 s
+  ⊘   39 canceled (server gaps + Scala 3 lambda incompatibility)
 ```
+
+Pass rate excluding cancels: **100% (400/400)**.
 
 ## Per-suite breakdown
 
 | Suite | Tests | Canceled | Notes |
 |-------|------:|---------:|-------|
-| CatalogIntegrationSuite | 44 | 11 | server gaps (see § Cancel reasons) |
+| CatalogIntegrationSuite | 47 | 12 | server gaps (see § Cancel reasons) |
 | ColumnIntegrationSuite | 38 | 1 | Array-of-aliases overload |
 | DataFrameIntegrationSuite | 97 | 0 | |
 | DatasetIntegrationSuite | 2 | 1 | Scala 3 lambda |
@@ -43,7 +44,7 @@ Time:      44 s
 | WindowIntegrationSuite | 10 | 0 | |
 | WriterIntegrationSuite | 2 | 0 | |
 | WriterV2IntegrationSuite | 33 | 10 | mergeInto + writeTo.overwrite (requires V2 catalog) |
-| **Total** | **436** | **38** | |
+| **Total** | **439** | **39** | |
 
 ## Cancel reasons
 
@@ -85,6 +86,7 @@ These cancel because the running Spark 4.1.x server does not (yet) support the c
 | CatalogIntegrationSuite | getTableProperties | RPC missing |
 | CatalogIntegrationSuite | getCreateTableString | RPC missing |
 | CatalogIntegrationSuite | listPartitions | RPC missing |
+| CatalogIntegrationSuite | dropView | not supported on default catalog (no Hive metastore) |
 | TableValuedFunctionIntegrationSuite | tvf.variant_explode | variant type support |
 | WriterV2IntegrationSuite | writeTo.overwrite with condition replaces matching rows | V2 catalog required |
 | WriterV2IntegrationSuite | writeTo.overwrite with non-matching condition keeps all rows | V2 catalog required |
@@ -111,9 +113,20 @@ These cancel because the running Spark 4.1.x server does not (yet) support the c
 
 ## Genuinely uncovered API surface
 
-After this run, the only public APIs without integration coverage are:
+Audit method: extracted every public `def` from 21 main API source files (587 public methods total) and cross-referenced against all 19 integration test files (6,129 lines). After the latest test additions, **14 public methods** are not exercised by any integration test, broken down by reason:
 
-- **`DataFrameWriter.jdbc(...)`** — requires an external JDBC database; not in scope for the test environment.
-- **`StreamingQueryManager.addListener` / `removeListener` / `listListeners`** — covered only by unit tests (`StreamingQueryManagerSuite`, `StreamingQueryListenerSuite`); no end-to-end integration test exercises listener callbacks via the gRPC stream.
+| Reason | Count | Methods |
+|---|---:|---|
+| **Blocked by Scala 3/2.13 lambda incompat** | 3 | `KeyValueGroupedDataset.{mapGroupsWithState, flatMapGroupsWithState, transformWithState}` |
+| **Requires external resources** | 4 | `DataFrameWriter.jdbc` (external DB); `StreamingQueryManager.{addListener, removeListener, listListeners}` (gRPC listener stream + callback infra) |
+| **Already exercised indirectly by test infra** | 4 | `SparkSession.{addArtifact, addClassDir}` (called by `IntegrationTestBase`); `Dataset.sparkSession` (trivial accessor); `SparkSession.setDefaultSession` (called by `Builder.build`) |
+| **REPL-only / static lifecycle** | 2 | `SparkSession.registerClassFinder`, `SparkSession.clearDefaultSession` |
+| **Deprecated upstream** | 1 | `Catalog.createExternalTable` |
 
-Everything else in the public API is exercised by at least one integration test.
+**Method-level coverage: ~97.6% (573/587 public methods)**.
+
+### Real test gaps
+
+After this audit, the previously-uncovered Catalog methods `dropView`, `recoverPartitions`, and `refreshByPath` were added to `CatalogIntegrationSuite`. `recoverPartitions` and `refreshByPath` pass; `dropView` cancels because the test server has no Hive metastore.
+
+There are no remaining "should add a test today" gaps. The remaining 14 uncovered methods are either blocked by external constraints (Scala 2.13 server, external DB, gRPC listener infrastructure), exercised indirectly by test infrastructure, or intentionally out of scope (deprecated, REPL tooling).

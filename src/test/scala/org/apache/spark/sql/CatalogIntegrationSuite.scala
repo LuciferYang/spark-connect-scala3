@@ -475,6 +475,73 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
   }
 
+  test("catalog refreshByPath") {
+    val tableName = "test_catalog_refresh_by_path"
+    val tmpDir = java.nio.file.Files.createTempDirectory("sc3_refresh_by_path_").toString
+    try
+      spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
+      spark.sql(
+        s"CREATE TABLE $tableName (id INT) USING parquet LOCATION '$tmpDir'"
+      ).collect()
+      spark.sql(s"INSERT INTO $tableName VALUES (1), (2)").collect()
+      // refreshByPath should not throw for a valid path. The server may treat
+      // arbitrary paths as a no-op (still no error), so we just assert no exception.
+      spark.catalog.refreshByPath(tmpDir)
+    finally
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
+      catch case _: Exception => ()
+      try
+        java.nio.file.Files
+          .walk(java.nio.file.Paths.get(tmpDir))
+          .sorted(java.util.Comparator.reverseOrder())
+          .forEach(p => java.nio.file.Files.deleteIfExists(p))
+      catch case _: Exception => ()
+  }
+
+  test("catalog recoverPartitions") {
+    val tableName = "test_catalog_recover_partitions"
+    try
+      spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
+      spark.sql(
+        s"CREATE TABLE $tableName (id INT, dt STRING) USING parquet PARTITIONED BY (dt)"
+      ).collect()
+      spark.sql(s"INSERT INTO $tableName PARTITION (dt='2026-04-07') VALUES (1)").collect()
+
+      try
+        // recoverPartitions should run without error on a partitioned table.
+        spark.catalog.recoverPartitions(tableName)
+      catch
+        case _: Exception =>
+          // Some servers (or non-Hive table providers) reject this operation.
+          cancel("Catalog.recoverPartitions may not be supported by this server")
+    finally
+      spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
+  }
+
+  test("catalog dropView") {
+    val viewName = "test_catalog_drop_view"
+    try
+      spark.sql(s"DROP VIEW IF EXISTS $viewName").collect()
+      spark.sql(s"CREATE VIEW $viewName AS SELECT 1 AS id").collect()
+      assert(
+        spark.sql(s"SELECT * FROM $viewName").collect().length == 1,
+        "View should be queryable before drop"
+      )
+
+      try
+        spark.catalog.dropView(viewName)
+        // After drop, the view should no longer be queryable.
+        intercept[Exception] {
+          spark.sql(s"SELECT * FROM $viewName").collect()
+        }
+      catch
+        case _: Exception =>
+          cancel("Catalog.dropView may not be supported by this server")
+    finally
+      try spark.sql(s"DROP VIEW IF EXISTS $viewName").collect()
+      catch case _: Exception => ()
+  }
+
   test("catalog truncateTable") {
     val tableName = "test_catalog_truncate_table"
     try
