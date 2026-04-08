@@ -86,9 +86,8 @@ final class Dataset[T: ClassTag] private[sql] (
 
   /** Return a new Dataset containing only rows matching the predicate.
     *
-    * Wraps `func` in a top-level [[FilterAdaptor]] (rather than an inner anonymous lambda)
-    * so the closure has a stable, well-typed bytecode layout that the Scala 2.13 server can
-    * deserialize.
+    * Wraps `func` in a top-level [[FilterAdaptor]] (rather than an inner anonymous lambda) so the
+    * closure has a stable, well-typed bytecode layout that the Scala 2.13 server can deserialize.
     */
   def filter(func: T => Boolean): Dataset[T] =
     mapPartitions(new FilterAdaptor(func))(using encoder, summon[ClassTag[T]])
