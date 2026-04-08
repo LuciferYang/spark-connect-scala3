@@ -220,11 +220,7 @@ object AgnosticEncoders:
   // Collection Type Encoders
   // ---------------------------------------------------------------------------
 
-  /** Encoder for Option[E] values.
-    *
-    * Serializes as the inner encoder with nullable=true. The collection wrapper itself is
-    * serialized via standard Java serialization; the inner encoder uses its own writeReplace.
-    */
+  /** Encoder for Option[E] values. */
   @SerialVersionUID(1L)
   case class OptionEncoder[E](element: AgnosticEncoder[E])
       extends AgnosticEncoder[Option[E]]
@@ -234,6 +230,9 @@ object AgnosticEncoders:
     override def dataType: DataType = element.dataType
     override val clsTag: ClassTag[Option[E]] =
       ClassTag(classOf[Option[?]])
+    @throws[ObjectStreamException]
+    private def writeReplace(): AnyRef =
+      CollectionEncoderProxy("OptionEncoder", element, None, None, None)
 
   /** Encoder for Array[E] values. */
   @SerialVersionUID(1L)
@@ -244,6 +243,15 @@ object AgnosticEncoders:
     override def dataType: DataType = ArrayType(element.dataType, containsNull)
     override val clsTag: ClassTag[Array[E]] =
       ClassTag(classOf[Array[?]])
+    @throws[ObjectStreamException]
+    private def writeReplace(): AnyRef =
+      CollectionEncoderProxy(
+        "ArrayEncoder",
+        element,
+        Some(containsNull),
+        None,
+        None
+      )
 
   /** Encoder for Iterable-like collection types (Seq, List, etc.). */
   @SerialVersionUID(1L)
@@ -255,6 +263,15 @@ object AgnosticEncoders:
       with Serializable:
     override def isPrimitive: Boolean = false
     override def dataType: DataType = ArrayType(element.dataType, containsNull)
+    @throws[ObjectStreamException]
+    private def writeReplace(): AnyRef =
+      CollectionEncoderProxy(
+        "IterableEncoder",
+        element,
+        Some(containsNull),
+        Some(clsTag.runtimeClass.getName),
+        None
+      )
 
   /** Encoder for Map[K, V] types. */
   @SerialVersionUID(1L)
@@ -268,6 +285,14 @@ object AgnosticEncoders:
     override def isPrimitive: Boolean = false
     override def dataType: DataType =
       MapType(keyEncoder.dataType, valueEncoder.dataType, valueContainsNull)
+    @throws[ObjectStreamException]
+    private def writeReplace(): AnyRef =
+      MapEncoderProxy(
+        clsTag.runtimeClass.getName,
+        keyEncoder,
+        valueEncoder,
+        valueContainsNull
+      )
 
   // ---------------------------------------------------------------------------
   // Product (case class) Encoder stubs
@@ -303,6 +328,21 @@ object AgnosticEncoders:
     override def isPrimitive: Boolean = false
     override def dataType: DataType =
       StructType(fields.map(f => StructField(f.name, f.enc.dataType, f.nullable)))
+    @throws[ObjectStreamException]
+    private def writeReplace(): AnyRef =
+      ProductEncoderProxy(
+        clsTag.runtimeClass.getName,
+        fields.map(f =>
+          EncoderFieldProxy(
+            f.name,
+            f.enc,
+            f.nullable,
+            f.metadata.json,
+            f.readMethod,
+            f.writeMethod
+          )
+        ).toArray
+      )
 
 /** Serialization proxy for [[AgnosticEncoder]] instances.
   *
@@ -418,3 +458,190 @@ final class DecimalEncoderProxy(
         throw ClassNotFoundException(s"No matching constructor for $encoderName")
       )
     ctor.newInstance(allArgs*)
+
+/** Serialization proxy for a single field within a [[ProductEncoder]].
+  *
+  * Each field carries its encoder (which will use its own `writeReplace`), name, nullability, and
+  * metadata JSON. On the server side the proxy's `readResolve` reconstructs the server's
+  * `EncoderField` case class.
+  */
+@SerialVersionUID(1L)
+final class EncoderFieldProxy(
+    val name: String,
+    val enc: AgnosticEncoder[?],
+    val nullable: Boolean,
+    val metadataJson: String,
+    val readMethod: Option[String],
+    val writeMethod: Option[String]
+) extends Serializable:
+  @throws[ObjectStreamException]
+  private def readResolve(): AnyRef =
+    val cl = getClass.getClassLoader match
+      case null => ClassLoader.getSystemClassLoader
+      case c    => Option(c.getParent).getOrElse(c)
+    // Reconstruct server-side Metadata
+    val metaClass = Class.forName(
+      "org.apache.spark.sql.types.Metadata$",
+      true,
+      cl
+    )
+    val metaModule = metaClass.getField("MODULE$").get(null)
+    val fromJsonMethod = metaClass.getMethod("fromJson", classOf[String])
+    val metadata = fromJsonMethod.invoke(metaModule, metadataJson)
+    // Reconstruct server-side EncoderField
+    val efClass = Class.forName(
+      "org.apache.spark.sql.catalyst.encoders.AgnosticEncoders$EncoderField",
+      true,
+      cl
+    )
+    val metaType = Class.forName("org.apache.spark.sql.types.Metadata", true, cl)
+    val agEncType = Class.forName(
+      "org.apache.spark.sql.catalyst.encoders.AgnosticEncoder",
+      true,
+      cl
+    )
+    val optionType = classOf[Option[?]]
+    val ctor = efClass.getConstructors
+      .find(_.getParameterCount == 6)
+      .getOrElse(
+        throw ClassNotFoundException(s"No 6-arg constructor for EncoderField")
+      )
+    ctor.newInstance(
+      name,
+      enc,
+      java.lang.Boolean.valueOf(nullable),
+      metadata,
+      readMethod,
+      writeMethod
+    )
+
+/** Serialization proxy for [[ProductEncoder]].
+  *
+  * Stores the class name (for ClassTag) and field descriptors. On the server side, `readResolve`
+  * uses reflection to construct the server's `ProductEncoder` case class with the reconstructed
+  * `ClassTag`, fields, and `outerPointerGetter = None`.
+  */
+@SerialVersionUID(1L)
+final class ProductEncoderProxy(
+    val className: String,
+    val fields: Array[EncoderFieldProxy]
+) extends Serializable:
+  @throws[ObjectStreamException]
+  private def readResolve(): AnyRef =
+    val cl = getClass.getClassLoader match
+      case null => ClassLoader.getSystemClassLoader
+      case c    => Option(c.getParent).getOrElse(c)
+    // Reconstruct ClassTag on the server side
+    val clsTagModule = Class.forName("scala.reflect.ClassTag$", true, cl)
+    val ctModule = clsTagModule.getField("MODULE$").get(null)
+    val applyMethod =
+      clsTagModule.getMethod("apply", classOf[Class[?]])
+    val runtimeClass = Class.forName(className, true, cl)
+    val clsTag = applyMethod.invoke(ctModule, runtimeClass)
+    // Resolve each field (EncoderFieldProxy.readResolve will be called by Java serialization)
+    val resolvedFields = fields.toSeq
+    // Reconstruct server-side ProductEncoder
+    val peClass = Class.forName(
+      "org.apache.spark.sql.catalyst.encoders.AgnosticEncoders$ProductEncoder",
+      true,
+      cl
+    )
+    val clsTagType = Class.forName("scala.reflect.ClassTag", true, cl)
+    val seqType = Class.forName("scala.collection.immutable.Seq", true, cl)
+    val optionType = classOf[Option[?]]
+    val ctor = peClass.getConstructors
+      .find(_.getParameterCount == 3)
+      .getOrElse(
+        throw ClassNotFoundException("No 3-arg constructor for ProductEncoder")
+      )
+    ctor.newInstance(clsTag, resolvedFields, None)
+
+/** Serialization proxy for collection-type encoders: [[OptionEncoder]], [[ArrayEncoder]],
+  * [[IterableEncoder]].
+  *
+  * These share a common pattern: an encoder name, an element encoder, optional containsNull flag,
+  * and optional class name (for ClassTag in IterableEncoder).
+  */
+@SerialVersionUID(1L)
+final class CollectionEncoderProxy(
+    val encoderName: String,
+    val element: AgnosticEncoder[?],
+    val containsNull: Option[Boolean],
+    val className: Option[String],
+    val lenientSerialization: Option[Boolean]
+) extends Serializable:
+  @throws[ObjectStreamException]
+  private def readResolve(): AnyRef =
+    val cl = getClass.getClassLoader match
+      case null => ClassLoader.getSystemClassLoader
+      case c    => Option(c.getParent).getOrElse(c)
+    val encPkg = "org.apache.spark.sql.catalyst.encoders.AgnosticEncoders$"
+    encoderName match
+      case "OptionEncoder" =>
+        val clazz = Class.forName(s"${encPkg}OptionEncoder", true, cl)
+        val agEncType = Class.forName(
+          "org.apache.spark.sql.catalyst.encoders.AgnosticEncoder",
+          true,
+          cl
+        )
+        val ctor = clazz.getConstructors.find(_.getParameterCount == 1).get
+        ctor.newInstance(element)
+      case "ArrayEncoder" =>
+        val clazz = Class.forName(s"${encPkg}ArrayEncoder", true, cl)
+        val ctor = clazz.getConstructors.find(_.getParameterCount == 2).get
+        ctor.newInstance(element, java.lang.Boolean.valueOf(containsNull.getOrElse(false)))
+      case "IterableEncoder" =>
+        val clazz = Class.forName(s"${encPkg}IterableEncoder", true, cl)
+        val ctor = clazz.getConstructors.find(_.getParameterCount == 4).get
+        val runtimeClass = Class.forName(className.get, true, cl)
+        val clsTagModule = Class.forName("scala.reflect.ClassTag$", true, cl)
+        val ctModule = clsTagModule.getField("MODULE$").get(null)
+        val applyMethod = clsTagModule.getMethod("apply", classOf[Class[?]])
+        val clsTag = applyMethod.invoke(ctModule, runtimeClass)
+        ctor.newInstance(
+          clsTag,
+          element,
+          java.lang.Boolean.valueOf(containsNull.getOrElse(false)),
+          java.lang.Boolean.valueOf(lenientSerialization.getOrElse(false))
+        )
+      case other =>
+        throw ClassNotFoundException(s"Unknown collection encoder: $other")
+
+/** Serialization proxy for [[MapEncoder]].
+  *
+  * Reconstructs the server-side `MapEncoder` case class via reflection, carrying the ClassTag class
+  * name, key/value encoders, and valueContainsNull flag.
+  */
+@SerialVersionUID(1L)
+final class MapEncoderProxy(
+    val className: String,
+    val keyEncoder: AgnosticEncoder[?],
+    val valueEncoder: AgnosticEncoder[?],
+    val valueContainsNull: Boolean
+) extends Serializable:
+  @throws[ObjectStreamException]
+  private def readResolve(): AnyRef =
+    val cl = getClass.getClassLoader match
+      case null => ClassLoader.getSystemClassLoader
+      case c    => Option(c.getParent).getOrElse(c)
+    val clazz = Class.forName(
+      "org.apache.spark.sql.catalyst.encoders.AgnosticEncoders$MapEncoder",
+      true,
+      cl
+    )
+    val runtimeClass = Class.forName(className, true, cl)
+    val clsTagModule = Class.forName("scala.reflect.ClassTag$", true, cl)
+    val ctModule = clsTagModule.getField("MODULE$").get(null)
+    val applyMethod = clsTagModule.getMethod("apply", classOf[Class[?]])
+    val clsTag = applyMethod.invoke(ctModule, runtimeClass)
+    val ctor = clazz.getConstructors
+      .find(_.getParameterCount == 4)
+      .getOrElse(
+        throw ClassNotFoundException("No 4-arg constructor for MapEncoder")
+      )
+    ctor.newInstance(
+      clsTag,
+      keyEncoder,
+      valueEncoder,
+      java.lang.Boolean.valueOf(valueContainsNull)
+    )

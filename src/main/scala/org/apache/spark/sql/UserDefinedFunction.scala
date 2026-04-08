@@ -12,6 +12,7 @@ import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.*
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.UdfPacket
 import org.apache.spark.sql.expressions.Aggregator
+import org.apache.spark.sql.util.ClosureCleaner
 import org.apache.spark.sql.types.*
 
 /** A user-defined function that can be applied to Columns.
@@ -110,6 +111,7 @@ final class UserDefinedFunction private[sql] (
 
   /** Serialize a function closure wrapped in a UdfPacket. */
   private def serializeFunction(f: AnyRef): Array[Byte] =
+    ClosureCleaner.clean(f)
     val inputEncs = _inputAgnosticEncoders.getOrElse(inputTypes.map(encoderForType))
     val outputEnc = _outputAgnosticEncoder.getOrElse(encoderForType(returnType))
     val packet = UdfPacket(f, inputEncs, outputEnc)
