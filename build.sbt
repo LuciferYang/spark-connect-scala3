@@ -67,6 +67,12 @@ lazy val root = (project in file("."))
         // Zstandard for plan compression
         "com.github.luben" % "zstd-jni" % "1.5.6-8",
 
+        // ASM for closure-cleaning bytecode analysis (mirrors upstream Spark's
+        // ClosureCleaner approach for stripping unused outer references from
+        // Scala lambdas before sending them over the wire).
+        "org.ow2.asm" % "asm" % "9.9.1",
+        "org.ow2.asm" % "asm-tree" % "9.9.1",
+
         // Ammonite REPL (published per full Scala version, not binary)
         "com.lihaoyi" % s"ammonite_$scalaFullVersion" % ammoniteVersion cross CrossVersion.disabled,
 
