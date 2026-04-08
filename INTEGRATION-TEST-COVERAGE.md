@@ -9,26 +9,31 @@ SBT_OPTS="-Dsun.net.client.defaultConnectTimeout=10000 -Dsun.net.client.defaultR
 
 See [run-integration-tests.md](run-integration-tests.md) for the full command and configuration notes.
 
-## Last run: 2026-04-07
+## Last run: 2026-04-08
 
 ```
-Suites:    19 (0 aborted)
-Tests:    439 total
-  ✅  400 passed
+Suites:    20 (0 aborted)
+Tests:    456 total
+  ✅  417 passed
   ❌    0 failed
-  ⊘   39 canceled (server gaps + Scala 3 lambda incompatibility)
+  ⊘   39 canceled (server gaps + Scala 3 case-class typed lambdas)
 ```
 
-Pass rate excluding cancels: **100% (400/400)**.
+Pass rate excluding cancels: **100% (417/417)**.
+
+Recent changes:
+- **+4 primitive-typed `Dataset` tests** (`Dataset[Int]/[String].map`, `filter`, `flatMap`) — these exercise the new top-level adaptor classes (`MapPartitionsAdaptor`, `FilterAdaptor`, `FlatMapAdaptor`) that fix Problem A from the README's Known Limitations section.
+- **+13 JDBC tests** in the new `JdbcIntegrationSuite` (Spark 4.1.1 H2 read coverage).
 
 ## Per-suite breakdown
 
 | Suite | Tests | Canceled | Notes |
 |-------|------:|---------:|-------|
 | CatalogIntegrationSuite | 47 | 12 | server gaps (see § Cancel reasons) |
+| JdbcIntegrationSuite | 13 | 0 | H2 read coverage |
 | ColumnIntegrationSuite | 38 | 1 | Array-of-aliases overload |
 | DataFrameIntegrationSuite | 97 | 0 | |
-| DatasetIntegrationSuite | 2 | 1 | Scala 3 lambda |
+| DatasetIntegrationSuite | 6 | 1 | Scala 3 case-class lambda (Problem B) |
 | DatasetTypedOpsIntegrationSuite | 49 | 3 | Scala 3 lambda |
 | GroupedDataFrameIntegrationSuite | 13 | 0 | |
 | KeyValueGroupedDatasetIntegrationSuite | 10 | 9 | Scala 3 lambda (only `cogroup` runs) |
@@ -44,7 +49,7 @@ Pass rate excluding cancels: **100% (400/400)**.
 | WindowIntegrationSuite | 10 | 0 | |
 | WriterIntegrationSuite | 2 | 0 | |
 | WriterV2IntegrationSuite | 33 | 10 | mergeInto + writeTo.overwrite (requires V2 catalog) |
-| **Total** | **439** | **39** | |
+| **Total** | **456** | **39** | |
 
 ## Cancel reasons
 

@@ -14,7 +14,12 @@ import org.apache.spark.connect.proto.{
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.ProductEncoder
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
-import org.apache.spark.sql.connect.common.UdfPacket
+import org.apache.spark.sql.connect.common.{
+  FilterAdaptor,
+  FlatMapAdaptor,
+  MapPartitionsAdaptor,
+  UdfPacket
+}
 
 import scala.reflect.ClassTag
 
@@ -79,17 +84,28 @@ final class Dataset[T: ClassTag] private[sql] (
     val newDf = DataFrame(sparkSession, relation)
     Dataset(newDf, outEnc)
 
-  /** Return a new Dataset containing only rows matching the predicate. */
+  /** Return a new Dataset containing only rows matching the predicate.
+    *
+    * Wraps `func` in a top-level [[FilterAdaptor]] (rather than an inner anonymous lambda)
+    * so the closure has a stable, well-typed bytecode layout that the Scala 2.13 server can
+    * deserialize.
+    */
   def filter(func: T => Boolean): Dataset[T] =
-    mapPartitions(iter => iter.filter(func))(using encoder, summon[ClassTag[T]])
+    mapPartitions(new FilterAdaptor(func))(using encoder, summon[ClassTag[T]])
 
-  /** Return a new Dataset by applying a function to each element. */
+  /** Return a new Dataset by applying a function to each element.
+    *
+    * Wraps `func` in a top-level [[MapPartitionsAdaptor]] for serialization stability.
+    */
   def map[U: Encoder: ClassTag](func: T => U): Dataset[U] =
-    mapPartitions(iter => iter.map(func))
+    mapPartitions(new MapPartitionsAdaptor(func))
 
-  /** Return a new Dataset by applying a function that returns a sequence. */
+  /** Return a new Dataset by applying a function that returns a sequence.
+    *
+    * Wraps `func` in a top-level [[FlatMapAdaptor]] for serialization stability.
+    */
   def flatMap[U: Encoder: ClassTag](func: T => IterableOnce[U]): Dataset[U] =
-    mapPartitions(iter => iter.flatMap(func))
+    mapPartitions(new FlatMapAdaptor(func))
 
   /** Apply a function to each element. */
   def foreach(func: T => Unit): Unit =
@@ -602,6 +618,7 @@ final class Dataset[T: ClassTag] private[sql] (
       .setOutputType(
         DataTypeProtoConverter.toProto(outputEncoder.dataType)
       )
+      .addInputTypes(DataTypeProtoConverter.toProto(inputEncoder.dataType))
       .setNullable(true)
     CommonInlineUserDefinedFunction
       .newBuilder()
