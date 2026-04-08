@@ -21,8 +21,6 @@ import org.apache.spark.sql.connect.common.{
   UdfPacket
 }
 
-import org.apache.spark.sql.util.ClosureCleaner
-
 import scala.reflect.ClassTag
 
 /** A strongly-typed collection of domain-specific objects.
@@ -611,8 +609,6 @@ final class Dataset[T: ClassTag] private[sql] (
       inputEncoder: AgnosticEncoder[?],
       outputEncoder: AgnosticEncoder[?]
   ): CommonInlineUserDefinedFunction =
-    // Clean the closure before serialization to strip non-serializable outer references
-    ClosureCleaner.clean(func)
     val packet = UdfPacket(func, Seq(inputEncoder), outputEncoder)
     val payload = UdfPacket.serialize(packet)
     val scalaUdf = ScalarScalaUDF
