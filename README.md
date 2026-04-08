@@ -48,30 +48,11 @@ This project provides that Scala 3 client.
 
 ## Known Limitations
 
-### Scala 3 Typed Lambdas on Scala 2.13 Spark Servers
+### Typed Lambdas Referencing User Case Class Fields
 
-Spark 4.0/4.1 servers are built with Scala 2.13, and certain Scala 3 typed‑Dataset closures cannot be deserialized on the server. The error surfaces as `INTERNAL_ERROR: Failed to unpack scala udf`.
+Spark 4.0/4.1 servers are built with Scala 2.13. When a Scala 3 typed‑Dataset lambda directly references a user‑defined case class field (e.g., `_.name` on a `Dataset[Person]`), the Scala 3‑emitted lambda bytecode invokes `Person.name()` in a way the Scala 2.13 server cannot link, even when `Person` is uploaded via `addClassDir`. The error surfaces as `INTERNAL_ERROR: Failed to unpack scala udf`.
 
-There are two distinct problems with different scope, which are handled separately by SC3:
-
-#### Problem A — Closure capture of method parameters (✅ FIXED in v0.2.1+)
-
-When `Dataset.map(func)` was implemented as `mapPartitions(iter => iter.map(func))`, the inner anonymous lambda captured the `func` method parameter, producing a Scala 3‑only synthesized class layout that the Scala 2.13 server's `ObjectInputStream` could not reconstruct.
-
-**Fix:** SC3 now wraps `func` in stable, top‑level adaptor classes (`MapPartitionsAdaptor`, `FilterAdaptor`, `FlatMapAdaptor` in `org.apache.spark.sql.connect.common`) instead of inner anonymous lambdas. Primitive‑typed Dataset operations now work end‑to‑end against a Scala 2.13 server:
-
-```scala
-spark.createDataset(Seq(1, 2, 3, 4, 5)).map(_ + 1).collect()      // ✓ works
-spark.createDataset(Seq("a", "bb", "ccc")).map(_.length).collect() // ✓ works
-spark.createDataset(Seq(1, 2, 3)).filter(_ > 1).collect()          // ✓ works
-spark.createDataset(Seq(1, 2, 3)).flatMap(n => Seq.fill(n)(n))     // ✓ works
-```
-
-#### Problem B — User‑defined case class field access in typed lambdas (still open)
-
-When the user lambda itself directly references a user‑defined case class field (e.g., `_.name` on a `Dataset[Person]`), the Scala 3‑emitted lambda bytecode invokes `Person.name()` in a way the Scala 2.13 server cannot link, even when the closure is otherwise clean and `Person` is uploaded via `addClassDir`.
-
-**Affected APIs** when input type is a user‑defined case class:
+**Affected APIs** when the input type is a user‑defined case class:
 
 | Category | Operations |
 |----------|-----------|
@@ -79,20 +60,21 @@ When the user lambda itself directly references a user‑defined case class fiel
 | KeyValueGroupedDataset | `groupByKey`, `mapGroups`, `flatMapGroups`, `flatMapSortedGroups`, `reduceGroups`, `mapValues`, `cogroup`, stateful variants |
 | Streaming | `foreachBatch` (also has a server‑side `classic.Dataset` vs SC3 `DataFrame` cast issue) |
 
-**Unaffected operations** — these don't ship Scala 3 typed lambdas to the server:
+**Unaffected operations** — these work correctly:
 
 | Category | Operations |
 |----------|-----------|
+| Primitive‑typed Datasets | `Dataset[Int]/[String]/...` `map`, `filter`, `flatMap`, etc. |
 | DataFrame transforms | `select`, `filter(Column)`, `where`, `join`, `joinWith`, `groupBy`, `agg`, `orderBy`, `withColumn`, `drop`, `union`, `distinct`, etc. |
 | DataFrame actions | `collect`, `count`, `show`, `first`, `head`, `take`, `toJSON`, `toLocalIterator`, etc. |
 | SQL | `spark.sql(...)` |
-| UDF/UDAF | `udf.register(...)` and `Aggregator` — these serialize via Java `ObjectOutputStream` and only ship column‑level lambdas, not Dataset closures |
+| UDF/UDAF | `udf.register(...)` and `Aggregator` — these serialize via Java `ObjectOutputStream` and only ship column‑level lambdas |
 | Streaming | `readStream`, `writeStream` (trigger, outputMode, format, toTable), `StreamingQuery` lifecycle |
 | Catalog | All catalog operations |
 
-**Workaround for Problem B:** Use Column‑expression APIs and (column‑level) UDFs instead of typed lambdas. For example, replace `ds.filter(_.age > 28)` with `df.filter(col("age") > 28)`, or extract the field into a column first and apply a `udf((name: String) => …)`.
+**Workaround:** Use Column‑expression APIs and column‑level UDFs instead of typed lambdas. For example, replace `ds.filter(_.age > 28)` with `df.filter(col("age") > 28)`, or extract the field into a column first and apply a `udf((name: String) => …)`.
 
-**Integration test status:** ~14 tests are still `cancel`ed for Problem B. They will start passing once a Scala 3‑native Spark Connect server is available, or when SC3 implements an alternative path for user‑type lambdas.
+**Integration test status:** ~14 tests are `cancel`ed (not failed) for this limitation. They will start passing once a Scala 3‑native Spark Connect server is available.
 
 ### Server-Side Hang on `interruptOperation` with Non-Existent Operation ID
 
