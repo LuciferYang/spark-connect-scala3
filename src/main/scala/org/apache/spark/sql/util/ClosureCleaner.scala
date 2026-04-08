@@ -11,12 +11,12 @@ import java.lang.reflect.Field
   * essential for making closures serializable when they capture large, non-serializable outer
   * scopes (e.g., SparkContext).
   *
-  * This simplified version for Scala 3 focuses on the indylambda path (the only path Scala 3
-  * uses) and performs basic outer-reference cleaning without ASM. It:
+  * This simplified version for Scala 3 focuses on the indylambda path (the only path Scala 3 uses)
+  * and performs basic outer-reference cleaning without ASM. It:
   *
-  * 1. Detects if the closure is an indylambda (via `SerializedLambda`)
-  * 2. Nulls out `$outer` references in captured objects when they are not serializable
-  * 3. Verifies the cleaned closure is serializable
+  *   1. Detects if the closure is an indylambda (via `SerializedLambda`)
+  *   2. Nulls out `$outer` references in captured objects when they are not serializable
+  *   3. Verifies the cleaned closure is serializable
   */
 object ClosureCleaner:
 
@@ -40,7 +40,8 @@ object ClosureCleaner:
     val bytes = serialize(func)
     // We don't need to actually deserialize on the client side;
     // just verify serialization doesn't throw.
-    if bytes.isEmpty then throw SparkSerializationException("Closure serialization produced empty bytes")
+    if bytes.isEmpty then
+      throw SparkSerializationException("Closure serialization produced empty bytes")
 
   /** Try to get the SerializedLambda for an indylambda closure. */
   private def getSerializedLambda(func: AnyRef): Option[SerializedLambda] =
