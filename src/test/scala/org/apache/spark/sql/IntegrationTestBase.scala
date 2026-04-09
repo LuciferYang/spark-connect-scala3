@@ -19,10 +19,10 @@ trait IntegrationTestBase extends org.scalatest.funsuite.AnyFunSuite:
 
   /** Upload test/main class files so the server can deserialize UDF lambdas.
     *
-    * SC3's `connect/common` and `catalyst/encoders` packages contain Scala 3-compiled versions
-    * of classes that also exist on the Scala 2.13 server. Uploading those would shadow the
-    * server's copies and cause `ArrayStoreException` classloader conflicts. We exclude them,
-    * keeping only SC3-only classes (serialization proxies) that must be present on the server.
+    * SC3's `connect/common` and `catalyst/encoders` packages contain Scala 3-compiled versions of
+    * classes that also exist on the Scala 2.13 server. Uploading those would shadow the server's
+    * copies and cause `ArrayStoreException` classloader conflicts. We exclude them, keeping only
+    * SC3-only classes (serialization proxies) that must be present on the server.
     */
   protected lazy val classFilesUploaded: Boolean =
     val connectCommonPrefix = "org/apache/spark/sql/connect/common/"
@@ -37,9 +37,12 @@ trait IntegrationTestBase extends org.scalatest.funsuite.AnyFunSuite:
     // Classes in connect/common/ that exist on the server and must NOT be shadowed.
     // All other classes in this package are SC3-only and should be uploaded.
     val serverConnectCommonClasses = Set(
-      "UdfPacket", "UdfPacket$",
-      "ForeachWriterPacket", "ForeachWriterPacket$",
-      "LiteralValueProtoConverter", "LiteralValueProtoConverter$",
+      "UdfPacket",
+      "UdfPacket$",
+      "ForeachWriterPacket",
+      "ForeachWriterPacket$",
+      "LiteralValueProtoConverter",
+      "LiteralValueProtoConverter$",
       "LiteralValueProtoConverter$ToLiteralProtoOptions",
       "LiteralValueProtoConverter$ToLiteralProtoOptions$"
     )
@@ -79,22 +82,21 @@ trait IntegrationTestBase extends org.scalatest.funsuite.AnyFunSuite:
   /** Helper to catch Scala 3/2.13 lambda serialization incompatibility.
     *
     * All operations that serialize Scala 3 lambdas to a Scala 2.13 Spark server may fail because:
-    * - The server cannot find `$deserializeLambda$`
-    * - The LambdaSerializationProxy cannot resolve the impl method on the server
-    * - The server cannot generate an encoder for inner classes
-    * - The server receives a null encoder from cross-version proxy resolution
-    * This wraps those operations and cancels the test gracefully when a known incompatibility is
-    * detected.
+    *   - The server cannot find `$deserializeLambda$`
+    *   - The LambdaSerializationProxy cannot resolve the impl method on the server
+    *   - The server cannot generate an encoder for inner classes
+    *   - The server receives a null encoder from cross-version proxy resolution This wraps those
+    *     operations and cancels the test gracefully when a known incompatibility is detected.
     */
   protected def withLambdaCompat[T](body: => T): T =
     def isKnownIncompat(msg: String): Boolean =
       msg != null && (
         msg.contains("deserializeLambda") ||
-        msg.contains("Failed to unpack scala udf") ||
-        msg.contains("Failed to load class correctly") ||
-        msg.contains("Failed to resolve method handle") ||
-        msg.contains("Unable to generate an encoder for inner class") ||
-        msg.contains("\"encoder\" is null")
+          msg.contains("Failed to unpack scala udf") ||
+          msg.contains("Failed to load class correctly") ||
+          msg.contains("Failed to resolve method handle") ||
+          msg.contains("Unable to generate an encoder for inner class") ||
+          msg.contains("\"encoder\" is null")
       )
     try body
     catch

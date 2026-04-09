@@ -220,7 +220,8 @@ final class SparkSession private[sql] (
 
   /** Upload all `.class` files under a directory.
     *
-    * @param exclude optional predicate on relative path; return `true` to skip.
+    * @param exclude
+    *   optional predicate on relative path; return `true` to skip.
     */
   def addClassDir(base: Path, exclude: Path => Boolean = _ => false): Unit =
     client.artifactManager.addClassDir(base, exclude)

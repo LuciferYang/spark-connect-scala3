@@ -85,8 +85,9 @@ final class ArtifactManager private[client] (
 
   /** Upload all `.class` files under a directory, preserving the directory structure.
     *
-    * @param exclude optional predicate on the relative path (e.g. "org/apache/spark/...").
-    *               Return `true` to skip the file.
+    * @param exclude
+    *   optional predicate on the relative path (e.g. "org/apache/spark/..."). Return `true` to skip
+    *   the file.
     */
   def addClassDir(base: Path, exclude: Path => Boolean = _ => false): Unit =
     if !Files.isDirectory(base) then return
