@@ -4,8 +4,11 @@ import java.io.{
   ByteArrayOutputStream,
   ObjectInputStream,
   ObjectOutputStream,
+  ObjectStreamException,
+  OutputStream,
   Serializable
 }
+import java.lang.invoke.SerializedLambda
 
 import scala.collection.mutable
 
@@ -27,7 +30,17 @@ final class UdfPacket(
     val function: AnyRef,
     val inputEncoders: Seq[AgnosticEncoder[?]],
     val outputEncoder: AgnosticEncoder[?]
-) extends Serializable
+) extends Serializable:
+  /** Replace with a proxy that avoids DefaultSerializationProxy/Seq type-check issues
+    * in Java 17+ when the server uses defaultReadObject.
+    */
+  @throws[ObjectStreamException]
+  private def writeReplace(): AnyRef =
+    UdfPacketSerializationProxy(
+      function,
+      inputEncoders.toArray[AnyRef],
+      outputEncoder
+    )
 
 object UdfPacket:
   /** Serialize a UdfPacket to bytes using Java serialization.
@@ -38,6 +51,11 @@ object UdfPacket:
     * unused ones. Without this step, Scala 3 lambdas often capture the test suite, the
     * SparkSession, and the gRPC client, none of which are deserializable on a Scala 2.13 server —
     * yielding the generic "Failed to unpack scala udf" error.
+    *
+    * Additionally, the custom `ObjectOutputStream` intercepts every `SerializedLambda` produced
+    * by Scala 3 lambda `writeReplace()` and replaces it with a `LambdaSerializationProxy`. This
+    * proxy bypasses `\$deserializeLambda\$` entirely, reconstructing the lambda on the server via
+    * `MethodHandle` invocation. This solves the core Scala 3 → 2.13 lambda incompatibility.
     *
     * Note: SC3 deliberately does NOT perform a client-side round-trip
     * (`ObjectInputStream.readObject`) check the way upstream Spark Connect does. SC3's
@@ -54,7 +72,14 @@ object UdfPacket:
       else UdfPacket(cleanedFunction, packet.inputEncoders, packet.outputEncoder)
 
     val bos = ByteArrayOutputStream()
-    val oos = ObjectOutputStream(bos)
+    // Custom OOS that replaces SerializedLambda with LambdaSerializationProxy.
+    // This is called for every object in the graph, so nested lambdas (e.g., a lambda
+    // captured by an adaptor) are also intercepted automatically.
+    val oos = new ObjectOutputStream(bos):
+      enableReplaceObject(true)
+      override def replaceObject(obj: AnyRef): AnyRef = obj match
+        case sl: SerializedLambda => LambdaSerializationProxy.fromSerializedLambda(sl)
+        case other                => other
     try
       oos.writeObject(cleanedPacket)
       oos.flush()

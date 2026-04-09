@@ -218,8 +218,12 @@ final class SparkSession private[sql] (
   def addArtifact(bytes: Array[Byte], target: String): Unit =
     client.artifactManager.addArtifact(bytes, target)
 
-  /** Upload all `.class` files under a directory. */
-  def addClassDir(base: Path): Unit = client.artifactManager.addClassDir(base)
+  /** Upload all `.class` files under a directory.
+    *
+    * @param exclude optional predicate on relative path; return `true` to skip.
+    */
+  def addClassDir(base: Path, exclude: Path => Boolean = _ => false): Unit =
+    client.artifactManager.addClassDir(base, exclude)
 
   /** Register a `ClassFinder` for automatic class upload before each execution. */
   def registerClassFinder(finder: ClassFinder): Unit =

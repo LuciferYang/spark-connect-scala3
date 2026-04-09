@@ -340,7 +340,7 @@ object AgnosticEncoders:
             f.metadata.json,
             f.readMethod,
             f.writeMethod
-          )
+          ): AnyRef
         ).toArray
       )
 
@@ -524,19 +524,25 @@ final class EncoderFieldProxy(
 @SerialVersionUID(1L)
 final class ProductEncoderProxy(
     val className: String,
-    val fields: Array[EncoderFieldProxy]
+    val fields: Array[AnyRef]
 ) extends Serializable:
   @throws[ObjectStreamException]
   private def readResolve(): AnyRef =
-    val cl = getClass.getClassLoader match
+    // Use parent classloader for server-side Spark/Scala classes
+    val serverCl = getClass.getClassLoader match
       case null => ClassLoader.getSystemClassLoader
       case c    => Option(c.getParent).getOrElse(c)
+    // Use context classloader (session classloader) for user classes like Person, Dept etc.
+    val sessionCl = Thread.currentThread().getContextClassLoader match
+      case null => serverCl
+      case c    => c
     // Reconstruct ClassTag on the server side
-    val clsTagModule = Class.forName("scala.reflect.ClassTag$", true, cl)
+    val clsTagModule = Class.forName("scala.reflect.ClassTag$", true, serverCl)
     val ctModule = clsTagModule.getField("MODULE$").get(null)
     val applyMethod =
       clsTagModule.getMethod("apply", classOf[Class[?]])
-    val runtimeClass = Class.forName(className, true, cl)
+    // Load the user's class with session classloader (it may be an uploaded artifact)
+    val runtimeClass = Class.forName(className, true, sessionCl)
     val clsTag = applyMethod.invoke(ctModule, runtimeClass)
     // Resolve each field (EncoderFieldProxy.readResolve will be called by Java serialization)
     val resolvedFields = fields.toSeq
@@ -544,10 +550,10 @@ final class ProductEncoderProxy(
     val peClass = Class.forName(
       "org.apache.spark.sql.catalyst.encoders.AgnosticEncoders$ProductEncoder",
       true,
-      cl
+      serverCl
     )
-    val clsTagType = Class.forName("scala.reflect.ClassTag", true, cl)
-    val seqType = Class.forName("scala.collection.immutable.Seq", true, cl)
+    val clsTagType = Class.forName("scala.reflect.ClassTag", true, serverCl)
+    val seqType = Class.forName("scala.collection.immutable.Seq", true, serverCl)
     val optionType = classOf[Option[?]]
     val ctor = peClass.getConstructors
       .find(_.getParameterCount == 3)

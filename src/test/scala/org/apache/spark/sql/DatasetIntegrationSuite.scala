@@ -6,7 +6,8 @@ import org.apache.spark.sql.tags.IntegrationTest
 @IntegrationTest
 class DatasetIntegrationSuite extends IntegrationTestBase:
 
-  case class Person(name: String, age: Int) derives Encoder
+  // Person is top-level in EncoderSuite.scala
+  // to avoid "inner class" errors on the remote Spark server.
 
   test("createDataset and collect typed") {
     val ds = spark.createDataset(Seq(

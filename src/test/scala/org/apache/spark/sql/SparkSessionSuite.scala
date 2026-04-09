@@ -406,7 +406,11 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
   }
 
   test("addClassDir method exists") {
-    val method = classOf[SparkSession].getMethod("addClassDir", classOf[java.nio.file.Path])
+    val method = classOf[SparkSession].getMethod(
+      "addClassDir",
+      classOf[java.nio.file.Path],
+      classOf[Function1[?, ?]]
+    )
     method should not be null
   }
 

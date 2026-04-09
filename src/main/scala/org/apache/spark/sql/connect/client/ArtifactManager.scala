@@ -83,15 +83,21 @@ final class ArtifactManager private[client] (
       )
     addArtifacts(Seq(artifact))
 
-  /** Upload all `.class` files under a directory, preserving the directory structure. */
-  def addClassDir(base: Path): Unit =
+  /** Upload all `.class` files under a directory, preserving the directory structure.
+    *
+    * @param exclude optional predicate on the relative path (e.g. "org/apache/spark/...").
+    *               Return `true` to skip the file.
+    */
+  def addClassDir(base: Path, exclude: Path => Boolean = _ => false): Unit =
     if !Files.isDirectory(base) then return
     val builder = Seq.newBuilder[Artifact]
     val stream = Files.walk(base)
     try
       stream.forEach { path =>
         if Files.isRegularFile(path) && path.toString.endsWith(".class") then
-          builder += Artifact.newClassArtifact(base.relativize(path), Artifact.LocalFile(path))
+          val rel = base.relativize(path)
+          if !exclude(rel) then
+            builder += Artifact.newClassArtifact(rel, Artifact.LocalFile(path))
       }
     finally stream.close()
     addArtifacts(builder.result())

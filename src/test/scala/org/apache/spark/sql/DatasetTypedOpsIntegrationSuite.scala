@@ -10,8 +10,8 @@ import org.apache.spark.sql.types.*
 @IntegrationTest
 class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
 
-  case class Person(name: String, age: Int) derives Encoder
-  case class Dept(name: String, dept: String) derives Encoder
+  // Person and Dept are top-level in EncoderSuite.scala / TestModels.scala
+  // to avoid "inner class" errors on the remote Spark server.
 
   private def personDs: Dataset[Person] =
     spark.createDataset(Seq(

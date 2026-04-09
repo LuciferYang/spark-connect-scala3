@@ -14,8 +14,9 @@ import org.apache.spark.sql.types.*
 @IntegrationTest
 class KeyValueGroupedDatasetIntegrationSuite extends IntegrationTestBase:
 
-  case class Record(group: String, value: Int) derives Encoder
-  case class Score(group: String, score: Double) derives Encoder
+  // Record and GroupedScore are top-level in TestModels.scala
+  // to avoid "inner class" errors on the remote Spark server.
+  // Note: Score in EncoderSuite.scala has different fields, so we use GroupedScore here.
 
   private def recordDs: Dataset[Record] =
     spark.createDataset(Seq(
@@ -154,8 +155,8 @@ class KeyValueGroupedDatasetIntegrationSuite extends IntegrationTestBase:
     import Encoder.given
     withLambdaCompat {
       val scores = spark.createDataset(Seq(
-        Score("A", 1.0),
-        Score("B", 2.0)
+        GroupedScore("A", 1.0),
+        GroupedScore("B", 2.0)
       ))
       val result = recordDs
         .groupByKey(_.group)
