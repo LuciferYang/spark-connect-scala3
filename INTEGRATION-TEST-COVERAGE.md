@@ -14,12 +14,12 @@ See [run-integration-tests.md](run-integration-tests.md) for the full command an
 ```
 Suites:    20 (0 aborted)
 Tests:    454 total
-  ✅  425 passed
+  ✅  435 passed
   ❌    0 failed
-  ⊘   29 canceled (server gaps + Scala 3 case-class typed lambdas)
+  ⊘   19 canceled (server gaps + Scala 3 case-class typed lambdas)
 ```
 
-Pass rate excluding cancels: **100% (425/425)**.
+Pass rate excluding cancels: **100% (435/435)**.
 
 ## Per-suite breakdown
 
@@ -44,8 +44,8 @@ Pass rate excluding cancels: **100% (425/425)**.
 | UdfIntegrationSuite | 9 | 0 | |
 | WindowIntegrationSuite | 10 | 0 | |
 | WriterIntegrationSuite | 2 | 0 | |
-| WriterV2IntegrationSuite | 33 | 10 | mergeInto + writeTo.overwrite (requires V2 catalog) |
-| **Total** | **454** | **29** | |
+| WriterV2IntegrationSuite | 33 | 0 | all pass (requires InMemoryRowLevelOperationTableCatalog) |
+| **Total** | **454** | **19** | |
 
 ## Cancel reasons
 
@@ -60,7 +60,7 @@ Spark 4.0/4.1 servers are built with Scala 2.13 and cannot deserialize lambdas p
 | KeyValueGroupedDatasetIntegrationSuite | groupByKey.agg with typed column |
 | StreamingReadWriteIntegrationSuite | foreachBatch executes batch function |
 
-### Server-side gaps requiring extended proto / V2 catalog (23 tests)
+### Server-side gaps requiring extended proto (13 tests)
 
 These cancel because the running Spark 4.1.x server does not (yet) support the corresponding proto field, RPC, or feature. They are not SC3 client bugs.
 
@@ -79,16 +79,6 @@ These cancel because the running Spark 4.1.x server does not (yet) support the c
 | CatalogIntegrationSuite | listPartitions | RPC missing |
 | CatalogIntegrationSuite | dropView | not supported on default catalog (no Hive metastore) |
 | TableValuedFunctionIntegrationSuite | tvf.variant_explode | variant type support |
-| WriterV2IntegrationSuite | writeTo.overwrite with condition replaces matching rows | V2 catalog required |
-| WriterV2IntegrationSuite | writeTo.overwrite with non-matching condition keeps all rows | V2 catalog required |
-| WriterV2IntegrationSuite | mergeInto with whenMatched.updateAll and whenNotMatched.insertAll | V2 catalog required |
-| WriterV2IntegrationSuite | mergeInto with whenMatched(condition).update(Map) | V2 catalog required |
-| WriterV2IntegrationSuite | mergeInto with whenMatched.delete | V2 catalog required |
-| WriterV2IntegrationSuite | mergeInto with whenNotMatched(condition).insert(Map) | V2 catalog required |
-| WriterV2IntegrationSuite | mergeInto with whenNotMatchedBySource.delete | V2 catalog required |
-| WriterV2IntegrationSuite | mergeInto with whenNotMatchedBySource(condition).update(Map) | V2 catalog required |
-| WriterV2IntegrationSuite | mergeInto with withSchemaEvolution | V2 catalog required |
-| WriterV2IntegrationSuite | mergeInto with multiple when clauses | V2 catalog required |
 
 ### Server hang (1 test)
 

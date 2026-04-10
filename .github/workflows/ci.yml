@@ -98,7 +98,7 @@ jobs:
         run: |
           $SPARK_HOME/sbin/start-connect-server.sh \
             --jars "$CATALYST_TEST_JAR,$H2_JAR" \
-            --conf spark.sql.catalog.testcat=org.apache.spark.sql.connector.catalog.InMemoryTableCatalog
+            --conf spark.sql.catalog.testcat=org.apache.spark.sql.connector.catalog.InMemoryRowLevelOperationTableCatalog
           # Wait for server to be ready
           for i in $(seq 1 30); do
             if nc -z localhost 15002 2>/dev/null; then

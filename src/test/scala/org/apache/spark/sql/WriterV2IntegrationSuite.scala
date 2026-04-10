@@ -5,10 +5,10 @@ import org.apache.spark.sql.tags.IntegrationTest
 import org.apache.spark.sql.types.*
 
 /** Integration tests for DataFrameWriterV2 and MergeIntoWriter with real execution against a Spark
-  * Connect server configured with testcat (InMemoryTableCatalog).
+  * Connect server configured with testcat (InMemoryRowLevelOperationTableCatalog).
   *
   * Server configuration required:
-  * spark.sql.catalog.testcat=org.apache.spark.sql.connector.catalog.InMemoryTableCatalog
+  * spark.sql.catalog.testcat=org.apache.spark.sql.connector.catalog.InMemoryRowLevelOperationTableCatalog
   */
 @IntegrationTest
 class WriterV2IntegrationSuite extends IntegrationTestBase:
@@ -292,7 +292,8 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
 
   test("writeTo.overwrite with condition replaces matching rows") {
     withV2Table("wv2_overwrite") {
-      testDf.writeTo("testcat.wv2_overwrite").create()
+      // Partition by id so InMemoryTable recognises it as a filter attribute
+      testDf.writeTo("testcat.wv2_overwrite").partitionedBy(col("id")).create()
       assert(spark.read.table("testcat.wv2_overwrite").count() == 3)
 
       val replacement = spark.createDataFrame(
@@ -316,7 +317,8 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
 
   test("writeTo.overwrite with non-matching condition keeps all rows") {
     withV2Table("wv2_overwrite_nomatch") {
-      testDf.writeTo("testcat.wv2_overwrite_nomatch").create()
+      // Partition by id so InMemoryTable recognises it as a filter attribute
+      testDf.writeTo("testcat.wv2_overwrite_nomatch").partitionedBy(col("id")).create()
 
       val replacement = spark.createDataFrame(
         Seq(Row(99L, "new", 0.0)),
@@ -328,7 +330,7 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
         // Original rows for non-matching ids should remain; the overwrite adds the new row
         // for the matching partition (which is empty here)
         val count = spark.read.table("testcat.wv2_overwrite_nomatch").count()
-        // Expect at least the original 3 rows
+        // Expect at least the original 3 rows plus the new row
         assert(count >= 3)
       catch
         case e: Exception =>
@@ -452,10 +454,10 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
   // MergeIntoWriter tests
   // ---------------------------------------------------------------------------
 
-  // Note: InMemoryTableCatalog creates InMemoryTable which does NOT support
-  // SupportsRowLevelOperations. Merge operations may fail depending on the
-  // server version and catalog capabilities. All merge tests use try/catch
-  // to cancel gracefully when unsupported.
+  // Note: Merge tests require InMemoryRowLevelOperationTableCatalog (which creates
+  // InMemoryRowLevelOperationTable with SupportsRowLevelOperations). The source
+  // DataFrame must be registered as a temp view so that column references like
+  // col("source.id") resolve correctly on the server.
 
   /** Helper to create a V2 target table with id, name, value columns for merge tests. */
   private def createMergeTarget(tableName: String): Unit =
@@ -468,6 +470,15 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
       testSchema
     )
     target.writeTo(s"testcat.$tableName").create()
+
+  /** Register a DataFrame as a temp view named "source" and return the view name. */
+  private def withSourceView(sourceDf: DataFrame)(body: String => Unit): Unit =
+    val viewName = "source"
+    sourceDf.createOrReplaceTempView(viewName)
+    try body(viewName)
+    finally
+      try spark.sql(s"DROP VIEW IF EXISTS $viewName").collect()
+      catch case _: Exception => ()
 
   /** Helper to wrap merge operations that may not be supported. */
   private def withMergeSupport(body: => Unit): Unit =
@@ -482,7 +493,6 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
               e.getMessage.contains("MergeIntoTable") ||
               e.getMessage.contains("Row-level operations") ||
               e.getMessage.contains("MERGE_INTO_TABLE") ||
-              e.getMessage.contains("UNRESOLVED_COLUMN") ||
               e.getMessage.contains("INTERNAL_ERROR")) =>
         cancel(
           s"MERGE INTO not supported by server/catalog configuration: ${e.getMessage.take(120)}"
@@ -492,7 +502,7 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
     withV2Table("wv2_merge_basic") {
       createMergeTarget("wv2_merge_basic")
 
-      val source = spark.createDataFrame(
+      val sourceDf = spark.createDataFrame(
         Seq(
           Row(1L, "alice_updated", 100.0), // matches id=1, should update
           Row(4L, "dave", 40.0) // no match, should insert
@@ -500,23 +510,25 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
         testSchema
       )
 
-      withMergeSupport {
-        source.mergeInto(
-          "testcat.wv2_merge_basic",
-          col("testcat.wv2_merge_basic.id") === col("source.id")
-        )
-          .whenMatched().updateAll()
-          .whenNotMatched().insertAll()
-          .merge()
+      withSourceView(sourceDf) { source =>
+        withMergeSupport {
+          spark.table(source).mergeInto(
+            "testcat.wv2_merge_basic",
+            col(s"testcat.wv2_merge_basic.id") === col(s"$source.id")
+          )
+            .whenMatched().updateAll()
+            .whenNotMatched().insertAll()
+            .merge()
 
-        val result = spark.read.table("testcat.wv2_merge_basic")
-          .orderBy(col("id")).collect()
-        assert(result.length == 4)
-        // id=1 should be updated
-        assert(result(0).getString(1) == "alice_updated")
-        // id=4 should be inserted
-        assert(result(3).getLong(0) == 4L)
-        assert(result(3).getString(1) == "dave")
+          val result = spark.read.table("testcat.wv2_merge_basic")
+            .orderBy(col("id")).collect()
+          assert(result.length == 4)
+          // id=1 should be updated
+          assert(result(0).getString(1) == "alice_updated")
+          // id=4 should be inserted
+          assert(result(3).getLong(0) == 4L)
+          assert(result(3).getString(1) == "dave")
+        }
       }
     }
   }
@@ -525,7 +537,7 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
     withV2Table("wv2_merge_cond_update") {
       createMergeTarget("wv2_merge_cond_update")
 
-      val source = spark.createDataFrame(
+      val sourceDf = spark.createDataFrame(
         Seq(
           Row(1L, "alice_v2", 100.0),
           Row(2L, "bob_v2", 200.0)
@@ -533,21 +545,23 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
         testSchema
       )
 
-      withMergeSupport {
-        source.mergeInto(
-          "testcat.wv2_merge_cond_update",
-          col("testcat.wv2_merge_cond_update.id") === col("source.id")
-        )
-          .whenMatched(col("testcat.wv2_merge_cond_update.id") === lit(1L))
-          .update(Map("name" -> lit("conditional_update")))
-          .merge()
+      withSourceView(sourceDf) { source =>
+        withMergeSupport {
+          spark.table(source).mergeInto(
+            "testcat.wv2_merge_cond_update",
+            col("testcat.wv2_merge_cond_update.id") === col(s"$source.id")
+          )
+            .whenMatched(col("testcat.wv2_merge_cond_update.id") === lit(1L))
+            .update(Map("name" -> lit("conditional_update")))
+            .merge()
 
-        val result = spark.read.table("testcat.wv2_merge_cond_update")
-          .orderBy(col("id")).collect()
-        // id=1 should be conditionally updated
-        assert(result(0).getString(1) == "conditional_update")
-        // id=2 should remain unchanged (condition didn't match)
-        assert(result(1).getString(1) == "bob")
+          val result = spark.read.table("testcat.wv2_merge_cond_update")
+            .orderBy(col("id")).collect()
+          // id=1 should be conditionally updated
+          assert(result(0).getString(1) == "conditional_update")
+          // id=2 should remain unchanged (condition didn't match)
+          assert(result(1).getString(1) == "bob")
+        }
       }
     }
   }
@@ -556,25 +570,27 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
     withV2Table("wv2_merge_delete") {
       createMergeTarget("wv2_merge_delete")
 
-      val source = spark.createDataFrame(
+      val sourceDf = spark.createDataFrame(
         Seq(Row(1L, "alice", 10.0)),
         testSchema
       )
 
-      withMergeSupport {
-        source.mergeInto(
-          "testcat.wv2_merge_delete",
-          col("testcat.wv2_merge_delete.id") === col("source.id")
-        )
-          .whenMatched().delete()
-          .merge()
+      withSourceView(sourceDf) { source =>
+        withMergeSupport {
+          spark.table(source).mergeInto(
+            "testcat.wv2_merge_delete",
+            col("testcat.wv2_merge_delete.id") === col(s"$source.id")
+          )
+            .whenMatched().delete()
+            .merge()
 
-        val result = spark.read.table("testcat.wv2_merge_delete")
-          .orderBy(col("id")).collect()
-        // id=1 should be deleted
-        assert(result.length == 2)
-        assert(result(0).getLong(0) == 2L)
-        assert(result(1).getLong(0) == 3L)
+          val result = spark.read.table("testcat.wv2_merge_delete")
+            .orderBy(col("id")).collect()
+          // id=1 should be deleted
+          assert(result.length == 2)
+          assert(result(0).getLong(0) == 2L)
+          assert(result(1).getLong(0) == 3L)
+        }
       }
     }
   }
@@ -583,7 +599,7 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
     withV2Table("wv2_merge_cond_insert") {
       createMergeTarget("wv2_merge_cond_insert")
 
-      val source = spark.createDataFrame(
+      val sourceDf = spark.createDataFrame(
         Seq(
           Row(4L, "dave", 40.0),
           Row(5L, "eve", 50.0)
@@ -591,24 +607,26 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
         testSchema
       )
 
-      withMergeSupport {
-        source.mergeInto(
-          "testcat.wv2_merge_cond_insert",
-          col("testcat.wv2_merge_cond_insert.id") === col("source.id")
-        )
-          .whenNotMatched(col("source.id") === lit(4L))
-          .insert(Map(
-            "id" -> col("source.id"),
-            "name" -> col("source.name"),
-            "value" -> col("source.value")
-          ))
-          .merge()
+      withSourceView(sourceDf) { source =>
+        withMergeSupport {
+          spark.table(source).mergeInto(
+            "testcat.wv2_merge_cond_insert",
+            col("testcat.wv2_merge_cond_insert.id") === col(s"$source.id")
+          )
+            .whenNotMatched(col(s"$source.id") === lit(4L))
+            .insert(Map(
+              "id" -> col(s"$source.id"),
+              "name" -> col(s"$source.name"),
+              "value" -> col(s"$source.value")
+            ))
+            .merge()
 
-        val result = spark.read.table("testcat.wv2_merge_cond_insert")
-          .orderBy(col("id")).collect()
-        // id=4 should be inserted (condition matched), id=5 should NOT
-        assert(result.length == 4)
-        assert(result(3).getLong(0) == 4L)
+          val result = spark.read.table("testcat.wv2_merge_cond_insert")
+            .orderBy(col("id")).collect()
+          // id=4 should be inserted (condition matched), id=5 should NOT
+          assert(result.length == 4)
+          assert(result(3).getLong(0) == 4L)
+        }
       }
     }
   }
@@ -618,23 +636,25 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
       createMergeTarget("wv2_merge_nmsrc_del")
 
       // Source only has id=1, so ids 2 and 3 are "not matched by source"
-      val source = spark.createDataFrame(
+      val sourceDf = spark.createDataFrame(
         Seq(Row(1L, "alice", 10.0)),
         testSchema
       )
 
-      withMergeSupport {
-        source.mergeInto(
-          "testcat.wv2_merge_nmsrc_del",
-          col("testcat.wv2_merge_nmsrc_del.id") === col("source.id")
-        )
-          .whenNotMatchedBySource().delete()
-          .merge()
+      withSourceView(sourceDf) { source =>
+        withMergeSupport {
+          spark.table(source).mergeInto(
+            "testcat.wv2_merge_nmsrc_del",
+            col("testcat.wv2_merge_nmsrc_del.id") === col(s"$source.id")
+          )
+            .whenNotMatchedBySource().delete()
+            .merge()
 
-        val result = spark.read.table("testcat.wv2_merge_nmsrc_del").collect()
-        // Only id=1 should remain
-        assert(result.length == 1)
-        assert(result(0).getLong(0) == 1L)
+          val result = spark.read.table("testcat.wv2_merge_nmsrc_del").collect()
+          // Only id=1 should remain
+          assert(result.length == 1)
+          assert(result(0).getLong(0) == 1L)
+        }
       }
     }
   }
@@ -644,26 +664,28 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
       createMergeTarget("wv2_merge_nmsrc_upd")
 
       // Source only has id=1
-      val source = spark.createDataFrame(
+      val sourceDf = spark.createDataFrame(
         Seq(Row(1L, "alice", 10.0)),
         testSchema
       )
 
-      withMergeSupport {
-        source.mergeInto(
-          "testcat.wv2_merge_nmsrc_upd",
-          col("testcat.wv2_merge_nmsrc_upd.id") === col("source.id")
-        )
-          .whenNotMatchedBySource(col("testcat.wv2_merge_nmsrc_upd.id") === lit(2L))
-          .update(Map("name" -> lit("updated_by_source_miss")))
-          .merge()
+      withSourceView(sourceDf) { source =>
+        withMergeSupport {
+          spark.table(source).mergeInto(
+            "testcat.wv2_merge_nmsrc_upd",
+            col("testcat.wv2_merge_nmsrc_upd.id") === col(s"$source.id")
+          )
+            .whenNotMatchedBySource(col("testcat.wv2_merge_nmsrc_upd.id") === lit(2L))
+            .update(Map("name" -> lit("updated_by_source_miss")))
+            .merge()
 
-        val result = spark.read.table("testcat.wv2_merge_nmsrc_upd")
-          .orderBy(col("id")).collect()
-        // id=2 should be updated (not matched by source + condition)
-        assert(result(1).getString(1) == "updated_by_source_miss")
-        // id=3 should remain unchanged (condition didn't match)
-        assert(result(2).getString(1) == "charlie")
+          val result = spark.read.table("testcat.wv2_merge_nmsrc_upd")
+            .orderBy(col("id")).collect()
+          // id=2 should be updated (not matched by source + condition)
+          assert(result(1).getString(1) == "updated_by_source_miss")
+          // id=3 should remain unchanged (condition didn't match)
+          assert(result(2).getString(1) == "charlie")
+        }
       }
     }
   }
@@ -672,24 +694,26 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
     withV2Table("wv2_merge_schema_evo") {
       createMergeTarget("wv2_merge_schema_evo")
 
-      val source = spark.createDataFrame(
+      val sourceDf = spark.createDataFrame(
         Seq(Row(4L, "dave", 40.0)),
         testSchema
       )
 
-      withMergeSupport {
-        source.mergeInto(
-          "testcat.wv2_merge_schema_evo",
-          col("testcat.wv2_merge_schema_evo.id") === col("source.id")
-        )
-          .whenNotMatched().insertAll()
-          .withSchemaEvolution()
-          .merge()
+      withSourceView(sourceDf) { source =>
+        withMergeSupport {
+          spark.table(source).mergeInto(
+            "testcat.wv2_merge_schema_evo",
+            col("testcat.wv2_merge_schema_evo.id") === col(s"$source.id")
+          )
+            .whenNotMatched().insertAll()
+            .withSchemaEvolution()
+            .merge()
 
-        val result = spark.read.table("testcat.wv2_merge_schema_evo")
-          .orderBy(col("id")).collect()
-        assert(result.length == 4)
-        assert(result(3).getLong(0) == 4L)
+          val result = spark.read.table("testcat.wv2_merge_schema_evo")
+            .orderBy(col("id")).collect()
+          assert(result.length == 4)
+          assert(result(3).getLong(0) == 4L)
+        }
       }
     }
   }
@@ -698,7 +722,7 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
     withV2Table("wv2_merge_multi") {
       createMergeTarget("wv2_merge_multi")
 
-      val source = spark.createDataFrame(
+      val sourceDf = spark.createDataFrame(
         Seq(
           Row(1L, "alice_new", 100.0), // matches target id=1
           Row(4L, "dave", 40.0), // no match in target
@@ -707,24 +731,26 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
         testSchema
       )
 
-      withMergeSupport {
-        source.mergeInto(
-          "testcat.wv2_merge_multi",
-          col("testcat.wv2_merge_multi.id") === col("source.id")
-        )
-          .whenMatched().updateAll()
-          .whenNotMatched().insertAll()
-          .whenNotMatchedBySource().delete()
-          .merge()
+      withSourceView(sourceDf) { source =>
+        withMergeSupport {
+          spark.table(source).mergeInto(
+            "testcat.wv2_merge_multi",
+            col("testcat.wv2_merge_multi.id") === col(s"$source.id")
+          )
+            .whenMatched().updateAll()
+            .whenNotMatched().insertAll()
+            .whenNotMatchedBySource().delete()
+            .merge()
 
-        val result = spark.read.table("testcat.wv2_merge_multi")
-          .orderBy(col("id")).collect()
-        // id=1 updated, id=2 and id=3 deleted (not matched by source), id=4 and id=5 inserted
-        assert(result.length == 3)
-        assert(result(0).getLong(0) == 1L)
-        assert(result(0).getString(1) == "alice_new")
-        assert(result(1).getLong(0) == 4L)
-        assert(result(2).getLong(0) == 5L)
+          val result = spark.read.table("testcat.wv2_merge_multi")
+            .orderBy(col("id")).collect()
+          // id=1 updated, id=2 and id=3 deleted (not matched by source), id=4 and id=5 inserted
+          assert(result.length == 3)
+          assert(result(0).getLong(0) == 1L)
+          assert(result(0).getString(1) == "alice_new")
+          assert(result(1).getLong(0) == 4L)
+          assert(result(2).getLong(0) == 5L)
+        }
       }
     }
   }
@@ -733,13 +759,13 @@ class WriterV2IntegrationSuite extends IntegrationTestBase:
     withV2Table("wv2_merge_no_action") {
       createMergeTarget("wv2_merge_no_action")
 
-      val source = spark.createDataFrame(
+      val sourceDf = spark.createDataFrame(
         Seq(Row(1L, "alice", 10.0)),
         testSchema
       )
 
       val caught = intercept[SparkException] {
-        source.mergeInto(
+        sourceDf.mergeInto(
           "testcat.wv2_merge_no_action",
           col("testcat.wv2_merge_no_action.id") === col("source.id")
         ).merge()

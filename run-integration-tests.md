@@ -4,11 +4,25 @@ Integration tests require a live Spark Connect server (4.1.x) listening on `sc:/
 
 ## Prerequisites
 
-Start the Spark Connect server:
+Download required test jars:
 
 ```bash
-$SPARK_HOME/sbin/start-connect-server.sh
+SPARK_VERSION=4.1.1  # adjust to match your server version
+# Catalyst test jar (InMemoryRowLevelOperationTableCatalog for V2/MergeInto tests)
+wget -q "https://repo1.maven.org/maven2/org/apache/spark/spark-catalyst_2.13/${SPARK_VERSION}/spark-catalyst_2.13-${SPARK_VERSION}-tests.jar"
+# H2 JDBC driver (for JDBC integration tests)
+wget -q "https://repo1.maven.org/maven2/com/h2database/h2/2.2.224/h2-2.2.224.jar"
 ```
+
+Start the Spark Connect server with test jars and V2 catalog config:
+
+```bash
+$SPARK_HOME/sbin/start-connect-server.sh \
+  --jars "spark-catalyst_2.13-${SPARK_VERSION}-tests.jar,h2-2.2.224.jar" \
+  --conf spark.sql.catalog.testcat=org.apache.spark.sql.connector.catalog.InMemoryRowLevelOperationTableCatalog
+```
+
+Without `--jars` and `--conf`, WriterV2/MergeInto and JDBC tests will cancel gracefully.
 
 ## Run all integration tests
 
