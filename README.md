@@ -57,7 +57,7 @@ Spark 4.0/4.1 servers are built with Scala 2.13. When a Scala 3 typed‑Dataset 
 | Category | Operations |
 |----------|-----------|
 | Dataset typed transforms | `map`, `flatMap`, `mapPartitions`, `filter`, `reduce`, `foreach`, `foreachPartition` |
-| KeyValueGroupedDataset | `groupByKey`, `mapGroups`, `flatMapGroups`, `flatMapSortedGroups`, `reduceGroups`, `mapValues`, `cogroup`, stateful variants |
+| KeyValueGroupedDataset | `reduceGroups` (via ReduceAggregator), `mapValues` (user lambda), `agg(TypedColumn)` (user lambda in aggregator) |
 | Streaming | `foreachBatch` (also has a server‑side `classic.Dataset` vs SC3 `DataFrame` cast issue) |
 
 **Unaffected operations** — these work correctly:
@@ -65,6 +65,7 @@ Spark 4.0/4.1 servers are built with Scala 2.13. When a Scala 3 typed‑Dataset 
 | Category | Operations |
 |----------|-----------|
 | Primitive‑typed Datasets | `Dataset[Int]/[String]/...` `map`, `filter`, `flatMap`, etc. |
+| KeyValueGroupedDataset (adaptor‑wrapped) | `groupByKey`, `keys`, `count`, `mapGroups`, `flatMapGroups`, `flatMapSortedGroups`, `cogroup`, `keyAs` |
 | DataFrame transforms | `select`, `filter(Column)`, `where`, `join`, `joinWith`, `groupBy`, `agg`, `orderBy`, `withColumn`, `drop`, `union`, `distinct`, etc. |
 | DataFrame actions | `collect`, `count`, `show`, `first`, `head`, `take`, `toJSON`, `toLocalIterator`, etc. |
 | SQL | `spark.sql(...)` |
@@ -74,7 +75,7 @@ Spark 4.0/4.1 servers are built with Scala 2.13. When a Scala 3 typed‑Dataset 
 
 **Workaround:** Use Column‑expression APIs and column‑level UDFs instead of typed lambdas. For example, replace `ds.filter(_.age > 28)` with `df.filter(col("age") > 28)`, or extract the field into a column first and apply a `udf((name: String) => …)`.
 
-**Integration test status:** ~14 tests are `cancel`ed (not failed) for this limitation. They will start passing once a Scala 3‑native Spark Connect server is available.
+**Integration test status:** ~5 tests are `cancel`ed (not failed) for this limitation. They will start passing once a Scala 3‑native Spark Connect server is available.
 
 ### Server-Side Hang on `interruptOperation` with Non-Existent Operation ID
 
@@ -313,6 +314,7 @@ src/
 │       │   └── ExecutePlanResponseReattachableIterator.scala # Reattachable execution
 │       ├── connect/common/
 │       │   ├── UdfPacket.scala             # UDF serialization
+│       │   ├── UdfAdaptors.scala           # Top-level adaptor classes for Scala 3→2.13 lambda stability
 │       │   └── ForeachWriterPacket.scala   # ForeachWriter serialization
 │       ├── connect/
 │       │   └── SessionCleaner.scala        # GC-based CachedRemoteRelation cleanup
@@ -437,7 +439,7 @@ src/
 - [x] `foreachBatch` / `foreach` (ForeachWriter)
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
-- [x] Unit tests (603 tests)
+- [x] Unit tests (1839 tests)
 - [x] Integration tests (Spark 4.1.1)
 - [x] Error handling (retry policies, gRPC exception conversion, reattachable execution, enriched error details via FetchErrorDetails RPC)
 - [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)

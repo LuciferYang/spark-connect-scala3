@@ -9,34 +9,30 @@ SBT_OPTS="-Dsun.net.client.defaultConnectTimeout=10000 -Dsun.net.client.defaultR
 
 See [run-integration-tests.md](run-integration-tests.md) for the full command and configuration notes.
 
-## Last run: 2026-04-08
+## Last run: 2026-04-10
 
 ```
 Suites:    20 (0 aborted)
-Tests:    456 total
-  ✅  417 passed
+Tests:    454 total
+  ✅  425 passed
   ❌    0 failed
-  ⊘   39 canceled (server gaps + Scala 3 case-class typed lambdas)
+  ⊘   29 canceled (server gaps + Scala 3 case-class typed lambdas)
 ```
 
-Pass rate excluding cancels: **100% (417/417)**.
-
-Recent changes:
-- **+4 primitive-typed `Dataset` tests** (`Dataset[Int]/[String].map`, `filter`, `flatMap`) — these exercise the new top-level adaptor classes (`MapPartitionsAdaptor`, `FilterAdaptor`, `FlatMapAdaptor`) that fix Problem A from the README's Known Limitations section.
-- **+13 JDBC tests** in the new `JdbcIntegrationSuite` (Spark 4.1.1 H2 read coverage).
+Pass rate excluding cancels: **100% (425/425)**.
 
 ## Per-suite breakdown
 
 | Suite | Tests | Canceled | Notes |
 |-------|------:|---------:|-------|
 | CatalogIntegrationSuite | 47 | 12 | server gaps (see § Cancel reasons) |
-| JdbcIntegrationSuite | 13 | 0 | H2 read coverage |
 | ColumnIntegrationSuite | 38 | 1 | Array-of-aliases overload |
 | DataFrameIntegrationSuite | 97 | 0 | |
-| DatasetIntegrationSuite | 6 | 1 | Scala 3 case-class lambda (Problem B) |
-| DatasetTypedOpsIntegrationSuite | 49 | 3 | Scala 3 lambda |
+| DatasetIntegrationSuite | 6 | 0 | |
+| DatasetTypedOpsIntegrationSuite | 49 | 0 | |
 | GroupedDataFrameIntegrationSuite | 13 | 0 | |
-| KeyValueGroupedDatasetIntegrationSuite | 10 | 9 | Scala 3 lambda (only `cogroup` runs) |
+| JdbcIntegrationSuite | 13 | 0 | H2 read coverage |
+| KeyValueGroupedDatasetIntegrationSuite | 10 | 3 | Scala 3 lambda (7 pass, 3 cancel) |
 | NaStatIntegrationSuite | 20 | 0 | |
 | ReadWriteIntegrationSuite | 25 | 0 | |
 | RuntimeConfigIntegrationSuite | 11 | 0 | |
@@ -49,32 +45,22 @@ Recent changes:
 | WindowIntegrationSuite | 10 | 0 | |
 | WriterIntegrationSuite | 2 | 0 | |
 | WriterV2IntegrationSuite | 33 | 10 | mergeInto + writeTo.overwrite (requires V2 catalog) |
-| **Total** | **456** | **39** | |
+| **Total** | **454** | **29** | |
 
 ## Cancel reasons
 
-### Scala 3 lambda serialization (15 tests)
+### Scala 3 lambda serialization (4 tests)
 
 Spark 4.0/4.1 servers are built with Scala 2.13 and cannot deserialize lambdas produced by Scala 3 (`$deserializeLambda$` is missing). All affected tests are wrapped in `withLambdaCompat` and gracefully `cancel`. They will start passing once a Scala 3-native Spark Connect server is available. See [README.md § Known Limitations](README.md#scala-3-lambda-serialization-on-scala-213-spark-server).
 
 | Suite | Test |
 |-------|------|
-| DatasetIntegrationSuite | Dataset map and filter |
-| DatasetTypedOpsIntegrationSuite | flatMap expands each element |
-| DatasetTypedOpsIntegrationSuite | mapPartitions transforms partitions |
-| DatasetTypedOpsIntegrationSuite | transform applies function to Dataset |
-| KeyValueGroupedDatasetIntegrationSuite | groupByKey.keys returns distinct keys |
-| KeyValueGroupedDatasetIntegrationSuite | groupByKey.count returns (key, count) pairs |
-| KeyValueGroupedDatasetIntegrationSuite | mapGroups aggregates per group |
-| KeyValueGroupedDatasetIntegrationSuite | flatMapGroups expands per group |
 | KeyValueGroupedDatasetIntegrationSuite | reduceGroups reduces within each group |
 | KeyValueGroupedDatasetIntegrationSuite | mapValues transforms values then mapGroups |
-| KeyValueGroupedDatasetIntegrationSuite | flatMapSortedGroups produces sorted iteration within group |
 | KeyValueGroupedDatasetIntegrationSuite | groupByKey.agg with typed column |
-| KeyValueGroupedDatasetIntegrationSuite | keyAs changes key encoder type |
 | StreamingReadWriteIntegrationSuite | foreachBatch executes batch function |
 
-### Server-side gaps requiring extended proto / V2 catalog (22 tests)
+### Server-side gaps requiring extended proto / V2 catalog (23 tests)
 
 These cancel because the running Spark 4.1.x server does not (yet) support the corresponding proto field, RPC, or feature. They are not SC3 client bugs.
 

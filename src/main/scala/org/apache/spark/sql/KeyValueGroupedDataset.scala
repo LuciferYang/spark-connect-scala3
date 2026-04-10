@@ -13,7 +13,13 @@ import org.apache.spark.connect.proto.{
 }
 import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
-import org.apache.spark.sql.connect.common.UdfPacket
+import org.apache.spark.sql.connect.common.{
+  CountGroupsAdaptor,
+  MapGroupsAdaptor,
+  MapValuesFlatMapAdaptor,
+  ReduceGroupsAdaptor,
+  UdfPacket
+}
 import org.apache.spark.sql.expressions.{Aggregator, ReduceAggregator}
 import org.apache.spark.sql.streaming.{
   GroupState,
@@ -44,7 +50,19 @@ import scala.reflect.ClassTag
   */
 final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] private[sql] (
     private[sql] val ds: Dataset[V],
-    private[sql] val groupingFunc: V => K
+    private[sql] val groupingFunc: V => K,
+    // Pre-built grouping UDF proto. Set by mapValues to avoid re-serializing
+    // the original groupingFunc against the wrong value type.
+    private[sql] val groupingUdfOverride: Option[CommonInlineUserDefinedFunction] = None,
+    // Original (pre-mapValues) relation and value encoder for GroupMap input.
+    // After mapValues, the input relation in the proto must reference the original dataset,
+    // because the server applies the grouping UDF to the input relation.
+    private[sql] val originalRelation: Option[Relation] = None,
+    private[sql] val originalValueEncoder: Option[Encoder[?]] = None,
+    // The mapValues transform function. When set, flatMapGroups/mapGroups compose this
+    // with the user function so the server receives an (OriginalV => K) grouping UDF
+    // and the map function internally applies the value transform.
+    private[sql] val mapValuesFunc: Option[Any => V] = None
 ):
 
   private val keyEncoder: Encoder[K] = summon[Encoder[K]]
@@ -63,19 +81,31 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   /** Apply a transformation function to the value of each group. */
   def mapValues[W: Encoder: ClassTag](func: V => W): KeyValueGroupedDataset[K, W] =
     val transformedDs = ds.map(func)(using summon[Encoder[W]], summon[ClassTag[W]])
-    val newGroupingFunc: W => K = w =>
-      throw UnsupportedOperationException(
-        "mapValues grouping function should not be called directly"
-      )
-    // Build a new KVGD with the original grouping expressions applied to the original input
-    // but values mapped through func. The server-side implementation handles this correctly.
-    KeyValueGroupedDataset(transformedDs, newGroupingFunc)(
-      using
-      keyEncoder,
-      summon[ClassTag[K]],
-      summon[Encoder[W]],
-      summon[ClassTag[W]]
-    )
+    // Capture the current grouping UDF proto and original relation before the value type changes.
+    // After mapping, the original groupingFunc (V => K) is no longer type-compatible
+    // with the new value type W, so we pre-build the UDF and pass it as an override.
+    val keyAg = keyEncoder.agnosticEncoder
+    val valueAg = valueEncoder.agnosticEncoder
+    val cachedGroupingUdf =
+      if keyAg != null && valueAg != null then Some(buildGroupingUdf(keyAg, valueAg))
+      else groupingUdfOverride
+    // Preserve the original (pre-mapValues) relation for GroupMap input.
+    // If this KVGD already has an originalRelation (chained mapValues), keep that.
+    val origRel = originalRelation.orElse(Some(ds.df.relation))
+    val origValEnc = originalValueEncoder.orElse(Some(valueEncoder))
+    val newKvgd = new KeyValueGroupedDataset(
+      transformedDs,
+      groupingFunc.asInstanceOf[W => K], // not actually called — override is used
+      cachedGroupingUdf,
+      origRel,
+      origValEnc,
+      // Compose with any existing mapValuesFunc for chained mapValues calls.
+      // The composed function maps from the original value type to the final mapped type.
+      Some(mapValuesFunc match
+        case Some(prev) => ((x: Any) => func(prev(x).asInstanceOf[V])).asInstanceOf[Any => W]
+        case None       => ((x: Any) => func(x.asInstanceOf[V])).asInstanceOf[Any => W])
+    )(using keyEncoder, summon[ClassTag[K]], summon[Encoder[W]], summon[ClassTag[W]])
+    newKvgd
 
   /** Return a Dataset of the unique keys. */
   def keys: Dataset[K] =
@@ -90,7 +120,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     * falls back to client-side implementation.
     */
   def mapGroups[U: Encoder: ClassTag](func: (K, Iterator[V]) => U): Dataset[U] =
-    flatMapGroups((k, iter) => Iterator.single(func(k, iter)))
+    flatMapGroups(new MapGroupsAdaptor(func))
 
   /** Apply a function to each group, returning an iterator of results per group. */
   def flatMapGroups[U: Encoder: ClassTag](
@@ -98,13 +128,26 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   ): Dataset[U] =
     val outEnc = summon[Encoder[U]]
     val keyAg = keyEncoder.agnosticEncoder
-    val valueAg = valueEncoder.agnosticEncoder
     val outAg = outEnc.agnosticEncoder
-    if keyAg == null || valueAg == null || outAg == null then
+    // For mapValues-derived KVGDs, use the original relation and value encoder
+    val inputRelation = originalRelation.getOrElse(ds.df.relation)
+    val inputValueAg =
+      originalValueEncoder.map(_.agnosticEncoder).getOrElse(valueEncoder.agnosticEncoder)
+    val currentValueAg = valueEncoder.agnosticEncoder
+    if keyAg == null || inputValueAg == null || currentValueAg == null || outAg == null then
       return flatMapGroupsLocal(func, outEnc)
     // Build server-side GroupMap
-    val groupingUdf = buildGroupingUdf(keyAg, valueAg)
-    val mapUdf = buildGroupMapUdf(func, keyAg, valueAg, outAg)
+    val groupingUdf = buildGroupingUdf(keyAg, inputValueAg)
+    // When mapValuesFunc is set, compose it with the user function so the server-side UDF
+    // accepts the original value type and internally maps values before calling user func.
+    val effectiveFunc: AnyRef = mapValuesFunc match
+      case Some(mvf) =>
+        new MapValuesFlatMapAdaptor[K, U](
+          mvf.asInstanceOf[Any => Any],
+          func.asInstanceOf[(K, Iterator[Any]) => IterableOnce[U]]
+        )
+      case None => func.asInstanceOf[AnyRef]
+    val mapUdf = buildGroupMapUdf(effectiveFunc, keyAg, inputValueAg, outAg)
     val relation = Relation
       .newBuilder()
       .setCommon(
@@ -113,7 +156,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       .setGroupMap(
         GroupMap
           .newBuilder()
-          .setInput(ds.df.relation)
+          .setInput(inputRelation)
           .addGroupingExpressions(
             Expression
               .newBuilder()
@@ -140,11 +183,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     if valueAg != null then
       val reducer = ReduceAggregator[V](func)(using valueEncoder)
       agg(reducer.toColumn)
-    else
-      mapGroups { (k, iter) =>
-        val reduced = iter.reduce(func)
-        (k, reduced)
-      }
+    else mapGroups(new ReduceGroupsAdaptor(func))
 
   /** Count the number of elements in each group.
     *
@@ -154,9 +193,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       pairEnc: Encoder[(K, Long)],
       pairCt: ClassTag[(K, Long)]
   ): Dataset[(K, Long)] =
-    mapGroups { (k, iter) =>
-      (k, iter.size.toLong)
-    }
+    mapGroups(new CountGroupsAdaptor[K])
 
   /** Apply a function to each group with sorted values, returning an iterator of results per group.
     *
@@ -703,24 +740,30 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val newDf = ds.sparkSession.createDataFrame(rows, outEnc.schema)
     Dataset(newDf, outEnc)
 
-  /** Build the grouping key UDF proto. */
+  /** Build the grouping key UDF proto.
+    *
+    * If a pre-built groupingUdfOverride is available (e.g. from mapValues), returns that directly.
+    * Otherwise serializes the groupingFunc.
+    */
   private[sql] def buildGroupingUdf(
       keyAg: AgnosticEncoder[?],
       valueAg: AgnosticEncoder[?]
   ): CommonInlineUserDefinedFunction =
-    val packet = UdfPacket(groupingFunc.asInstanceOf[AnyRef], Seq(valueAg), keyAg)
-    val payload = UdfPacket.serialize(packet)
-    val scalaUdf = ScalarScalaUDF
-      .newBuilder()
-      .setPayload(ByteString.copyFrom(payload))
-      .setOutputType(DataTypeProtoConverter.toProto(keyAg.dataType))
-      .setNullable(true)
-    CommonInlineUserDefinedFunction
-      .newBuilder()
-      .setFunctionName("groupByKey")
-      .setDeterministic(true)
-      .setScalarScalaUdf(scalaUdf.build())
-      .build()
+    groupingUdfOverride.getOrElse {
+      val packet = UdfPacket(groupingFunc.asInstanceOf[AnyRef], Seq(valueAg), keyAg)
+      val payload = UdfPacket.serialize(packet)
+      val scalaUdf = ScalarScalaUDF
+        .newBuilder()
+        .setPayload(ByteString.copyFrom(payload))
+        .setOutputType(DataTypeProtoConverter.toProto(keyAg.dataType))
+        .setNullable(true)
+      CommonInlineUserDefinedFunction
+        .newBuilder()
+        .setFunctionName("groupByKey")
+        .setDeterministic(true)
+        .setScalarScalaUdf(scalaUdf.build())
+        .build()
+    }
 
   /** Build the group map function UDF proto. */
   private def buildGroupMapUdf(

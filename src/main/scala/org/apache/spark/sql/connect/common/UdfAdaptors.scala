@@ -37,3 +37,47 @@ final class FlatMapAdaptor[T, U](val func: T => IterableOnce[U])
     extends (Iterator[T] => Iterator[U])
     with Serializable:
   def apply(iter: Iterator[T]): Iterator[U] = iter.flatMap(func)
+
+// ---------------------------------------------------------------------------
+// KeyValueGroupedDataset adaptors
+// ---------------------------------------------------------------------------
+
+/** Adaptor for `KVGD.mapGroups` — wraps a `(K, Iterator[V]) => U` function into a
+  * `(K, Iterator[V]) => IterableOnce[U]` by producing `Iterator.single(func(k, iter))`.
+  *
+  * Without this, the wrapper lambda `(k, iter) => Iterator.single(func(k, iter))` compiles into the
+  * KVGD class, whose impl method does not exist on the Scala 2.13 server.
+  */
+final class MapGroupsAdaptor[K, V, U](val func: (K, Iterator[V]) => U)
+    extends ((K, Iterator[V]) => IterableOnce[U])
+    with Serializable:
+  def apply(k: K, iter: Iterator[V]): IterableOnce[U] = Iterator.single(func(k, iter))
+
+/** Adaptor for `KVGD.count()` — maps each group to `(key, count)`. */
+final class CountGroupsAdaptor[K]
+    extends ((K, Iterator[?]) => (K, Long))
+    with Serializable:
+  def apply(k: K, iter: Iterator[?]): (K, Long) = (k, iter.size.toLong)
+
+/** Adaptor for `KVGD.reduceGroups` fallback — reduces values within each group and pairs with key.
+  */
+final class ReduceGroupsAdaptor[K, V](val func: (V, V) => V)
+    extends ((K, Iterator[V]) => (K, V))
+    with Serializable:
+  def apply(k: K, iter: Iterator[V]): (K, V) = (k, iter.reduce(func))
+
+/** Adaptor for `KVGD.flatMapGroups` after `mapValues` — composes the value transform with the
+  * user's flatMap function.
+  *
+  * After `mapValues(f)`, the GroupMap input relation still has the original value type V_orig. The
+  * server deserializes each row as V_orig, but the user's function expects the mapped type W. This
+  * adaptor bridges the gap by applying `valueMapFunc` to each element before delegating to the
+  * user's `flatMapFunc`.
+  */
+final class MapValuesFlatMapAdaptor[K, U](
+    val valueMapFunc: Any => Any,
+    val flatMapFunc: (K, Iterator[Any]) => IterableOnce[U]
+) extends ((K, Iterator[Any]) => IterableOnce[U])
+    with Serializable:
+  def apply(k: K, iter: Iterator[Any]): IterableOnce[U] =
+    flatMapFunc(k, iter.map(valueMapFunc))
