@@ -4,7 +4,17 @@ import org.apache.spark.sql.StorageLevel
 import org.apache.spark.sql.tags.IntegrationTest
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
-/** Integration tests for Catalog operations. */
+/** Integration tests for Catalog operations.
+  *
+  * Some Catalog operations (listViews, listPartitions, dropTable, dropView, createDatabase,
+  * dropDatabase, truncateTable, analyzeTable, getTableProperties, getCreateTableString) are
+  * currently implemented via SQL fallback because the upstream Spark Connect proto (branch-4.1)
+  * does not define dedicated RPC messages for them.
+  *
+  * TODO: When the upstream proto adds native support for these operations (expected in a future
+  * Spark version), replace the SQL fallback in Catalog.scala with proto-based implementations and
+  * update these tests accordingly.
+  */
 @IntegrationTest
 class CatalogIntegrationSuite extends IntegrationTestBase:
 

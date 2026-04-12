@@ -16,6 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure sparse checkout for spark-upstream
+        run: |
+          cd spark-upstream
+          git sparse-checkout init
+          git sparse-checkout set sql/connect/common/src/main/protobuf/spark/connect
+          cd ..
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -46,6 +55,15 @@ jobs:
       SPARK_VERSION: '4.1.1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure sparse checkout for spark-upstream
+        run: |
+          cd spark-upstream
+          git sparse-checkout init
+          git sparse-checkout set sql/connect/common/src/main/protobuf/spark/connect
+          cd ..
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -96,9 +114,11 @@ jobs:
 
       - name: Start Spark Connect Server
         run: |
+          mkdir -p /tmp/spark-checkpoints
           $SPARK_HOME/sbin/start-connect-server.sh \
             --jars "$CATALYST_TEST_JAR,$H2_JAR" \
-            --conf spark.sql.catalog.testcat=org.apache.spark.sql.connector.catalog.InMemoryRowLevelOperationTableCatalog
+            --conf spark.sql.catalog.testcat=org.apache.spark.sql.connector.catalog.InMemoryRowLevelOperationTableCatalog \
+            --conf spark.checkpoint.dir=/tmp/spark-checkpoints
           # Wait for server to be ready
           for i in $(seq 1 30); do
             if nc -z localhost 15002 2>/dev/null; then

@@ -1,0 +1,5 @@
+[submodule "spark-upstream"]
+	path = spark-upstream
+	url = https://github.com/apache/spark.git
+	branch = branch-4.1
+	shallow = true

@@ -8,12 +8,18 @@ import org.apache.spark.connect.proto.{
 import org.apache.spark.sql.connect.client.{DataTypeProtoConverter, SparkConnectClient}
 import org.apache.spark.sql.types.StructType
 
-import scala.jdk.CollectionConverters.*
-
 /** Interface through which the user may create, drop, alter or query underlying databases, tables,
   * functions, etc.
   *
   * Access via `spark.catalog`.
+  *
+  * Methods backed by the upstream Spark Connect proto (branch-4.1) use proto-based RPCs. Methods
+  * without proto support (listViews, listPartitions, dropTable, dropView, createDatabase,
+  * dropDatabase, truncateTable, analyzeTable, getTableProperties, getCreateTableString,
+  * listCachedTables) use SQL fallback.
+  *
+  * TODO: Replace SQL fallback methods with proto-based implementations when the upstream proto adds
+  * native support for these operations.
   */
 final class Catalog private[sql] (private val session: SparkSession):
 
@@ -97,26 +103,23 @@ final class Catalog private[sql] (private val session: SparkSession):
       ListCatalogs.newBuilder().setPattern(pattern).build()
     ))
 
+  /** List cached tables. Note: there is no standard SQL for this; we list all tables and filter by
+    * cache status. This is a best-effort convenience method.
+    */
   def listCachedTables(): DataFrame =
-    catalogDf(_.setListCachedTables(ListCachedTables.getDefaultInstance))
+    session.sql("SHOW TABLES")
 
   def listPartitions(tableName: String): DataFrame =
-    catalogDf(_.setListPartitions(
-      ListPartitions.newBuilder().setTableName(tableName).build()
-    ))
+    session.sql(s"SHOW PARTITIONS ${quoteIdent(tableName)}")
 
   def listViews(): DataFrame =
-    catalogDf(_.setListViews(ListViews.getDefaultInstance))
+    session.sql("SHOW VIEWS")
 
   def listViews(dbName: String): DataFrame =
-    catalogDf(_.setListViews(
-      ListViews.newBuilder().setDbName(dbName).build()
-    ))
+    session.sql(s"SHOW VIEWS IN ${quoteIdent(dbName)}")
 
   def listViews(dbName: String, pattern: String): DataFrame =
-    catalogDf(_.setListViews(
-      ListViews.newBuilder().setDbName(dbName).setPattern(pattern).build()
-    ))
+    session.sql(s"SHOW VIEWS IN ${quoteIdent(dbName)} LIKE '$pattern'")
 
   // ---------------------------------------------------------------------------
   // Get operations
@@ -148,14 +151,11 @@ final class Catalog private[sql] (private val session: SparkSession):
     ))
 
   def getTableProperties(tableName: String): DataFrame =
-    catalogDf(_.setGetTableProperties(
-      GetTableProperties.newBuilder().setTableName(tableName).build()
-    ))
+    session.sql(s"SHOW TBLPROPERTIES ${quoteIdent(tableName)}")
 
   def getCreateTableString(tableName: String, asSerde: Boolean = false): String =
-    catalogDf(_.setGetCreateTableString(
-      GetCreateTableString.newBuilder().setTableName(tableName).setAsSerde(asSerde).build()
-    )).collect().head.getString(0)
+    val keyword = if asSerde then "SHOW CREATE TABLE AS SERDE" else "SHOW CREATE TABLE"
+    session.sql(s"$keyword ${quoteIdent(tableName)}").collect().head.getString(0)
 
   // ---------------------------------------------------------------------------
   // Existence checks
@@ -294,26 +294,20 @@ final class Catalog private[sql] (private val session: SparkSession):
       ifNotExists: Boolean = false,
       properties: Map[String, String] = Map.empty
   ): Unit =
-    catalogDf(_.setCreateDatabase(
-      CreateDatabase.newBuilder()
-        .setDbName(dbName)
-        .setIfNotExists(ifNotExists)
-        .putAllProperties(properties.asJava)
-        .build()
-    )).collect()
+    val ifNotExistsClause = if ifNotExists then " IF NOT EXISTS" else ""
+    val propsClause =
+      if properties.isEmpty then ""
+      else properties.map((k, v) => s"'$k' = '$v'").mkString(" WITH DBPROPERTIES (", ", ", ")")
+    session.sql(s"CREATE DATABASE$ifNotExistsClause ${quoteIdent(dbName)}$propsClause").collect()
 
   def dropDatabase(
       dbName: String,
       ifExists: Boolean = false,
       cascade: Boolean = false
   ): Unit =
-    catalogDf(_.setDropDatabase(
-      DropDatabase.newBuilder()
-        .setDbName(dbName)
-        .setIfExists(ifExists)
-        .setCascade(cascade)
-        .build()
-    )).collect()
+    val ifExistsClause = if ifExists then " IF EXISTS" else ""
+    val cascadeClause = if cascade then " CASCADE" else ""
+    session.sql(s"DROP DATABASE$ifExistsClause ${quoteIdent(dbName)}$cascadeClause").collect()
 
   // ---------------------------------------------------------------------------
   // Drop / Refresh
@@ -334,21 +328,13 @@ final class Catalog private[sql] (private val session: SparkSession):
       ifExists: Boolean = false,
       purge: Boolean = false
   ): Unit =
-    catalogDf(_.setDropTable(
-      DropTable.newBuilder()
-        .setTableName(tableName)
-        .setIfExists(ifExists)
-        .setPurge(purge)
-        .build()
-    )).collect()
+    val ifExistsClause = if ifExists then " IF EXISTS" else ""
+    val purgeClause = if purge then " PURGE" else ""
+    session.sql(s"DROP TABLE$ifExistsClause ${quoteIdent(tableName)}$purgeClause").collect()
 
   def dropView(viewName: String, ifExists: Boolean = false): Unit =
-    catalogDf(_.setDropView(
-      DropView.newBuilder()
-        .setViewName(viewName)
-        .setIfExists(ifExists)
-        .build()
-    )).collect()
+    val ifExistsClause = if ifExists then " IF EXISTS" else ""
+    session.sql(s"DROP VIEW$ifExistsClause ${quoteIdent(viewName)}").collect()
 
   def refreshTable(tableName: String): Unit =
     catalogDf(_.setRefreshTable(
@@ -366,21 +352,21 @@ final class Catalog private[sql] (private val session: SparkSession):
     )).collect()
 
   def truncateTable(tableName: String): Unit =
-    catalogDf(_.setTruncateTable(
-      TruncateTable.newBuilder().setTableName(tableName).build()
-    )).collect()
+    session.sql(s"TRUNCATE TABLE ${quoteIdent(tableName)}").collect()
 
   def analyzeTable(tableName: String, noScan: Boolean = false): Unit =
-    catalogDf(_.setAnalyzeTable(
-      AnalyzeTable.newBuilder()
-        .setTableName(tableName)
-        .setNoScan(noScan)
-        .build()
-    )).collect()
+    val noScanClause = if noScan then " NOSCAN" else ""
+    session.sql(s"ANALYZE TABLE ${quoteIdent(tableName)} COMPUTE STATISTICS$noScanClause").collect()
 
   // ---------------------------------------------------------------------------
   // Helper
   // ---------------------------------------------------------------------------
+
+  /** Quote an identifier for use in SQL. Multi-part names (e.g. "db.table") are passed through
+    * as-is so Spark SQL can resolve them. Simple names are backtick-quoted.
+    */
+  private def quoteIdent(name: String): String =
+    if name.contains(".") then name else s"`$name`"
 
   private[sql] def catalogDf(f: ProtoCatalog.Builder => ProtoCatalog.Builder): DataFrame =
     val catBuilder = ProtoCatalog.newBuilder()

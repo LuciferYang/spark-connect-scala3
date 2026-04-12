@@ -88,7 +88,7 @@ lazy val root = (project in file("."))
     ),
 
     Compile / PB.protoSources := Seq(
-      baseDirectory.value / "src" / "main" / "protobuf"
+      baseDirectory.value / "spark-upstream" / "sql" / "connect" / "common" / "src" / "main" / "protobuf"
     ),
 
     // gRPC Java codegen plugin
