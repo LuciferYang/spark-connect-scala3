@@ -2,10 +2,8 @@ package org.apache.spark.sql.connect.common
 
 import java.io.{
   ByteArrayOutputStream,
-  ObjectInputStream,
   ObjectOutputStream,
   ObjectStreamException,
-  OutputStream,
   Serializable
 }
 import java.lang.invoke.SerializedLambda

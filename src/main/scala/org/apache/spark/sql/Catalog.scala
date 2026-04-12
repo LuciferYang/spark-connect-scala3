@@ -5,7 +5,7 @@ import org.apache.spark.connect.proto.{
   StorageLevel as _,
   *
 }
-import org.apache.spark.sql.connect.client.{DataTypeProtoConverter, SparkConnectClient}
+import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.types.StructType
 
 /** Interface through which the user may create, drop, alter or query underlying databases, tables,
@@ -22,8 +22,6 @@ import org.apache.spark.sql.types.StructType
   * native support for these operations.
   */
 final class Catalog private[sql] (private val session: SparkSession):
-
-  private def client: SparkConnectClient = session.client
 
   // ---------------------------------------------------------------------------
   // Current database / catalog

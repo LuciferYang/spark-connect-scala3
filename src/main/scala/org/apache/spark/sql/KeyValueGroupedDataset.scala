@@ -20,7 +20,7 @@ import org.apache.spark.sql.connect.common.{
   ReduceGroupsAdaptor,
   UdfPacket
 }
-import org.apache.spark.sql.expressions.{Aggregator, ReduceAggregator}
+import org.apache.spark.sql.expressions.ReduceAggregator
 import org.apache.spark.sql.streaming.{
   GroupState,
   GroupStateTimeout,
@@ -31,7 +31,7 @@ import org.apache.spark.sql.streaming.{
   TimeMode
 }
 
-import scala.jdk.CollectionConverters.*
+import scala.annotation.nowarn
 import scala.reflect.ClassTag
 
 /** A Dataset that has been grouped by a key-extracting function, enabling typed group operations.
@@ -236,6 +236,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     *
     * Falls back to client-side implementation since CoGroupMap requires additional proto support.
     */
+  @nowarn("msg=unused.*parameter")
   def cogroup[U: Encoder: ClassTag, R: Encoder: ClassTag](
       other: KeyValueGroupedDataset[K, U]
   )(func: (K, Iterator[V], Iterator[U]) => IterableOnce[R]): Dataset[R] =
@@ -250,6 +251,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     * [[TypedColumn]]s created by typed aggregation functions (e.g. `Aggregator.toColumn` or
     * `typed.sum`). The result is a Dataset containing the key and the aggregation results.
     */
+  @nowarn("msg=unused.*parameter")
   def agg[U1](col1: TypedColumn[V, U1])(using
       e1: Encoder[U1],
       pairEnc: Encoder[(K, U1)],
@@ -257,6 +259,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   ): Dataset[(K, U1)] =
     aggUntyped(pairEnc, pairCt)(col1)
 
+  @nowarn("msg=unused.*parameter")
   def agg[U1, U2](
       col1: TypedColumn[V, U1],
       col2: TypedColumn[V, U2]
@@ -268,6 +271,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   ): Dataset[(K, U1, U2)] =
     aggUntyped(tupleEnc, tupleCt)(col1, col2)
 
+  @nowarn("msg=unused.*parameter")
   def agg[U1, U2, U3](
       col1: TypedColumn[V, U1],
       col2: TypedColumn[V, U2],
@@ -281,6 +285,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   ): Dataset[(K, U1, U2, U3)] =
     aggUntyped(tupleEnc, tupleCt)(col1, col2, col3)
 
+  @nowarn("msg=unused.*parameter")
   def agg[U1, U2, U3, U4](
       col1: TypedColumn[V, U1],
       col2: TypedColumn[V, U2],
@@ -296,6 +301,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   ): Dataset[(K, U1, U2, U3, U4)] =
     aggUntyped(tupleEnc, tupleCt)(col1, col2, col3, col4)
 
+  @nowarn("msg=unused.*parameter")
   def agg[U1, U2, U3, U4, U5](
       col1: TypedColumn[V, U1],
       col2: TypedColumn[V, U2],
@@ -313,6 +319,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   ): Dataset[(K, U1, U2, U3, U4, U5)] =
     aggUntyped(tupleEnc, tupleCt)(col1, col2, col3, col4, col5)
 
+  @nowarn("msg=unused.*parameter")
   def agg[U1, U2, U3, U4, U5, U6](
       col1: TypedColumn[V, U1],
       col2: TypedColumn[V, U2],
@@ -332,6 +339,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   ): Dataset[(K, U1, U2, U3, U4, U5, U6)] =
     aggUntyped(tupleEnc, tupleCt)(col1, col2, col3, col4, col5, col6)
 
+  @nowarn("msg=unused.*parameter")
   def agg[U1, U2, U3, U4, U5, U6, U7](
       col1: TypedColumn[V, U1],
       col2: TypedColumn[V, U2],
@@ -353,6 +361,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   ): Dataset[(K, U1, U2, U3, U4, U5, U6, U7)] =
     aggUntyped(tupleEnc, tupleCt)(col1, col2, col3, col4, col5, col6, col7)
 
+  @nowarn("msg=unused.*parameter")
   def agg[U1, U2, U3, U4, U5, U6, U7, U8](
       col1: TypedColumn[V, U1],
       col2: TypedColumn[V, U2],
@@ -516,6 +525,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     *
     * Builds a GroupMap proto with state-related fields.
     */
+  @nowarn("msg=unused.*parameter")
   private def flatMapGroupsWithStateHelper[S: Encoder: ClassTag, U: Encoder: ClassTag](
       isMapGroupsWithState: Boolean,
       outputMode: OutputMode,
@@ -583,6 +593,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     * Serializes the statefulProcessor itself as the UDF function and builds a GroupMap proto with
     * TransformWithStateInfo.
     */
+  @nowarn("msg=unused.*parameter")
   private def transformWithStateHelper[U: Encoder: ClassTag, S: Encoder: ClassTag](
       statefulProcessor: StatefulProcessor[K, V, U],
       timeMode: TimeMode,

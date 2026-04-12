@@ -1,16 +1,14 @@
 package org.apache.spark.sql.connect.client
 
-import io.grpc.{ManagedChannel, ManagedChannelBuilder, Metadata, Status, StatusRuntimeException}
+import io.grpc.{ManagedChannel, ManagedChannelBuilder, Metadata}
 import io.grpc.stub.MetadataUtils
 import org.apache.spark.connect.proto.*
 
-import java.net.URI
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
-import org.apache.spark.sql.StorageLevel
 
 /** Core gRPC client for communicating with Spark Connect Server.
   *

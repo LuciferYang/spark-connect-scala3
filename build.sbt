@@ -46,6 +46,11 @@ lazy val root = (project in file("."))
       "-deprecation"
     ),
 
+    // Strict warnings-as-errors for main sources: unused symbols + deprecation → compile errors.
+    // Test code is relaxed to avoid noise from unused variables in test fixtures.
+    Compile / scalacOptions ++= Seq("-Wunused:all", "-Werror"),
+    Test / scalacOptions --= Seq("-Wunused:all", "-Werror"),
+
     Compile / mainClass := Some("org.apache.spark.sql.application.ConnectRepl"),
 
     libraryDependencies ++= {

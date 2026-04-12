@@ -1,7 +1,6 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.{StorageLevel as _, Catalog as _, *}
-import org.apache.spark.connect.proto.StorageLevel as ProtoStorageLevel
 import org.apache.spark.sql.connect.client.{
   ArrowDeserializer,
   DataTypeProtoConverter,

@@ -1,7 +1,6 @@
 package org.apache.spark.sql.streaming
 
 import java.sql.Date
-import java.util.concurrent.TimeUnit
 
 /** Wrapper object representing the state for a group in mapGroupsWithState/flatMapGroupsWithState.
   *

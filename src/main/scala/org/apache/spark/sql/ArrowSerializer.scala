@@ -17,7 +17,7 @@ import org.apache.arrow.vector.{
   VarCharVector,
   VectorSchemaRoot
 }
-import org.apache.arrow.vector.complex.{ListVector, StructVector, MapVector}
+import org.apache.arrow.vector.complex.{ListVector, StructVector}
 import org.apache.arrow.vector.ipc.ArrowStreamWriter
 import org.apache.arrow.vector.types.FloatingPointPrecision
 import org.apache.arrow.vector.types.pojo.{ArrowType, Field, FieldType, Schema as ArrowSchema}
@@ -117,6 +117,7 @@ private[sql] object ArrowSerializer:
           java.util.Collections.emptyList()
         )
 
+  @scala.annotation.nowarn("msg=unused explicit parameter")
   private def setArrowValue(vec: FieldVector, idx: Int, value: Any, dt: types.DataType): Unit =
     if value == null then
       vec.setNull(idx)

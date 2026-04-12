@@ -8,8 +8,6 @@ import org.apache.spark.connect.proto.{
 }
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 
-import scala.jdk.CollectionConverters.*
-
 /** A column expression in a DataFrame.
   *
   * Column objects are lazy — they build a protobuf Expression tree that gets sent to the server

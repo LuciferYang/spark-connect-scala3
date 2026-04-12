@@ -21,6 +21,7 @@ import org.apache.spark.sql.connect.common.{
   UdfPacket
 }
 
+import scala.annotation.nowarn
 import scala.reflect.ClassTag
 
 /** A strongly-typed collection of domain-specific objects.
@@ -269,6 +270,7 @@ final class Dataset[T: ClassTag] private[sql] (
     *   val joined: Dataset[(Person, Department)] = ds1.joinWith(ds2, ds1("deptId") === ds2("id"))
     * }}}
     */
+  @nowarn("msg=unused.*parameter")
   def joinWith[U: Encoder: ClassTag](
       other: Dataset[U],
       condition: Column,
@@ -580,18 +582,6 @@ final class Dataset[T: ClassTag] private[sql] (
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
-
-  /** Create a new Dataset[T] from a local Seq[T] using the current session. */
-  private def createFromSeq(data: Seq[T]): Dataset[T] =
-    val rows = data.map(encoder.toRow)
-    val newDf = sparkSession.createDataFrame(rows, encoder.schema)
-    Dataset(newDf, encoder)
-
-  /** Create a new Dataset[U] from a local Seq[U]. */
-  private def createFromSeqAs[U: ClassTag](data: Seq[U], enc: Encoder[U]): Dataset[U] =
-    val rows = data.map(enc.toRow)
-    val newDf = sparkSession.createDataFrame(rows, enc.schema)
-    Dataset(newDf, enc)
 
   /** Client-side fallback for mapPartitions when AgnosticEncoder is not available. */
   private def mapPartitionsLocal[U: ClassTag](

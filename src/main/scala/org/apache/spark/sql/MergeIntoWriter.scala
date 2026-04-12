@@ -1,6 +1,5 @@
 package org.apache.spark.sql
 
-import scala.jdk.CollectionConverters.*
 import org.apache.spark.connect.proto.*
 
 /** Writer for executing MERGE INTO operations.

@@ -1,6 +1,6 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.{Command, Plan}
+import org.apache.spark.connect.proto.Command
 import org.apache.spark.sql.connect.client.SparkConnectClient
 
 /** Functions for registering user-defined functions (UDFs).

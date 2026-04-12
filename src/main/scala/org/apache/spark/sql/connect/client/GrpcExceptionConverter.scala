@@ -17,8 +17,6 @@ import scala.util.control.NonFatal
   */
 object GrpcExceptionConverter:
 
-  private val SparkErrorInfoReason = "org.apache.spark.SparkException"
-
   /** Wrap `fn` so that any `StatusRuntimeException` is converted to a `SparkException`. */
   def convert[T](fn: => T): T =
     try fn

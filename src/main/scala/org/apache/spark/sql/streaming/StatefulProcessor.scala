@@ -1,6 +1,7 @@
 package org.apache.spark.sql.streaming
 
 import java.io.Serializable
+import scala.annotation.nowarn
 
 /** Abstract class for stateful processing in transformWithState.
   *
@@ -15,6 +16,7 @@ abstract class StatefulProcessor[K, I, O] extends Serializable:
   def handleInputRows(key: K, inputRows: Iterator[I], timerValues: TimerValues): Iterator[O]
 
   /** Called when a timer expires. */
+  @nowarn("msg=unused.*parameter")
   def handleExpiredTimer(
       key: K,
       timerValues: TimerValues,

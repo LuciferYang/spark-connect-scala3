@@ -42,6 +42,7 @@ import java.lang.invoke.{
 }
 import java.lang.reflect.{Field, Modifier}
 
+import scala.annotation.nowarn
 import scala.collection.mutable.{ArrayBuffer, LinkedHashSet, Map, Queue, Set, Stack}
 import scala.jdk.CollectionConverters._
 
@@ -100,6 +101,7 @@ private[common] object SparkClassUtilsShim:
 
 /** A cleaner that renders closures serializable if they can be done so safely.
   */
+@nowarn("msg=return")
 private[sql] object ClosureCleaner extends Logging {
   // Get an ASM class reader for a given class from the JAR that loaded it
   private[common] def getClassReader(cls: Class[_]): ClassReader = {
@@ -680,6 +682,7 @@ private[sql] object ClosureCleaner extends Logging {
   }
 }
 
+@nowarn("msg=(return|unused explicit parameter)")
 private[common] object IndylambdaScalaClosures extends Logging {
   // internal name of java.lang.invoke.LambdaMetafactory
   val LambdaMetafactoryClassName = "java/lang/invoke/LambdaMetafactory"

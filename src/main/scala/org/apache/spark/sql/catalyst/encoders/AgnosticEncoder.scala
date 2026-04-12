@@ -494,13 +494,6 @@ final class EncoderFieldProxy(
       true,
       cl
     )
-    val metaType = Class.forName("org.apache.spark.sql.types.Metadata", true, cl)
-    val agEncType = Class.forName(
-      "org.apache.spark.sql.catalyst.encoders.AgnosticEncoder",
-      true,
-      cl
-    )
-    val optionType = classOf[Option[?]]
     val ctor = efClass.getConstructors
       .find(_.getParameterCount == 6)
       .getOrElse(
@@ -552,9 +545,6 @@ final class ProductEncoderProxy(
       true,
       serverCl
     )
-    val clsTagType = Class.forName("scala.reflect.ClassTag", true, serverCl)
-    val seqType = Class.forName("scala.collection.immutable.Seq", true, serverCl)
-    val optionType = classOf[Option[?]]
     val ctor = peClass.getConstructors
       .find(_.getParameterCount == 3)
       .getOrElse(
@@ -585,11 +575,6 @@ final class CollectionEncoderProxy(
     encoderName match
       case "OptionEncoder" =>
         val clazz = Class.forName(s"${encPkg}OptionEncoder", true, cl)
-        val agEncType = Class.forName(
-          "org.apache.spark.sql.catalyst.encoders.AgnosticEncoder",
-          true,
-          cl
-        )
         val ctor = clazz.getConstructors.find(_.getParameterCount == 1).get
         ctor.newInstance(element)
       case "ArrayEncoder" =>
