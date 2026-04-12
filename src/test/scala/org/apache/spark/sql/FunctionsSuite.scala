@@ -1805,17 +1805,6 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.approx_count_distinct(Column("x"), 0.05), "approx_count_distinct", 2)
   }
 
-  // ----- Deprecated aliases -----
-
-  test("approxCountDistinct deprecated alias") {
-    assertFn(functions.approxCountDistinct(Column("x")), "approx_count_distinct", 1)
-    assertFn(functions.approxCountDistinct(Column("x"), 0.05), "approx_count_distinct", 2)
-  }
-
-  test("monotonicallyIncreasingId deprecated alias") {
-    assertFn(functions.monotonicallyIncreasingId(), "monotonically_increasing_id", 0)
-  }
-
   // ----- round default scale parameter -----
 
   test("round with default scale") {

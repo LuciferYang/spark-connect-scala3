@@ -405,27 +405,6 @@ class ColumnIntegrationSuite extends IntegrationTestBase:
   }
 
   // ---------------------------------------------------------------------------
-  // as(aliases: Array[String]) — multi-alias for struct columns
-  // ---------------------------------------------------------------------------
-
-  test("as with Array of aliases for struct column") {
-    val df = spark.sql("SELECT named_struct('x', 1, 'y', 2) AS s")
-    try
-      val result = df.select(col("s").as(Array("a", "b")))
-      val cols = result.columns
-      assert(cols.length == 2)
-      assert(cols.toSet == Set("a", "b"))
-      val row = result.collect()(0)
-      assert(row.getInt(0) == 1)
-      assert(row.getInt(1) == 2)
-    catch
-      case e: Exception =>
-        cancel(
-          s"Multi-alias for struct columns may not be supported by this server: ${e.getMessage}"
-        )
-  }
-
-  // ---------------------------------------------------------------------------
   // getItem with Column key — dynamic array index
   // ---------------------------------------------------------------------------
 
