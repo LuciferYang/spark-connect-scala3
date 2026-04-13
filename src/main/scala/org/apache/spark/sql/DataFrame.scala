@@ -47,6 +47,8 @@ final class DataFrame private[sql] (
 
   def where(conditionExpr: String): DataFrame = filter(functions.expr(conditionExpr))
 
+  def filter(conditionExpr: String): DataFrame = where(conditionExpr)
+
   def limit(n: Int): DataFrame =
     withRelation(_.setLimit(
       Limit.newBuilder().setInput(relation).setLimit(n).build()
@@ -59,10 +61,16 @@ final class DataFrame private[sql] (
 
   def sort(cols: Column*): DataFrame = orderBy(cols*)
 
+  def sort(sortCol: String, sortCols: String*): DataFrame =
+    sort((sortCol +: sortCols).map(Column(_))*)
+
   def orderBy(cols: Column*): DataFrame =
     val sortBuilder = Sort.newBuilder().setInput(relation).setIsGlobal(true)
     cols.foreach(c => sortBuilder.addOrder(c.toSortOrder))
     withRelation(cols.toSeq)(_.setSort(sortBuilder.build()))
+
+  def orderBy(sortCol: String, sortCols: String*): DataFrame =
+    orderBy((sortCol +: sortCols).map(Column(_))*)
 
   def groupBy(cols: Column*): GroupedDataFrame =
     GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.GroupBy)
@@ -73,8 +81,14 @@ final class DataFrame private[sql] (
   def rollup(cols: Column*): GroupedDataFrame =
     GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.Rollup)
 
+  def rollup(col1: String, cols: String*): GroupedDataFrame =
+    rollup((col1 +: cols).map(Column(_))*)
+
   def cube(cols: Column*): GroupedDataFrame =
     GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.Cube)
+
+  def cube(col1: String, cols: String*): GroupedDataFrame =
+    cube((col1 +: cols).map(Column(_))*)
 
   def agg(aggExpr: Column, aggExprs: Column*): DataFrame =
     groupBy(Seq.empty[Column]*).agg(aggExpr, aggExprs*)
@@ -588,12 +602,18 @@ final class DataFrame private[sql] (
 
   def first(): Row = limit(1).collect().head
 
-  def head(n: Int = 1): Array[Row] = limit(n).collect()
+  def head(n: Int): Array[Row] = limit(n).collect()
+
+  def head(): Row = head(1).head
 
   def take(n: Int): Array[Row] = head(n)
 
   def show(numRows: Int = 20, truncate: Int = 20): Unit =
     show(numRows, truncate, vertical = false)
+
+  def show(truncate: Boolean): Unit = show(20, if truncate then 20 else 0)
+
+  def show(numRows: Int, truncate: Boolean): Unit = show(numRows, if truncate then 20 else 0)
 
   /** Display the first numRows rows of this DataFrame.
     *

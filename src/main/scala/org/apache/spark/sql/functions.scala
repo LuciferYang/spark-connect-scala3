@@ -46,16 +46,27 @@ object functions:
   def avg(col: Column): Column = callFn("avg", col)
   def avg(colName: String): Column = avg(Column(colName))
   def mean(col: Column): Column = avg(col)
+  def mean(colName: String): Column = mean(Column(colName))
   def min(col: Column): Column = callFn("min", col)
   def min(colName: String): Column = min(Column(colName))
   def max(col: Column): Column = callFn("max", col)
   def max(colName: String): Column = max(Column(colName))
   def first(col: Column): Column = callFn("first", col)
+  def first(colName: String): Column = first(Column(colName))
+  def first(colName: String, ignoreNulls: Boolean): Column =
+    callFn("first", Column(colName), Column.lit(ignoreNulls))
   def last(col: Column): Column = callFn("last", col)
+  def last(colName: String): Column = last(Column(colName))
+  def last(colName: String, ignoreNulls: Boolean): Column =
+    callFn("last", Column(colName), Column.lit(ignoreNulls))
   def countDistinct(col: Column, cols: Column*): Column =
     callFn("count", isDistinct = true, (col +: cols)*)
+  def countDistinct(colName: String, colNames: String*): Column =
+    countDistinct(Column(colName), colNames.map(Column(_))*)
   def collect_list(col: Column): Column = callFn("collect_list", col)
+  def collect_list(colName: String): Column = collect_list(Column(colName))
   def collect_set(col: Column): Column = callFn("collect_set", col)
+  def collect_set(colName: String): Column = collect_set(Column(colName))
   def any_value(col: Column): Column = callFn("any_value", col)
   def count_if(col: Column): Column = callFn("count_if", col)
   def product(col: Column): Column = callFn("product", col)
@@ -120,11 +131,17 @@ object functions:
   def hll_sketch_agg(e: Column, lgConfigK: Int): Column =
     callFn("hll_sketch_agg", e, Column.lit(lgConfigK))
   def hll_sketch_agg(e: Column): Column = callFn("hll_sketch_agg", e)
+  def hll_sketch_agg(colName: String, lgConfigK: Int): Column =
+    hll_sketch_agg(Column(colName), lgConfigK)
+  def hll_sketch_agg(colName: String): Column = hll_sketch_agg(Column(colName))
   def hll_union_agg(e: Column, allowDifferentLgConfigK: Column): Column =
     callFn("hll_union_agg", e, allowDifferentLgConfigK)
   def hll_union_agg(e: Column, allowDifferentLgConfigK: Boolean): Column =
     callFn("hll_union_agg", e, Column.lit(allowDifferentLgConfigK))
   def hll_union_agg(e: Column): Column = callFn("hll_union_agg", e)
+  def hll_union_agg(colName: String, allowDifferentLgConfigK: Boolean): Column =
+    hll_union_agg(Column(colName), allowDifferentLgConfigK)
+  def hll_union_agg(colName: String): Column = hll_union_agg(Column(colName))
 
   // ---------------------------------------------------------------------------
   // Math functions
@@ -132,20 +149,33 @@ object functions:
 
   def abs(col: Column): Column = callFn("abs", col)
   def sqrt(col: Column): Column = callFn("sqrt", col)
+  def sqrt(colName: String): Column = sqrt(Column(colName))
   def pow(l: Column, r: Column): Column = callFn("power", l, r)
   def round(col: Column, scale: Int = 0): Column = callFn("round", col, Column.lit(scale))
   def floor(col: Column): Column = callFn("floor", col)
+  def floor(colName: String): Column = floor(Column(colName))
   def ceil(col: Column): Column = callFn("ceil", col)
+  def ceil(colName: String): Column = ceil(Column(colName))
   def log(col: Column): Column = callFn("ln", col)
+  def log(colName: String): Column = log(Column(colName))
   def log10(col: Column): Column = callFn("log10", col)
+  def log10(colName: String): Column = log10(Column(colName))
   def log2(col: Column): Column = callFn("log2", col)
+  def log2(colName: String): Column = log2(Column(colName))
   def exp(col: Column): Column = callFn("exp", col)
+  def exp(colName: String): Column = exp(Column(colName))
   def greatest(cols: Column*): Column = callFn("greatest", cols*)
+  def greatest(colName: String, colNames: String*): Column =
+    greatest((colName +: colNames).map(Column(_))*)
   def least(cols: Column*): Column = callFn("least", cols*)
+  def least(colName: String, colNames: String*): Column =
+    least((colName +: colNames).map(Column(_))*)
   def rand(seed: Long = 0L): Column = callFn("rand", Column.lit(seed))
   def randn(seed: Long = 0L): Column = callFn("randn", Column.lit(seed))
   def log1p(col: Column): Column = callFn("log1p", col)
+  def log1p(colName: String): Column = log1p(Column(colName))
   def expm1(col: Column): Column = callFn("expm1", col)
+  def expm1(colName: String): Column = expm1(Column(colName))
   def hypot(l: Column, r: Column): Column = callFn("hypot", l, r)
   def pmod(dividend: Column, divisor: Column): Column =
     callFn("pmod", dividend, divisor)
@@ -340,7 +370,11 @@ object functions:
   // ---------------------------------------------------------------------------
 
   def array(cols: Column*): Column = callFn("array", cols*)
+  def array(colName: String, colNames: String*): Column =
+    array((colName +: colNames).map(Column(_))*)
   def struct(cols: Column*): Column = callFn("struct", cols*)
+  def struct(colName: String, colNames: String*): Column =
+    struct((colName +: colNames).map(Column(_))*)
   def explode(col: Column): Column = callFn("explode", col)
   def explode_outer(col: Column): Column = callFn("explode_outer", col)
   def posexplode(col: Column): Column = callFn("posexplode", col)
@@ -801,22 +835,37 @@ object functions:
   // ---------------------------------------------------------------------------
 
   def sin(col: Column): Column = callFn("sin", col)
+  def sin(colName: String): Column = sin(Column(colName))
   def cos(col: Column): Column = callFn("cos", col)
+  def cos(colName: String): Column = cos(Column(colName))
   def tan(col: Column): Column = callFn("tan", col)
+  def tan(colName: String): Column = tan(Column(colName))
   def asin(col: Column): Column = callFn("asin", col)
+  def asin(colName: String): Column = asin(Column(colName))
   def acos(col: Column): Column = callFn("acos", col)
+  def acos(colName: String): Column = acos(Column(colName))
   def atan(col: Column): Column = callFn("atan", col)
+  def atan(colName: String): Column = atan(Column(colName))
   def atan2(l: Column, r: Column): Column = callFn("atan2", l, r)
   def sinh(col: Column): Column = callFn("sinh", col)
+  def sinh(colName: String): Column = sinh(Column(colName))
   def cosh(col: Column): Column = callFn("cosh", col)
+  def cosh(colName: String): Column = cosh(Column(colName))
   def tanh(col: Column): Column = callFn("tanh", col)
+  def tanh(colName: String): Column = tanh(Column(colName))
   def cbrt(col: Column): Column = callFn("cbrt", col)
+  def cbrt(colName: String): Column = cbrt(Column(colName))
   def rint(col: Column): Column = callFn("rint", col)
+  def rint(colName: String): Column = rint(Column(colName))
   def signum(col: Column): Column = callFn("signum", col)
+  def signum(colName: String): Column = signum(Column(colName))
   def degrees(col: Column): Column = callFn("degrees", col)
+  def degrees(colName: String): Column = degrees(Column(colName))
   def radians(col: Column): Column = callFn("radians", col)
+  def radians(colName: String): Column = radians(Column(colName))
   def bround(col: Column, scale: Int = 0): Column = callFn("bround", col, Column.lit(scale))
   def bin(col: Column): Column = callFn("bin", col)
+  def bin(colName: String): Column = bin(Column(colName))
   def hex(col: Column): Column = callFn("hex", col)
   def unhex(col: Column): Column = callFn("unhex", col)
   def conv(col: Column, fromBase: Int, toBase: Int): Column =
@@ -832,39 +881,59 @@ object functions:
   def bit_count(col: Column): Column = callFn("bit_count", col)
   def bit_get(col: Column, pos: Column): Column = callFn("bit_get", col, pos)
   def acosh(e: Column): Column = callFn("acosh", e)
+  def acosh(colName: String): Column = acosh(Column(colName))
   def asinh(e: Column): Column = callFn("asinh", e)
+  def asinh(colName: String): Column = asinh(Column(colName))
   def atanh(e: Column): Column = callFn("atanh", e)
+  def atanh(colName: String): Column = atanh(Column(colName))
   def cot(e: Column): Column = callFn("cot", e)
   def csc(e: Column): Column = callFn("csc", e)
   def sec(e: Column): Column = callFn("sec", e)
   def toDegrees(e: Column): Column = callFn("degrees", e)
+  def toDegrees(colName: String): Column = toDegrees(Column(colName))
   def toRadians(e: Column): Column = callFn("radians", e)
+  def toRadians(colName: String): Column = toRadians(Column(colName))
 
   // ---------------------------------------------------------------------------
   // Aggregate functions (extended)
   // ---------------------------------------------------------------------------
 
   def sumDistinct(col: Column): Column = callFn("sum", isDistinct = true, col)
+  def sumDistinct(colName: String): Column = sumDistinct(Column(colName))
   def approx_count_distinct(col: Column): Column = callFn("approx_count_distinct", col)
+  def approx_count_distinct(colName: String): Column = approx_count_distinct(Column(colName))
   def approx_count_distinct(col: Column, rsd: Double): Column =
     callFn("approx_count_distinct", col, Column.lit(rsd))
+  def approx_count_distinct(colName: String, rsd: Double): Column =
+    approx_count_distinct(Column(colName), rsd)
   @deprecated("Use approx_count_distinct", "2.1.0")
   def approxCountDistinct(col: Column): Column = approx_count_distinct(col)
   @deprecated("Use approx_count_distinct", "2.1.0")
   def approxCountDistinct(col: Column, rsd: Double): Column = approx_count_distinct(col, rsd)
   def variance(col: Column): Column = callFn("variance", col)
+  def variance(colName: String): Column = variance(Column(colName))
   def var_pop(col: Column): Column = callFn("var_pop", col)
+  def var_pop(colName: String): Column = var_pop(Column(colName))
   def var_samp(col: Column): Column = callFn("var_samp", col)
+  def var_samp(colName: String): Column = var_samp(Column(colName))
   def stddev(col: Column): Column = callFn("stddev", col)
+  def stddev(colName: String): Column = stddev(Column(colName))
   def stddev_pop(col: Column): Column = callFn("stddev_pop", col)
+  def stddev_pop(colName: String): Column = stddev_pop(Column(colName))
   def stddev_samp(col: Column): Column = callFn("stddev_samp", col)
+  def stddev_samp(colName: String): Column = stddev_samp(Column(colName))
   def skewness(col: Column): Column = callFn("skewness", col)
+  def skewness(colName: String): Column = skewness(Column(colName))
   def kurtosis(col: Column): Column = callFn("kurtosis", col)
+  def kurtosis(colName: String): Column = kurtosis(Column(colName))
   def corr(col1: Column, col2: Column): Column = callFn("corr", col1, col2)
   def covar_pop(col1: Column, col2: Column): Column = callFn("covar_pop", col1, col2)
   def covar_samp(col1: Column, col2: Column): Column = callFn("covar_samp", col1, col2)
   def grouping(col: Column): Column = callFn("grouping", col)
+  def grouping(colName: String): Column = grouping(Column(colName))
   def grouping_id(cols: Column*): Column = callFn("grouping_id", cols*)
+  def grouping_id(colName: String, colNames: String*): Column =
+    grouping_id((colName +: colNames).map(Column(_))*)
   def percentile_approx(col: Column, percentage: Column, accuracy: Column): Column =
     callFn("percentile_approx", col, percentage, accuracy)
   def try_avg(col: Column): Column = callFn("try_avg", col)
@@ -1038,6 +1107,7 @@ object functions:
   // ---------------------------------------------------------------------------
 
   def hll_sketch_estimate(c: Column): Column = callFn("hll_sketch_estimate", c)
+  def hll_sketch_estimate(colName: String): Column = hll_sketch_estimate(Column(colName))
   def hll_union(c1: Column, c2: Column): Column = callFn("hll_union", c1, c2)
   def hll_union(c1: Column, c2: Column, allowDifferentLgConfigK: Boolean): Column =
     callFn("hll_union", c1, c2, Column.lit(allowDifferentLgConfigK))
@@ -1051,17 +1121,25 @@ object functions:
   def theta_sketch_agg(e: Column, lgNomEntries: Int): Column =
     callFn("theta_sketch_agg", e, Column.lit(lgNomEntries))
   def theta_sketch_agg(e: Column): Column = callFn("theta_sketch_agg", e)
+  def theta_sketch_agg(colName: String, lgNomEntries: Int): Column =
+    theta_sketch_agg(Column(colName), lgNomEntries)
+  def theta_sketch_agg(colName: String): Column = theta_sketch_agg(Column(colName))
   def theta_intersection_agg(e: Column): Column = callFn("theta_intersection_agg", e)
+  def theta_intersection_agg(colName: String): Column = theta_intersection_agg(Column(colName))
   def theta_union_agg(e: Column, lgNomEntries: Column): Column =
     callFn("theta_union_agg", e, lgNomEntries)
   def theta_union_agg(e: Column, lgNomEntries: Int): Column =
     callFn("theta_union_agg", e, Column.lit(lgNomEntries))
   def theta_union_agg(e: Column): Column = callFn("theta_union_agg", e)
+  def theta_union_agg(colName: String, lgNomEntries: Int): Column =
+    theta_union_agg(Column(colName), lgNomEntries)
+  def theta_union_agg(colName: String): Column = theta_union_agg(Column(colName))
   def theta_difference(c1: Column, c2: Column): Column =
     callFn("theta_difference", c1, c2)
   def theta_intersection(c1: Column, c2: Column): Column =
     callFn("theta_intersection", c1, c2)
   def theta_sketch_estimate(c: Column): Column = callFn("theta_sketch_estimate", c)
+  def theta_sketch_estimate(colName: String): Column = theta_sketch_estimate(Column(colName))
   def theta_union(c1: Column, c2: Column): Column = callFn("theta_union", c1, c2)
   def theta_union(c1: Column, c2: Column, lgNomEntries: Int): Column =
     callFn("theta_union", c1, c2, Column.lit(lgNomEntries))
@@ -1381,8 +1459,16 @@ object functions:
   def dense_rank(): Column = callFn("dense_rank")
   def lead(col: Column, offset: Int = 1): Column =
     callFn("lead", col, Column.lit(offset))
+  def lead(colName: String, offset: Int): Column =
+    lead(Column(colName), offset)
+  def lead(colName: String, offset: Int, defaultValue: Any): Column =
+    callFn("lead", Column(colName), Column.lit(offset), Column.lit(defaultValue))
   def lag(col: Column, offset: Int = 1): Column =
     callFn("lag", col, Column.lit(offset))
+  def lag(colName: String, offset: Int): Column =
+    lag(Column(colName), offset)
+  def lag(colName: String, offset: Int, defaultValue: Any): Column =
+    callFn("lag", Column(colName), Column.lit(offset), Column.lit(defaultValue))
   def ntile(n: Int): Column = callFn("ntile", Column.lit(n))
   def percent_rank(): Column = callFn("percent_rank")
   def cume_dist(): Column = callFn("cume_dist")

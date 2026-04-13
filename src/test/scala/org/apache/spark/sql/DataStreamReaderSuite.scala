@@ -75,3 +75,86 @@ class DataStreamReaderSuite extends AnyFunSuite with Matchers:
     val df = spark.readStream.format("rate").load()
     df.relation.hasCommon shouldBe true
   }
+
+  // ---------- P0 API: format convenience methods ----------
+
+  test("json(path) sets format to json and path") {
+    val spark = session
+    val df = spark.readStream.json("/data/stream.json")
+    val read = extractRead(df)
+    read.getIsStreaming shouldBe true
+    read.getDataSource.getFormat shouldBe "json"
+    read.getDataSource.getPaths(0) shouldBe "/data/stream.json"
+  }
+
+  test("csv(path) sets format to csv and path") {
+    val spark = session
+    val df = spark.readStream.csv("/data/stream.csv")
+    val read = extractRead(df)
+    read.getDataSource.getFormat shouldBe "csv"
+    read.getDataSource.getPaths(0) shouldBe "/data/stream.csv"
+  }
+
+  test("parquet(path) sets format to parquet and path") {
+    val spark = session
+    val df = spark.readStream.parquet("/data/stream.parquet")
+    val read = extractRead(df)
+    read.getDataSource.getFormat shouldBe "parquet"
+    read.getDataSource.getPaths(0) shouldBe "/data/stream.parquet"
+  }
+
+  test("orc(path) sets format to orc and path") {
+    val spark = session
+    val df = spark.readStream.orc("/data/stream.orc")
+    val read = extractRead(df)
+    read.getDataSource.getFormat shouldBe "orc"
+    read.getDataSource.getPaths(0) shouldBe "/data/stream.orc"
+  }
+
+  test("text(path) sets format to text and path") {
+    val spark = session
+    val df = spark.readStream.text("/data/stream.txt")
+    val read = extractRead(df)
+    read.getDataSource.getFormat shouldBe "text"
+    read.getDataSource.getPaths(0) shouldBe "/data/stream.txt"
+  }
+
+  test("xml(path) sets format to xml and path") {
+    val spark = session
+    val df = spark.readStream.xml("/data/stream.xml")
+    val read = extractRead(df)
+    read.getDataSource.getFormat shouldBe "xml"
+    read.getDataSource.getPaths(0) shouldBe "/data/stream.xml"
+  }
+
+  test("textFile(path) sets format to text and selects value column") {
+    val spark = session
+    val df = spark.readStream.textFile("/data/stream.txt")
+    val rel = df.relation
+    rel.hasProject shouldBe true
+  }
+
+  test("typed option overloads set options correctly") {
+    val spark = session
+    val df = spark.readStream
+      .format("kafka")
+      .option("boolOpt", true)
+      .option("longOpt", 42L)
+      .option("doubleOpt", 3.14)
+      .load()
+    val opts = extractRead(df).getDataSource.getOptionsMap
+    opts.get("boolOpt") shouldBe "true"
+    opts.get("longOpt") shouldBe "42"
+    opts.get("doubleOpt") shouldBe "3.14"
+  }
+
+  test("schema(StructType) sets DDL schema string") {
+    val spark = session
+    val schema = types.StructType(Seq(
+      types.StructField("name", types.StringType),
+      types.StructField("age", types.IntegerType)
+    ))
+    val df = spark.readStream.format("csv").schema(schema).load()
+    val read = extractRead(df)
+    read.getDataSource.getSchema should not be empty
+  }

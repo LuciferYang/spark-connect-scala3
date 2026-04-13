@@ -2392,3 +2392,117 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
       4
     )
   }
+
+  // ---------- P0 API: String overloads ----------
+
+  test("aggregate string overloads") {
+    assertFn(functions.mean("x"), "avg", 1)
+    assertFn(functions.collect_list("x"), "collect_list", 1)
+    assertFn(functions.collect_set("x"), "collect_set", 1)
+    assertFn(functions.kurtosis("x"), "kurtosis", 1)
+    assertFn(functions.skewness("x"), "skewness", 1)
+    assertFn(functions.stddev("x"), "stddev", 1)
+    assertFn(functions.stddev_samp("x"), "stddev_samp", 1)
+    assertFn(functions.stddev_pop("x"), "stddev_pop", 1)
+    assertFn(functions.variance("x"), "variance", 1)
+    assertFn(functions.var_samp("x"), "var_samp", 1)
+    assertFn(functions.var_pop("x"), "var_pop", 1)
+    assertFn(functions.grouping("x"), "grouping", 1)
+  }
+
+  test("sumDistinct string overload") {
+    val c = functions.sumDistinct("x")
+    c.expr.hasUnresolvedFunction shouldBe true
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "sum"
+    fn.getIsDistinct shouldBe true
+    fn.getArgumentsList should have size 1
+  }
+
+  test("first/last string overloads") {
+    assertFn(functions.first("x"), "first", 1)
+    assertFn(functions.first("x", ignoreNulls = true), "first", 2)
+    assertFn(functions.last("x"), "last", 1)
+    assertFn(functions.last("x", ignoreNulls = false), "last", 2)
+  }
+
+  test("countDistinct string overload") {
+    val c = functions.countDistinct("a", "b", "c")
+    c.expr.hasUnresolvedFunction shouldBe true
+    val fn = c.expr.getUnresolvedFunction
+    fn.getFunctionName shouldBe "count"
+    fn.getIsDistinct shouldBe true
+    fn.getArgumentsList should have size 3
+  }
+
+  test("grouping_id string overload") {
+    assertFn(functions.grouping_id("a", "b"), "grouping_id", 2)
+  }
+
+  test("approx_count_distinct string overloads") {
+    assertFn(functions.approx_count_distinct("x"), "approx_count_distinct", 1)
+    assertFn(functions.approx_count_distinct("x", 0.05), "approx_count_distinct", 2)
+  }
+
+  test("math string overloads") {
+    assertFn(functions.sqrt("x"), "sqrt", 1)
+    assertFn(functions.floor("x"), "floor", 1)
+    assertFn(functions.ceil("x"), "ceil", 1)
+    assertFn(functions.log("x"), "ln", 1)
+    assertFn(functions.log10("x"), "log10", 1)
+    assertFn(functions.log2("x"), "log2", 1)
+    assertFn(functions.log1p("x"), "log1p", 1)
+    assertFn(functions.exp("x"), "exp", 1)
+    assertFn(functions.expm1("x"), "expm1", 1)
+    assertFn(functions.bin("x"), "bin", 1)
+  }
+
+  test("trig string overloads") {
+    assertFn(functions.sin("x"), "sin", 1)
+    assertFn(functions.cos("x"), "cos", 1)
+    assertFn(functions.tan("x"), "tan", 1)
+    assertFn(functions.asin("x"), "asin", 1)
+    assertFn(functions.acos("x"), "acos", 1)
+    assertFn(functions.atan("x"), "atan", 1)
+    assertFn(functions.sinh("x"), "sinh", 1)
+    assertFn(functions.cosh("x"), "cosh", 1)
+    assertFn(functions.tanh("x"), "tanh", 1)
+    assertFn(functions.cbrt("x"), "cbrt", 1)
+    assertFn(functions.rint("x"), "rint", 1)
+    assertFn(functions.signum("x"), "signum", 1)
+    assertFn(functions.degrees("x"), "degrees", 1)
+    assertFn(functions.radians("x"), "radians", 1)
+    assertFn(functions.acosh("x"), "acosh", 1)
+    assertFn(functions.asinh("x"), "asinh", 1)
+    assertFn(functions.atanh("x"), "atanh", 1)
+    assertFn(functions.toDegrees("x"), "degrees", 1)
+    assertFn(functions.toRadians("x"), "radians", 1)
+  }
+
+  test("collection string overloads") {
+    assertFn(functions.array("a", "b", "c"), "array", 3)
+    assertFn(functions.struct("a", "b"), "struct", 2)
+    assertFn(functions.greatest("a", "b"), "greatest", 2)
+    assertFn(functions.least("a", "b", "c"), "least", 3)
+  }
+
+  test("lead/lag string overloads") {
+    assertFn(functions.lead("x", 2), "lead", 2)
+    assertFn(functions.lead("x", 2, 0), "lead", 3)
+    assertFn(functions.lag("x", 1), "lag", 2)
+    assertFn(functions.lag("x", 1, "default"), "lag", 3)
+  }
+
+  test("sketch string overloads") {
+    assertFn(functions.hll_sketch_estimate("x"), "hll_sketch_estimate", 1)
+    assertFn(functions.hll_sketch_agg("x"), "hll_sketch_agg", 1)
+    assertFn(functions.hll_sketch_agg("x", 12), "hll_sketch_agg", 2)
+    assertFn(functions.hll_union_agg("x"), "hll_union_agg", 1)
+    assertFn(functions.hll_union_agg("x", true), "hll_union_agg", 2)
+    assertFn(functions.theta_sketch_estimate("x"), "theta_sketch_estimate", 1)
+    assertFn(functions.theta_sketch_agg("x"), "theta_sketch_agg", 1)
+    assertFn(functions.theta_sketch_agg("x", 4096), "theta_sketch_agg", 2)
+    assertFn(functions.theta_intersection_agg("x"), "theta_intersection_agg", 1)
+    assertFn(functions.theta_union_agg("x"), "theta_union_agg", 1)
+    assertFn(functions.theta_union_agg("x", 4096), "theta_union_agg", 2)
+  }

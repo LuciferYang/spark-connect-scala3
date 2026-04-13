@@ -515,3 +515,54 @@ class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
     personDs.printSchema()
     personDs.printSchema(2)
   }
+
+  // ---------------------------------------------------------------------------
+  // P0 API: String overloads and missing ops
+  // ---------------------------------------------------------------------------
+
+  test("filter(String) on typed Dataset") {
+    val result = personDs.filter("age > 28").collect()
+    assert(result.length == 2) // Alice(30), Charlie(35)
+    assert(result.toSet == Set(Person("Alice", 30), Person("Charlie", 35)))
+  }
+
+  test("where(String) on typed Dataset") {
+    val result = personDs.where("age < 30").collect()
+    assert(result.length == 1)
+    assert(result.head == Person("Bob", 25))
+  }
+
+  test("select(String, String*) on typed Dataset") {
+    val result = personDs.select("name").collect()
+    assert(result.length == 3)
+  }
+
+  test("selectExpr(String*) on typed Dataset") {
+    val result = personDs.selectExpr("name", "age + 1 as age_plus_one").collect()
+    assert(result.length == 3)
+  }
+
+  test("groupBy(String) on typed Dataset") {
+    val result = personDs.groupBy("name").agg(functions.count(Column("age")).as("cnt")).collect()
+    assert(result.length == 3)
+  }
+
+  test("agg on typed Dataset") {
+    val result = personDs.agg(functions.avg(Column("age")).as("avg_age")).collect()
+    assert(result.length == 1)
+  }
+
+  test("rollup(String) on typed Dataset") {
+    val result = personDs.rollup("name").agg(functions.sum(Column("age")).as("total")).collect()
+    assert(result.nonEmpty)
+  }
+
+  test("cube(String) on typed Dataset") {
+    val result = personDs.cube("name").agg(functions.sum(Column("age")).as("total")).collect()
+    assert(result.nonEmpty)
+  }
+
+  test("head() returns single typed element") {
+    val p = personDs.head()
+    assert(p.isInstanceOf[Person])
+  }

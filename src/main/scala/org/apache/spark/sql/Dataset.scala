@@ -157,6 +157,10 @@ final class Dataset[T: ClassTag] private[sql] (
 
   def select(cols: Column*): DataFrame = df.select(cols*)
 
+  def select(col: String, cols: String*): DataFrame = df.select((col +: cols)*)
+
+  def selectExpr(exprs: String*): DataFrame = df.selectExpr(exprs*)
+
   // ---------------------------------------------------------------------------
   // Typed select (TypedColumn 1-5 arity)
   // ---------------------------------------------------------------------------
@@ -209,7 +213,12 @@ final class Dataset[T: ClassTag] private[sql] (
 
   def filter(condition: Column): Dataset[T] = Dataset(df.filter(condition), encoder)
 
+  def filter(conditionExpr: String): Dataset[T] =
+    Dataset(df.filter(conditionExpr), encoder)
+
   def where(condition: Column): Dataset[T] = filter(condition)
+
+  def where(conditionExpr: String): Dataset[T] = filter(conditionExpr)
 
   def limit(n: Int): Dataset[T] = Dataset(df.limit(n), encoder)
 
@@ -258,6 +267,31 @@ final class Dataset[T: ClassTag] private[sql] (
     Dataset(df.sortWithinPartitions(colNames*), encoder)
 
   def groupBy(cols: Column*): GroupedDataFrame = df.groupBy(cols*)
+
+  def groupBy(col1: String, cols: String*): GroupedDataFrame =
+    df.groupBy((col1 +: cols).map(Column(_))*)
+
+  def agg(aggExpr: Column, aggExprs: Column*): DataFrame = df.agg(aggExpr, aggExprs*)
+
+  def agg(exprs: Map[String, String]): DataFrame = df.groupBy(Seq.empty[Column]*).agg(exprs)
+
+  def rollup(cols: Column*): GroupedDataFrame = df.rollup(cols*)
+
+  def rollup(col1: String, cols: String*): GroupedDataFrame = df.rollup(col1, cols*)
+
+  def cube(cols: Column*): GroupedDataFrame = df.cube(cols*)
+
+  def cube(col1: String, cols: String*): GroupedDataFrame = df.cube(col1, cols*)
+
+  def offset(n: Int): Dataset[T] = Dataset(df.offset(n), encoder)
+
+  def to(schema: types.StructType): DataFrame = df.to(schema)
+
+  def repartitionByRange(numPartitions: Int, partitionExprs: Column*): Dataset[T] =
+    Dataset(df.repartitionByRange(numPartitions, partitionExprs*), encoder)
+
+  def repartitionByRange(partitionExprs: Column*)(using DummyImplicit): Dataset[T] =
+    Dataset(df.repartitionByRange(partitionExprs*), encoder)
 
   def join(right: DataFrame, joinExpr: Column, joinType: String = "inner"): DataFrame =
     df.join(right, joinExpr, joinType)
@@ -394,7 +428,10 @@ final class Dataset[T: ClassTag] private[sql] (
   def first(): T = encoder.fromRow(df.first())
 
   /** Return the first n elements. */
-  def head(n: Int = 1): Array[T] = df.head(n).map(encoder.fromRow)
+  def head(n: Int): Array[T] = df.head(n).map(encoder.fromRow)
+
+  /** Return the first element. */
+  def head(): T = head(1).head
 
   /** Return the first n elements. */
   def take(n: Int): Array[T] = head(n)
@@ -404,6 +441,12 @@ final class Dataset[T: ClassTag] private[sql] (
 
   /** Show the first numRows. */
   def show(numRows: Int = 20, truncate: Int = 20): Unit = df.show(numRows, truncate)
+
+  /** Show the first numRows with truncation as boolean. */
+  def show(truncate: Boolean): Unit = df.show(truncate)
+
+  /** Show the first numRows with truncation as boolean. */
+  def show(numRows: Int, truncate: Boolean): Unit = df.show(numRows, truncate)
 
   /** Show the first numRows with optional vertical format. */
   def show(numRows: Int, truncate: Int, vertical: Boolean): Unit =

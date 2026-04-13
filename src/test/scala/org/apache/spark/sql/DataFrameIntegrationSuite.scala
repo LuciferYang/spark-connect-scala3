@@ -1208,3 +1208,65 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     assert(deduped != null)
     assert(deduped.isStreaming)
   }
+
+  // ---------------------------------------------------------------------------
+  // P0 API: String overloads
+  // ---------------------------------------------------------------------------
+
+  test("filter(String) with SQL expression") {
+    val df = spark.range(10).toDF("id")
+    val result = df.filter("id > 5").collect()
+    assert(result.length == 4)
+  }
+
+  test("sort(String, String*) ordering") {
+    val rows = Seq(Row("B", 2), Row("A", 1), Row("C", 3))
+    val schema = StructType(Seq(StructField("name", StringType), StructField("value", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+    val sorted = df.sort("name").collect()
+    assert(sorted(0).getString(0) == "A")
+    assert(sorted(1).getString(0) == "B")
+    assert(sorted(2).getString(0) == "C")
+  }
+
+  test("orderBy(String, String*) ordering") {
+    val rows = Seq(Row(3), Row(1), Row(2))
+    val schema = StructType(Seq(StructField("v", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+    val sorted = df.orderBy("v").collect()
+    assert(sorted(0).getInt(0) == 1)
+    assert(sorted(2).getInt(0) == 3)
+  }
+
+  test("rollup(String, String*) aggregation") {
+    val rows = Seq(Row("A", 1), Row("A", 2), Row("B", 3))
+    val schema = StructType(Seq(StructField("k", StringType), StructField("v", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.rollup("k").agg(functions.sum(Column("v")).as("total")).collect()
+    assert(result.nonEmpty)
+  }
+
+  test("cube(String, String*) aggregation") {
+    val rows = Seq(Row("A", 1), Row("A", 2), Row("B", 3))
+    val schema = StructType(Seq(StructField("k", StringType), StructField("v", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.cube("k").agg(functions.sum(Column("v")).as("total")).collect()
+    assert(result.nonEmpty)
+  }
+
+  test("head() returns single Row") {
+    val df = spark.range(5).toDF("id")
+    val row = df.head()
+    assert(row.getLong(0) == 0L)
+  }
+
+  test("show(truncate: Boolean) runs without error") {
+    val df = spark.range(3).toDF("id")
+    df.show(truncate = false)
+    df.show(truncate = true)
+  }
+
+  test("show(numRows: Int, truncate: Boolean) runs without error") {
+    val df = spark.range(3).toDF("id")
+    df.show(2, truncate = false)
+  }

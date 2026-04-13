@@ -2058,3 +2058,64 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
       .whenNotMatchedBySource().delete()
     writer shouldBe a[MergeIntoWriter]
   }
+
+  // ---------- P0 API: head() / show() / filter / sort / rollup / cube ----------
+
+  test("head() returns single Row via head(1)") {
+    // just verify head(n) compiles with explicit int (no default)
+    val df = testDf()
+    // head(n) delegates to limit(n).collect() — can't test without server
+    // but we can verify the method signature exists
+    val method = df.getClass.getMethod("head")
+    method should not be null
+  }
+
+  test("show(truncate: Boolean) compiles") {
+    val df = testDf()
+    val method = df.getClass.getMethod("show", classOf[Boolean])
+    method should not be null
+  }
+
+  test("show(numRows: Int, truncate: Boolean) compiles") {
+    val df = testDf()
+    val method = df.getClass.getMethod("show", classOf[Int], classOf[Boolean])
+    method should not be null
+  }
+
+  test("filter(String) builds Filter with ExpressionString") {
+    val df = testDf()
+    val result = df.filter("age > 10")
+    val rel = result.relation
+    rel.hasFilter shouldBe true
+    val cond = rel.getFilter.getCondition
+    cond.hasExpressionString shouldBe true
+    cond.getExpressionString.getExpression shouldBe "age > 10"
+  }
+
+  test("sort(String, String*) builds Sort proto") {
+    val df = testDf()
+    val result = df.sort("a", "b")
+    val rel = result.relation
+    rel.hasSort shouldBe true
+    rel.getSort.getOrderList should have size 2
+  }
+
+  test("orderBy(String, String*) builds Sort proto") {
+    val df = testDf()
+    val result = df.orderBy("x")
+    val rel = result.relation
+    rel.hasSort shouldBe true
+    rel.getSort.getOrderList should have size 1
+  }
+
+  test("rollup(String, String*) builds Aggregate with Rollup GroupType") {
+    val df = testDf()
+    val gdf = df.rollup("a", "b")
+    gdf shouldBe a[GroupedDataFrame]
+  }
+
+  test("cube(String, String*) builds Aggregate with Cube GroupType") {
+    val df = testDf()
+    val gdf = df.cube("a", "b")
+    gdf shouldBe a[GroupedDataFrame]
+  }

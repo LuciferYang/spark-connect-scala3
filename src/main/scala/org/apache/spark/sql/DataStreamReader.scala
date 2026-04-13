@@ -22,6 +22,12 @@ final class DataStreamReader private[sql] (private val session: SparkSession):
     opts = opts + (key -> value)
     this
 
+  def option(key: String, value: Boolean): DataStreamReader = option(key, value.toString)
+
+  def option(key: String, value: Long): DataStreamReader = option(key, value.toString)
+
+  def option(key: String, value: Double): DataStreamReader = option(key, value.toString)
+
   def options(m: Map[String, String]): DataStreamReader =
     opts = opts ++ m
     this
@@ -29,6 +35,9 @@ final class DataStreamReader private[sql] (private val session: SparkSession):
   def schema(schemaString: String): DataStreamReader =
     userSchema = Some(schemaString)
     this
+
+  def schema(schema: types.StructType): DataStreamReader =
+    this.schema(schema.toDDL)
 
   def load(): DataFrame = load(Seq.empty)
 
@@ -50,6 +59,21 @@ final class DataStreamReader private[sql] (private val session: SparkSession):
           .build())
         .build()
     )
+
+  def json(path: String): DataFrame = format("json").load(path)
+
+  def csv(path: String): DataFrame = format("csv").load(path)
+
+  def parquet(path: String): DataFrame = format("parquet").load(path)
+
+  def orc(path: String): DataFrame = format("orc").load(path)
+
+  def text(path: String): DataFrame = format("text").load(path)
+
+  def xml(path: String): DataFrame = format("xml").load(path)
+
+  def textFile(path: String): DataFrame =
+    text(path).select(Column("value"))
 
   def table(tableName: String): DataFrame =
     DataFrame(
