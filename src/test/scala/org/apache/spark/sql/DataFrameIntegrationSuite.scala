@@ -1270,3 +1270,36 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     val df = spark.range(3).toDF("id")
     df.show(2, truncate = false)
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: dropDuplicates(col1, cols*) varargs
+  // ---------------------------------------------------------------------------
+
+  test("dropDuplicates(col1, cols*) deduplicates on specified columns") {
+    val rows = Seq(
+      Row("Alice", 30),
+      Row("Alice", 25),
+      Row("Bob", 25)
+    )
+    val schema = StructType(Seq(
+      StructField("name", StringType),
+      StructField("age", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.dropDuplicates("name").collect()
+    assert(result.length == 2)
+    assert(result.map(_.getString(0)).toSet == Set("Alice", "Bob"))
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: agg(Map[String, String])
+  // ---------------------------------------------------------------------------
+
+  test("agg(Map) performs map-based aggregation") {
+    val rows = Seq(Row(1), Row(2), Row(3), Row(4), Row(5))
+    val schema = StructType(Seq(StructField("value", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.agg(Map("value" -> "sum")).collect()
+    assert(result.length == 1)
+    assert(result(0).get(0).toString.toLong == 15L)
+  }

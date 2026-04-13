@@ -353,3 +353,75 @@ class StreamingReadWriteIntegrationSuite extends IntegrationTestBase:
       assert(!query.isActive)
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: DataStreamWriter typed option overloads
+  // ---------------------------------------------------------------------------
+
+  test("writeStream.option(key, Boolean) converts to string") {
+    val df = spark.readStream.format("rate").option("rowsPerSecond", "5").load()
+    val query = df.writeStream
+      .format("console")
+      .option("truncate", false)
+      .outputMode("append")
+      .trigger(Trigger.ProcessingTime(2000))
+      .start()
+
+    try assert(query.isActive)
+    finally query.stop()
+  }
+
+  test("writeStream.option(key, Long) converts to string") {
+    val df = spark.readStream.format("rate").option("rowsPerSecond", "5").load()
+    val query = df.writeStream
+      .format("console")
+      .option("numRows", 10L)
+      .outputMode("append")
+      .trigger(Trigger.ProcessingTime(2000))
+      .start()
+
+    try assert(query.isActive)
+    finally query.stop()
+  }
+
+  test("writeStream.option(key, Double) converts to string") {
+    val df = spark.readStream.format("rate").option("rowsPerSecond", "5").load()
+    val query = df.writeStream
+      .format("console")
+      .option("threshold", 0.5)
+      .outputMode("append")
+      .trigger(Trigger.ProcessingTime(2000))
+      .start()
+
+    try assert(query.isActive)
+    finally query.stop()
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: outputMode(OutputMode) enum
+  // ---------------------------------------------------------------------------
+
+  test("outputMode(OutputMode.Append) works with streaming query") {
+    val df = spark.readStream.format("rate").option("rowsPerSecond", "5").load()
+    val query = df.writeStream
+      .format("console")
+      .outputMode(streaming.OutputMode.Append)
+      .trigger(Trigger.ProcessingTime(2000))
+      .start()
+
+    try assert(query.isActive)
+    finally query.stop()
+  }
+
+  test("outputMode(OutputMode.Complete) with aggregation") {
+    val df = spark.readStream.format("rate").option("rowsPerSecond", "5").load()
+      .groupBy(col("value")).count()
+    val query = df.writeStream
+      .format("console")
+      .outputMode(streaming.OutputMode.Complete)
+      .trigger(Trigger.ProcessingTime(2000))
+      .start()
+
+    try assert(query.isActive)
+    finally query.stop()
+  }

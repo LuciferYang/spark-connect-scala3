@@ -391,3 +391,31 @@ class DataFrameWriterSuite extends AnyFunSuite with Matchers:
     val op = buildWriteOp(writer)
     op.getPartitioningColumnsList.asScala shouldBe Seq("c")
   }
+
+  // ---------------------------------------------------------------------------
+  // clusterBy()
+  // ---------------------------------------------------------------------------
+
+  test("clusterBy sets clustering columns") {
+    val writer = DataFrameWriter(stubDf).clusterBy("col1", "col2")
+    val op = buildWriteOp(writer)
+    op.getClusteringColumnsList.asScala shouldBe Seq("col1", "col2")
+  }
+
+  test("clusterBy with single column") {
+    val writer = DataFrameWriter(stubDf).clusterBy("id")
+    val op = buildWriteOp(writer)
+    op.getClusteringColumnsList.asScala shouldBe Seq("id")
+  }
+
+  test("clusterBy returns the same DataFrameWriter instance") {
+    val writer = DataFrameWriter(stubDf)
+    val result = writer.clusterBy("col1")
+    result should be theSameInstanceAs writer
+  }
+
+  test("no clusterBy by default") {
+    val writer = DataFrameWriter(stubDf)
+    val op = buildWriteOp(writer)
+    op.getClusteringColumnsList.asScala shouldBe empty
+  }

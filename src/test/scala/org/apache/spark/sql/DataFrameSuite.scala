@@ -2119,3 +2119,38 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     val gdf = df.cube("a", "b")
     gdf shouldBe a[GroupedDataFrame]
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: dropDuplicates varargs
+  // ---------------------------------------------------------------------------
+
+  test("dropDuplicates(col1, cols*) delegates to Seq overload") {
+    val df = testDf()
+    val result = df.dropDuplicates("a", "b", "c")
+    val rel = result.relation
+    rel.hasDeduplicate shouldBe true
+    val dedup = rel.getDeduplicate
+    dedup.getAllColumnsAsKeys shouldBe false
+    dedup.getColumnNamesList.asScala shouldBe Seq("a", "b", "c")
+  }
+
+  test("dropDuplicates(col1) with single column works") {
+    val df = testDf()
+    val result = df.dropDuplicates("id")
+    val dedup = result.relation.getDeduplicate
+    dedup.getColumnNamesList.asScala shouldBe Seq("id")
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: agg(Map[String, String])
+  // ---------------------------------------------------------------------------
+
+  test("agg(Map) delegates to groupBy().agg(map)") {
+    val df = testDf()
+    val result = df.agg(Map("v1" -> "sum", "v2" -> "avg"))
+    result.relation.hasAggregate shouldBe true
+    val agg = result.relation.getAggregate
+    agg.getAggregateExpressionsCount shouldBe 2
+    // Grouping with empty cols (no groupBy)
+    agg.getGroupingExpressionsCount shouldBe 0
+  }

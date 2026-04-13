@@ -372,11 +372,16 @@ final class Dataset[T: ClassTag] private[sql] (
   def dropDuplicates(colNames: Seq[String]): Dataset[T] =
     Dataset(df.dropDuplicates(colNames), encoder)
 
+  def dropDuplicates(col1: String, cols: String*): Dataset[T] =
+    Dataset(df.dropDuplicates(col1, cols*), encoder)
+
   def describe(colNames: String*): DataFrame = df.describe(colNames*)
 
   def summary(statistics: String*): DataFrame = df.summary(statistics*)
 
   def union(other: Dataset[T]): Dataset[T] = Dataset(df.union(other.df), encoder)
+
+  def unionAll(other: Dataset[T]): Dataset[T] = union(other)
 
   def unionByName(other: Dataset[T], allowMissingColumns: Boolean = false): Dataset[T] =
     Dataset(df.unionByName(other.df, allowMissingColumns), encoder)

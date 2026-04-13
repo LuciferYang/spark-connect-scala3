@@ -17,6 +17,7 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
   private var bucketColNames: Seq[String] = Seq.empty
   private var sortColNames: Seq[String] = Seq.empty
   private var numBuckets: Int = 0
+  private var clusteringCols: Seq[String] = Seq.empty
 
   def format(fmt: String): DataFrameWriter =
     source = fmt
@@ -57,6 +58,10 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
 
   def sortBy(colName: String, colNames: String*): DataFrameWriter =
     sortColNames = colName +: colNames.toSeq
+    this
+
+  def clusterBy(colName: String, colNames: String*): DataFrameWriter =
+    clusteringCols = colName +: colNames.toSeq
     this
 
   def save(path: String): Unit =
@@ -133,6 +138,7 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
         .setNumBuckets(numBuckets)
       bucketColNames.foreach(bucketBuilder.addBucketColumnNames)
       builder.setBucketBy(bucketBuilder.build())
+    clusteringCols.foreach(builder.addClusteringColumns)
     builder
 
   private def executeCommand(command: Command): Unit =

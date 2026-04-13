@@ -257,3 +257,53 @@ class DataStreamWriterSuite extends AnyFunSuite with Matchers:
   test("Trigger.Once is a singleton") {
     Trigger.Once should be theSameInstanceAs Trigger.Once
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: Typed option overloads
+  // ---------------------------------------------------------------------------
+
+  test("option(key, Boolean) converts to string") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.option("header", true).buildWriteStreamOp().build()
+    proto.getOptionsMap.get("header") shouldBe "true"
+  }
+
+  test("option(key, Long) converts to string") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.option("maxRecords", 100L).buildWriteStreamOp().build()
+    proto.getOptionsMap.get("maxRecords") shouldBe "100"
+  }
+
+  test("option(key, Double) converts to string") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.option("threshold", 0.5).buildWriteStreamOp().build()
+    proto.getOptionsMap.get("threshold") shouldBe "0.5"
+  }
+
+  test("option(key, Boolean false) converts to string") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.option("header", false).buildWriteStreamOp().build()
+    proto.getOptionsMap.get("header") shouldBe "false"
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: outputMode(OutputMode) overload
+  // ---------------------------------------------------------------------------
+
+  test("outputMode(OutputMode.Append) sets 'Append'") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.outputMode(streaming.OutputMode.Append).buildWriteStreamOp().build()
+    proto.getOutputMode shouldBe "Append"
+  }
+
+  test("outputMode(OutputMode.Update) sets 'Update'") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.outputMode(streaming.OutputMode.Update).buildWriteStreamOp().build()
+    proto.getOutputMode shouldBe "Update"
+  }
+
+  test("outputMode(OutputMode.Complete) sets 'Complete'") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.outputMode(streaming.OutputMode.Complete).buildWriteStreamOp().build()
+    proto.getOutputMode shouldBe "Complete"
+  }

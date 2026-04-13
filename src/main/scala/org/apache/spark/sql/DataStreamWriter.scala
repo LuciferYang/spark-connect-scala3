@@ -43,6 +43,9 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
     mode = m
     this
 
+  def outputMode(outputMode: streaming.OutputMode): DataStreamWriter =
+    this.outputMode(outputMode.toString)
+
   def trigger(t: Trigger): DataStreamWriter =
     triggerOpt = Some(t)
     this
@@ -54,6 +57,10 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
   def option(key: String, value: String): DataStreamWriter =
     opts = opts + (key -> value)
     this
+
+  def option(key: String, value: Boolean): DataStreamWriter = option(key, value.toString)
+  def option(key: String, value: Long): DataStreamWriter = option(key, value.toString)
+  def option(key: String, value: Double): DataStreamWriter = option(key, value.toString)
 
   def options(m: Map[String, String]): DataStreamWriter =
     opts = opts ++ m

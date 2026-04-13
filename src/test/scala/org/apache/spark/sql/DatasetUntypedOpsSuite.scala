@@ -116,3 +116,32 @@ class DatasetUntypedOpsSuite extends AnyFunSuite with Matchers:
     val method = ds.getClass.getMethod("show", classOf[Int], classOf[Boolean])
     method should not be null
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: dropDuplicates varargs
+  // ---------------------------------------------------------------------------
+
+  test("dropDuplicates(col1, cols*) delegates to DataFrame") {
+    val ds = testDs()
+    val result = ds.dropDuplicates("a", "b")
+    val rel = result.df.relation
+    rel.hasDeduplicate shouldBe true
+    import scala.jdk.CollectionConverters.*
+    rel.getDeduplicate.getColumnNamesList.asScala shouldBe Seq("a", "b")
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: unionAll
+  // ---------------------------------------------------------------------------
+
+  test("unionAll is alias for union") {
+    val ds1 = testDs()
+    val ds2 = testDs()
+    val unionResult = ds1.union(ds2)
+    val unionAllResult = ds1.unionAll(ds2)
+    // Both should produce SetOp with UNION type
+    unionResult.df.relation.hasSetOp shouldBe true
+    unionAllResult.df.relation.hasSetOp shouldBe true
+    unionResult.df.relation.getSetOp.getSetOpType shouldBe
+      unionAllResult.df.relation.getSetOp.getSetOpType
+  }

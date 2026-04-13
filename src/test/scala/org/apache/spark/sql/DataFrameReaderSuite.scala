@@ -214,3 +214,40 @@ class DataFrameReaderSuite extends AnyFunSuite with Matchers:
     df.relation.hasCommon shouldBe true
     df.relation.getCommon.getPlanId should be >= 0L
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: xml convenience method
+  // ---------------------------------------------------------------------------
+
+  test("xml sets format to xml") {
+    val df = stubSession.read.xml("/data.xml")
+    val ds = df.relation.getRead.getDataSource
+    ds.getFormat shouldBe "xml"
+    ds.getPathsList.asScala shouldBe Seq("/data.xml")
+  }
+
+  test("xml with multiple paths") {
+    val df = stubSession.read.xml("/a.xml", "/b.xml")
+    val ds = df.relation.getRead.getDataSource
+    ds.getFormat shouldBe "xml"
+    ds.getPathsList.asScala shouldBe Seq("/a.xml", "/b.xml")
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: textFile convenience method
+  // ---------------------------------------------------------------------------
+
+  test("textFile selects value column") {
+    val df = stubSession.read.textFile("/data.txt")
+    // textFile wraps text().select("value"), so the relation should be a Project
+    val rel = df.relation
+    rel.hasProject shouldBe true
+    val proj = rel.getProject
+    proj.getExpressionsCount shouldBe 1
+    val expr = proj.getExpressions(0)
+    expr.hasUnresolvedAttribute shouldBe true
+    expr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "value"
+    // The input to the project should be a Read with text format
+    proj.getInput.hasRead shouldBe true
+    proj.getInput.getRead.getDataSource.getFormat shouldBe "text"
+  }

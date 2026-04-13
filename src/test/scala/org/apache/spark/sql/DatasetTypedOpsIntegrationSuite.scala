@@ -566,3 +566,30 @@ class DatasetTypedOpsIntegrationSuite extends IntegrationTestBase:
     val p = personDs.head()
     assert(p.isInstanceOf[Person])
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: dropDuplicates varargs on typed Dataset
+  // ---------------------------------------------------------------------------
+
+  test("dropDuplicates(col1, cols*) on typed Dataset") {
+    val ds = spark.createDataset(Seq(
+      Person("Alice", 30),
+      Person("Alice", 25),
+      Person("Bob", 25)
+    ))
+    val result = ds.dropDuplicates("name").collect()
+    assert(result.length == 2)
+    assert(result.map(_.name).toSet == Set("Alice", "Bob"))
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: unionAll on typed Dataset
+  // ---------------------------------------------------------------------------
+
+  test("unionAll on typed Dataset is alias for union") {
+    val ds1 = spark.createDataset(Seq(Person("Alice", 30), Person("Bob", 25)))
+    val ds2 = spark.createDataset(Seq(Person("Charlie", 35)))
+    val result = ds1.unionAll(ds2).collect()
+    assert(result.length == 3)
+    assert(result.map(_.name).toSet == Set("Alice", "Bob", "Charlie"))
+  }

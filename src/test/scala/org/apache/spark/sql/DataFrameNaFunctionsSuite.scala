@@ -174,3 +174,134 @@ class DataFrameNaFunctionsSuite extends AnyFunSuite with Matchers:
     val result = df.na.replace("a", Map(1 -> 2))
     result.relation.getReplace.getInput shouldBe df.relation
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: drop(Seq) overload
+  // ---------------------------------------------------------------------------
+
+  test("drop(Seq) defaults to 'any' behavior") {
+    val result = naFunctions.drop(Seq("a", "b"))
+    val naDrop = result.relation.getDropNa
+    naDrop.getColsList.asScala.toSeq shouldBe Seq("a", "b")
+    naDrop.hasMinNonNulls shouldBe false
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: drop(Array) overloads
+  // ---------------------------------------------------------------------------
+
+  test("drop(Array) delegates to drop(Seq)") {
+    val result = naFunctions.drop(Array("x", "y"))
+    val naDrop = result.relation.getDropNa
+    naDrop.getColsList.asScala.toSeq shouldBe Seq("x", "y")
+  }
+
+  test("drop(how, Array) delegates to drop(how, Seq)") {
+    val result = naFunctions.drop("all", Array("a"))
+    result.relation.getDropNa.getMinNonNulls shouldBe 1
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: drop(minNonNulls, Seq/Array)
+  // ---------------------------------------------------------------------------
+
+  test("drop(minNonNulls, Seq) builds NADrop with threshold and cols") {
+    val result = naFunctions.drop(2, Seq("a", "b", "c"))
+    val naDrop = result.relation.getDropNa
+    naDrop.getMinNonNulls shouldBe 2
+    naDrop.getColsList.asScala.toSeq shouldBe Seq("a", "b", "c")
+  }
+
+  test("drop(minNonNulls, Array) delegates to drop(minNonNulls, Seq)") {
+    val result = naFunctions.drop(3, Array("x"))
+    val naDrop = result.relation.getDropNa
+    naDrop.getMinNonNulls shouldBe 3
+    naDrop.getColsList.asScala.toSeq shouldBe Seq("x")
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: fill(Long) overloads
+  // ---------------------------------------------------------------------------
+
+  test("fill(Long, Seq) converts to Double") {
+    val result = naFunctions.fill(42L, Seq("a"))
+    val naFill = result.relation.getFillNa
+    naFill.getValuesCount shouldBe 1
+    naFill.getValues(0).getDouble shouldBe 42.0
+    naFill.getColsList.asScala.toSeq shouldBe Seq("a")
+  }
+
+  test("fill(Long, Seq) with explicit cols converts to Double") {
+    val result = naFunctions.fill(99L, Seq("a"))
+    val naFill = result.relation.getFillNa
+    naFill.getValues(0).getDouble shouldBe 99.0
+    naFill.getColsList.asScala.toSeq shouldBe Seq("a")
+  }
+
+  test("fill(Long, Array) converts to Double") {
+    val result = naFunctions.fill(7L, Array("b"))
+    val naFill = result.relation.getFillNa
+    naFill.getValues(0).getDouble shouldBe 7.0
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: fill(Double/String, Array) overloads
+  // ---------------------------------------------------------------------------
+
+  test("fill(Double, Array) delegates to fill(Double, Seq)") {
+    val result = naFunctions.fill(3.14, Array("pi"))
+    val naFill = result.relation.getFillNa
+    naFill.getValues(0).getDouble shouldBe 3.14
+    naFill.getColsList.asScala.toSeq shouldBe Seq("pi")
+  }
+
+  test("fill(String, Array) delegates to fill(String, Seq)") {
+    val result = naFunctions.fill("N/A", Array("name"))
+    val naFill = result.relation.getFillNa
+    naFill.getValues(0).getString shouldBe "N/A"
+    naFill.getColsList.asScala.toSeq shouldBe Seq("name")
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: fill(Boolean) overloads
+  // ---------------------------------------------------------------------------
+
+  test("fill(Boolean, Seq) builds NAFill with boolean literal") {
+    val result = naFunctions.fill(true, Seq("flag"))
+    val naFill = result.relation.getFillNa
+    naFill.getValuesCount shouldBe 1
+    naFill.getValues(0).getBoolean shouldBe true
+    naFill.getColsList.asScala.toSeq shouldBe Seq("flag")
+  }
+
+  test("fill(Boolean false, Seq) builds NAFill with boolean for specified cols") {
+    val result = naFunctions.fill(false, Seq("active", "enabled"))
+    val naFill = result.relation.getFillNa
+    naFill.getValues(0).getBoolean shouldBe false
+    naFill.getColsList.asScala.toSeq shouldBe Seq("active", "enabled")
+  }
+
+  test("fill(Boolean, Array) delegates to fill(Boolean, Seq)") {
+    val result = naFunctions.fill(true, Array("flag"))
+    val naFill = result.relation.getFillNa
+    naFill.getValues(0).getBoolean shouldBe true
+    naFill.getColsList.asScala.toSeq shouldBe Seq("flag")
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: replace(Seq, Map) multi-column
+  // ---------------------------------------------------------------------------
+
+  test("replace(Seq, Map) builds NAReplace with multiple columns") {
+    val result = naFunctions.replace(Seq("col1", "col2"), Map(1 -> 10, 2 -> 20))
+    val naReplace = result.relation.getReplace
+    naReplace.getColsList.asScala.toSeq shouldBe Seq("col1", "col2")
+    naReplace.getReplacementsCount shouldBe 2
+  }
+
+  test("replace(String, Map) now delegates to replace(Seq, Map)") {
+    val result = naFunctions.replace("col1", Map("a" -> "b"))
+    val naReplace = result.relation.getReplace
+    naReplace.getColsList.asScala.toSeq shouldBe Seq("col1")
+    naReplace.getReplacementsCount shouldBe 1
+  }

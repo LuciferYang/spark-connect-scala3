@@ -421,3 +421,67 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
       assert(result == 6) // 3 rows from each path
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: xml convenience method
+  // ---------------------------------------------------------------------------
+
+  test("write and read xml round-trip") {
+    withTempDir { dir =>
+      val path = dir.resolve("data.xml").toString
+      testDf.write.format("xml").option("rootTag", "data").option("rowTag", "row").save(path)
+      val result = spark.read.format("xml")
+        .option("rootTag", "data").option("rowTag", "row")
+        .load(path).count()
+      assert(result == 3)
+    }
+  }
+
+  test("read.xml convenience method") {
+    withTempDir { dir =>
+      val path = dir.resolve("data.xml").toString
+      testDf.write.format("xml").option("rootTag", "data").option("rowTag", "row").save(path)
+      val result = spark.read
+        .option("rootTag", "data").option("rowTag", "row")
+        .xml(path).count()
+      assert(result == 3)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: textFile convenience method
+  // ---------------------------------------------------------------------------
+
+  test("read.textFile selects value column") {
+    withTempDir { dir =>
+      val path = dir.resolve("data.text").toString
+      val textDf = spark.createDataFrame(
+        Seq(Row("hello"), Row("world"), Row("spark")),
+        StructType(Seq(StructField("value", StringType)))
+      )
+      textDf.write.text(path)
+      val result = spark.read.textFile(path).orderBy(col("value")).collect()
+      assert(result.length == 3)
+      // textFile returns DataFrame with single "value" column
+      assert(result(0).getString(0) == "hello")
+      assert(result(2).getString(0) == "world")
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // P1: DataFrameWriter clusterBy
+  // ---------------------------------------------------------------------------
+
+  test("clusterBy writes clustered table") {
+    val tableName = "sc3_test_cluster_by"
+    try
+      spark.range(100).withColumn("group", col("id") % lit(5))
+        .write.mode("overwrite")
+        .clusterBy("group")
+        .saveAsTable(tableName)
+      val result = spark.read.table(tableName).count()
+      assert(result == 100)
+    finally
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
+      catch case _: Exception => ()
+  }

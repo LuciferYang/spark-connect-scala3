@@ -93,6 +93,20 @@ final class GroupedDataFrame private[sql] (
       pivotValues = litValues
     )
 
+  def pivot(pivotColumn: String): GroupedDataFrame =
+    pivot(Column(pivotColumn))
+
+  def pivot(pivotColumn: String, values: Seq[Any]): GroupedDataFrame =
+    pivot(Column(pivotColumn), values)
+
+  def pivot(pivotColumn: String, values: java.util.List[Any]): GroupedDataFrame =
+    import scala.jdk.CollectionConverters.*
+    pivot(Column(pivotColumn), values.asScala.toSeq)
+
+  def pivot(pivotCol: Column, values: java.util.List[Any]): GroupedDataFrame =
+    import scala.jdk.CollectionConverters.*
+    pivot(pivotCol, values.asScala.toSeq)
+
   private def resolveColNames(colNames: Seq[String], funcName: String): Seq[Column] =
     colNames.map { name =>
       Column(Expression.newBuilder().setUnresolvedFunction(

@@ -169,3 +169,50 @@ class GroupedDataFrameIntegrationSuite extends IntegrationTestBase:
     val grandTotal = result.find(_.isNullAt(0)).get
     assert(grandTotal.get(1).toString.toLong == 150L)
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: pivot(String) overloads
+  // ---------------------------------------------------------------------------
+
+  test("pivot(String) with aggregation") {
+    val rows = Seq(
+      Row("Alice", "Math", 90),
+      Row("Alice", "Science", 85),
+      Row("Bob", "Math", 80),
+      Row("Bob", "Science", 95)
+    )
+    val schema = StructType(Seq(
+      StructField("name", StringType),
+      StructField("subject", StringType),
+      StructField("score", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.groupBy(col("name"))
+      .pivot("subject")
+      .agg(sum(col("score")))
+      .orderBy(col("name")).collect()
+    assert(result.length == 2)
+    assert(result(0).getString(0) == "Alice")
+  }
+
+  test("pivot(String, Seq) with explicit values") {
+    val rows = Seq(
+      Row("Alice", "Math", 90),
+      Row("Alice", "Science", 85),
+      Row("Bob", "Math", 80),
+      Row("Bob", "Science", 95)
+    )
+    val schema = StructType(Seq(
+      StructField("name", StringType),
+      StructField("subject", StringType),
+      StructField("score", IntegerType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.groupBy(col("name"))
+      .pivot("subject", Seq("Math", "Science"))
+      .agg(sum(col("score")))
+      .orderBy(col("name")).collect()
+    assert(result.length == 2)
+    // With explicit pivot values, columns should be predictable
+    assert(result(0).getString(0) == "Alice")
+  }

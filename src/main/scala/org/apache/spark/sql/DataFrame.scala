@@ -93,6 +93,9 @@ final class DataFrame private[sql] (
   def agg(aggExpr: Column, aggExprs: Column*): DataFrame =
     groupBy(Seq.empty[Column]*).agg(aggExpr, aggExprs*)
 
+  def agg(exprs: Map[String, String]): DataFrame =
+    groupBy(Seq.empty[Column]*).agg(exprs)
+
   def join(right: DataFrame, joinExpr: Column, joinType: String = "inner"): DataFrame =
     withRelation(Seq(joinExpr))(_.setJoin(
       Join.newBuilder()
@@ -188,6 +191,9 @@ final class DataFrame private[sql] (
     val dedup = Deduplicate.newBuilder().setInput(relation)
     colNames.foreach(dedup.addColumnNames)
     withRelation(_.setDeduplicate(dedup.build()))
+
+  def dropDuplicates(col1: String, cols: String*): DataFrame =
+    dropDuplicates(col1 +: cols)
 
   def dropDuplicatesWithinWatermark(): DataFrame =
     withRelation(_.setDeduplicate(

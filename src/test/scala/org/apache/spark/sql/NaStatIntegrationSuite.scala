@@ -194,3 +194,47 @@ class NaStatIntegrationSuite extends IntegrationTestBase:
     val sampled = df.stat.sampleBy("label", Map("X" -> 0.8, "Y" -> 0.2), seed = 42L)
     assert(sampled.count() > 0)
   }
+
+  // ---------------------------------------------------------------------------
+  // P1: NaFunctions additional overloads
+  // ---------------------------------------------------------------------------
+
+  test("na.drop(minNonNulls, cols) filters on specified columns") {
+    val result = naTestDf.na.drop(1, Seq("name", "age")).collect()
+    // Rows with at least 1 non-null among (name, age):
+    // Alice(name=Alice, age=30) -> 2 non-null ✓
+    // row2(name=null, age=25) -> 1 non-null ✓
+    // row3(name=Charlie, age=null) -> 1 non-null ✓
+    // row4(name=null, age=null) -> 0 non-null ✗
+    assert(result.length == 3)
+  }
+
+  test("na.fill(Boolean, cols) fills boolean columns") {
+    val rows = Seq(
+      Row("Alice", null),
+      Row("Bob", true),
+      Row(null, null)
+    )
+    val schema = StructType(Seq(
+      StructField("name", StringType),
+      StructField("active", types.BooleanType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.na.fill(false, Seq("active")).orderBy(col("name")).collect()
+    // null booleans should be filled with false
+    assert(result(0).getBoolean(1) == false) // Alice's null -> false
+    assert(result(1).getBoolean(1) == true)  // Bob stays true
+  }
+
+  test("na.replace(Seq, Map) replaces across multiple columns") {
+    val rows = Seq(Row("a", "a"), Row("b", "b"), Row("c", "c"))
+    val schema = StructType(Seq(
+      StructField("col1", StringType),
+      StructField("col2", StringType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.na.replace(Seq("col1", "col2"), Map("a" -> "x")).collect()
+    // Both col1 and col2 should have "a" replaced with "x"
+    val row0 = result.find(r => r.getString(0) == "x" || r.getString(1) == "x")
+    assert(row0.isDefined)
+  }

@@ -419,3 +419,42 @@ class GroupedDataFrameSuite extends AnyFunSuite with Matchers:
     result.relation.hasAggregate shouldBe true
     result.relation.getAggregate.getGroupingExpressionsCount shouldBe 2
   }
+
+  // ---------------------------------------------------------------------------
+  // pivot(String) overloads
+  // ---------------------------------------------------------------------------
+
+  test("pivot(String) wraps string in Column and sets PIVOT type") {
+    val pivoted = stubGrouped.pivot("category")
+    val result = pivoted.agg(functions.sum(Column("v1")).as("total"))
+    val agg = result.relation.getAggregate
+    agg.getGroupType shouldBe Aggregate.GroupType.GROUP_TYPE_PIVOT
+    agg.hasPivot shouldBe true
+    agg.getPivot.hasCol shouldBe true
+  }
+
+  test("pivot(String, Seq) passes pivot values") {
+    val pivoted = stubGrouped.pivot("status", Seq("active", "inactive"))
+    val result = pivoted.agg(functions.count(Column("*")).as("cnt"))
+    val agg = result.relation.getAggregate
+    agg.getGroupType shouldBe Aggregate.GroupType.GROUP_TYPE_PIVOT
+    agg.getPivot.getValuesCount shouldBe 2
+  }
+
+  test("pivot(String, java.util.List) converts Java List") {
+    val javaList = java.util.Arrays.asList[Any]("a", "b", "c")
+    val pivoted = stubGrouped.pivot("cat", javaList)
+    val result = pivoted.agg(functions.count(Column("*")).as("cnt"))
+    val agg = result.relation.getAggregate
+    agg.getGroupType shouldBe Aggregate.GroupType.GROUP_TYPE_PIVOT
+    agg.getPivot.getValuesCount shouldBe 3
+  }
+
+  test("pivot(Column, java.util.List) converts Java List with Column") {
+    val javaList = java.util.Arrays.asList[Any](1, 2)
+    val pivoted = stubGrouped.pivot(Column("cat"), javaList)
+    val result = pivoted.agg(functions.count(Column("*")).as("cnt"))
+    val agg = result.relation.getAggregate
+    agg.getGroupType shouldBe Aggregate.GroupType.GROUP_TYPE_PIVOT
+    agg.getPivot.getValuesCount shouldBe 2
+  }
