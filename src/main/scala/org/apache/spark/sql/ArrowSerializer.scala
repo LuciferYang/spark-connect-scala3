@@ -40,18 +40,21 @@ private[sql] object ArrowSerializer:
       val root = VectorSchemaRoot.create(arrowSchema, allocator)
       try
         val writer = ArrowStreamWriter(root, null, baos)
-        writer.start()
-        root.setRowCount(rows.size)
-        val vectors = root.getFieldVectors.asScala.toSeq
-        rows.indices.foreach { rowIdx =>
-          val row = rows(rowIdx)
-          vectors.zipWithIndex.foreach { (vec, colIdx) =>
-            setArrowValue(vec, rowIdx, row.get(colIdx), schema.fields(colIdx).dataType)
+        try
+          writer.start()
+          root.setRowCount(rows.size)
+          val vectors = root.getFieldVectors.asScala.toSeq
+          rows.indices.foreach { rowIdx =>
+            val row = rows(rowIdx)
+            vectors.zipWithIndex.foreach { (vec, colIdx) =>
+              setArrowValue(vec, rowIdx, row.get(colIdx), schema.fields(colIdx).dataType)
+            }
           }
-        }
-        vectors.foreach(_.setValueCount(rows.size))
-        writer.writeBatch()
-        writer.end()
+          vectors.foreach(_.setValueCount(rows.size))
+          writer.writeBatch()
+          writer.end()
+        finally
+          writer.close()
       finally
         root.close()
       baos.toByteArray
@@ -70,6 +73,8 @@ private[sql] object ArrowSerializer:
     case types.DateType      => new ArrowType.Date(org.apache.arrow.vector.types.DateUnit.DAY)
     case types.TimestampType =>
       new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, "UTC")
+    case types.TimestampNTZType =>
+      new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, null)
     case d: types.DecimalType => new ArrowType.Decimal(d.precision, d.scale, 128)
     case types.BinaryType     => ArrowType.Binary.INSTANCE
     case _: types.ArrayType   => ArrowType.List.INSTANCE
@@ -118,7 +123,6 @@ private[sql] object ArrowSerializer:
           java.util.Collections.emptyList()
         )
 
-  @scala.annotation.nowarn("msg=unused explicit parameter")
   private def setArrowValue(vec: FieldVector, idx: Int, value: Any, dt: types.DataType): Unit =
     if value == null then
       vec.setNull(idx)
@@ -160,9 +164,10 @@ private[sql] object ArrowSerializer:
         case v: ListVector =>
           val listWriter = v.getWriter
           val items = value match
-            case a: Array[?]    => a.toSeq
-            case s: Iterable[?] => s.toSeq
-            case _              => Seq(value)
+            case a: Array[?]          => a.toSeq
+            case s: Iterable[?]       => s.toSeq
+            case j: java.util.List[?] => j.asScala.toSeq
+            case _                    => Seq(value)
           listWriter.setPosition(idx)
           listWriter.startList()
           for item <- items do
@@ -179,19 +184,21 @@ private[sql] object ArrowSerializer:
                 case s: String  =>
                   val bytes = s.getBytes("UTF-8")
                   val buf = v.getAllocator.buffer(bytes.length)
-                  buf.writeBytes(bytes)
-                  listWriter.varChar().writeVarChar(0, bytes.length, buf)
-                  buf.close()
+                  try
+                    buf.writeBytes(bytes)
+                    listWriter.varChar().writeVarChar(0, bytes.length, buf)
+                  finally buf.close()
                 case _ => listWriter.writeNull()
           listWriter.endList()
         case v: StructVector =>
           val row = value.asInstanceOf[Row]
+          val st = dt.asInstanceOf[types.StructType]
           val structWriter = v.getWriter
           structWriter.setPosition(idx)
           structWriter.start()
           for i <- 0 until row.size do
             val childVec = v.getChildByOrdinal(i).asInstanceOf[FieldVector]
-            setArrowValue(childVec, idx, row.get(i), types.StringType)
+            setArrowValue(childVec, idx, row.get(i), st.fields(i).dataType)
           structWriter.end()
         case other =>
           throw UnsupportedOperationException(
