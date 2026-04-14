@@ -17,3 +17,6 @@ Thumbs.db
 # Metals (Scala LSP)
 .metals/
 metals.sbt
+
+# Local analysis docs
+API-GAP-*.md

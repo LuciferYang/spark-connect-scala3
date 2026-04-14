@@ -159,6 +159,9 @@ final class Catalog private[sql] (private val session: SparkSession):
   // Existence checks
   // ---------------------------------------------------------------------------
 
+  def catalogExists(catalogName: String): Boolean =
+    listCatalogs().filter(Column("name") === catalogName).count() > 0
+
   def databaseExists(dbName: String): Boolean =
     catalogDf(_.setDatabaseExists(
       DatabaseExists.newBuilder().setDbName(dbName).build()

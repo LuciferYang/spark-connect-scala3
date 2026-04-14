@@ -1303,3 +1303,99 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     assert(result.length == 1)
     assert(result(0).get(0).toString.toLong == 15L)
   }
+
+  // ---------------------------------------------------------------------------
+  // P2: Row typed getters integration tests
+  // ---------------------------------------------------------------------------
+
+  test("Row.getDecimal from decimal column") {
+    val df = spark.sql("SELECT CAST(3.14 AS DECIMAL(10,2)) AS d")
+    val row = df.collect().head
+    val d = row.getDecimal(0)
+    assert(d.compareTo(java.math.BigDecimal.valueOf(3.14)) == 0)
+  }
+
+  test("Row.getDate and getTimestamp") {
+    val df = spark.sql("SELECT DATE '2024-01-15' AS d, TIMESTAMP '2024-01-15 10:30:00' AS ts")
+    val row = df.collect().head
+    val d = row.getDate(0)
+    assert(d.toString == "2024-01-15")
+    val ts = row.getTimestamp(1)
+    assert(ts.toString.startsWith("2024-01-15"))
+  }
+
+  test("Row.getSeq and getList for array type") {
+    val df = spark.sql("SELECT array(1, 2, 3) AS arr")
+    val row = df.collect().head
+    val seq = row.getSeq[Int](0)
+    assert(seq == Seq(1, 2, 3))
+    val jList = row.getList[Int](0)
+    assert(jList.size() == 3)
+  }
+
+  test("Row.getMap and getJavaMap for map type") {
+    val df = spark.sql("SELECT map('a', 1, 'b', 2) AS m")
+    val row = df.collect().head
+    val m = row.getMap[String, Int](0)
+    assert(m("a") == 1)
+    assert(m("b") == 2)
+    val jm = row.getJavaMap[String, Int](0)
+    assert(jm.get("a") == 1)
+  }
+
+  test("Row.getStruct for nested struct") {
+    val df = spark.sql("SELECT struct(1 AS id, 'hello' AS name) AS s")
+    val row = df.collect().head
+    val inner = row.getStruct(0)
+    assert(inner.getInt(0) == 1)
+    assert(inner.getString(1) == "hello")
+  }
+
+  test("Row.fieldIndex and getAs by name") {
+    val df = spark.sql("SELECT 42 AS answer, 'hello' AS greeting")
+    val row = df.collect().head
+    assert(row.fieldIndex("answer") == 0)
+    assert(row.fieldIndex("greeting") == 1)
+    assert(row.getAs[Int]("answer") == 42)
+    assert(row.getAs[String]("greeting") == "hello")
+  }
+
+  test("Row.json and prettyJson") {
+    val df = spark.sql("SELECT 1 AS id, 'Alice' AS name")
+    val row = df.collect().head
+    val j = row.json
+    assert(j.contains("\"id\""))
+    assert(j.contains("\"name\""))
+    val pj = row.prettyJson
+    assert(pj.contains("\n"))
+  }
+
+  test("Row.anyNull integration") {
+    val rows = Seq(Row(1, null), Row(2, "hello"))
+    val schema = StructType(Seq(
+      StructField("id", IntegerType),
+      StructField("name", StringType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.collect()
+    assert(result(0).anyNull)
+    assert(!result(1).anyNull)
+  }
+
+  test("Row.copy integration") {
+    val df = spark.sql("SELECT 1 AS id, 'hello' AS name")
+    val row = df.collect().head
+    val copied = row.copy()
+    assert(copied == row)
+  }
+
+  // ---------------------------------------------------------------------------
+  // P2: SparkSession.time integration
+  // ---------------------------------------------------------------------------
+
+  test("spark.time measures query execution") {
+    val result = spark.time {
+      spark.range(10).count()
+    }
+    assert(result == 10L)
+  }

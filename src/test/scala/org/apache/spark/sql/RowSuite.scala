@@ -98,3 +98,210 @@ class RowSuite extends AnyFunSuite with Matchers:
     Row.empty.schema shouldBe None
     Row.fromSeq(Seq(1)).schema shouldBe None
   }
+
+  // ---------------------------------------------------------------------------
+  // getAs by field name
+  // ---------------------------------------------------------------------------
+
+  test("getAs[T](fieldName) by name with schema") {
+    val schema = StructType(
+      Seq(
+        StructField("name", StringType),
+        StructField("age", IntegerType)
+      )
+    )
+    val row = Row.fromSeqWithSchema(Seq("Alice", 30), schema)
+    row.getAs[String]("name") shouldBe "Alice"
+    row.getAs[Int]("age") shouldBe 30
+  }
+
+  test("getAs[T](fieldName) without schema throws") {
+    val row = Row(1, 2, 3)
+    an[UnsupportedOperationException] should be thrownBy
+      row.getAs[Int]("x")
+  }
+
+  // ---------------------------------------------------------------------------
+  // Typed getters
+  // ---------------------------------------------------------------------------
+
+  test("getDecimal returns BigDecimal") {
+    val bd = java.math.BigDecimal.valueOf(3.14)
+    val row = Row(bd)
+    row.getDecimal(0) shouldBe bd
+  }
+
+  test("getDecimal from Scala BigDecimal") {
+    val bd = BigDecimal("3.14")
+    val row = Row(bd)
+    row.getDecimal(0) shouldBe bd.underlying
+  }
+
+  test("getDecimal from Number") {
+    val row = Row(42.asInstanceOf[Number])
+    row.getDecimal(0) shouldBe java.math.BigDecimal.valueOf(42.0)
+  }
+
+  test("getDate returns java.sql.Date") {
+    val d = java.sql.Date.valueOf("2024-01-15")
+    val row = Row(d)
+    row.getDate(0) shouldBe d
+  }
+
+  test("getTimestamp returns java.sql.Timestamp") {
+    val ts = java.sql.Timestamp.valueOf("2024-01-15 10:30:00")
+    val row = Row(ts)
+    row.getTimestamp(0) shouldBe ts
+  }
+
+  test("getInstant returns java.time.Instant") {
+    val inst = java.time.Instant.parse("2024-01-15T10:30:00Z")
+    val row = Row(inst)
+    row.getInstant(0) shouldBe inst
+  }
+
+  test("getLocalDate returns java.time.LocalDate") {
+    val ld = java.time.LocalDate.of(2024, 1, 15)
+    val row = Row(ld)
+    row.getLocalDate(0) shouldBe ld
+  }
+
+  test("getSeq returns Seq[T]") {
+    val seq = Seq(1, 2, 3)
+    val row = Row(seq)
+    row.getSeq[Int](0) shouldBe seq
+  }
+
+  test("getList returns java.util.List") {
+    val seq = Seq("a", "b", "c")
+    val row = Row(seq)
+    val jList = row.getList[String](0)
+    jList shouldBe a[java.util.List[?]]
+    jList.size() shouldBe 3
+    jList.get(0) shouldBe "a"
+  }
+
+  test("getMap returns Map[K,V]") {
+    val m = Map("a" -> 1, "b" -> 2)
+    val row = Row(m)
+    row.getMap[String, Int](0) shouldBe m
+  }
+
+  test("getJavaMap returns java.util.Map") {
+    val m = Map("x" -> 10)
+    val row = Row(m)
+    val jm = row.getJavaMap[String, Int](0)
+    jm shouldBe a[java.util.Map[?, ?]]
+    jm.get("x") shouldBe 10
+  }
+
+  test("getStruct returns nested Row") {
+    val inner = Row("nested", 99)
+    val row = Row(inner)
+    row.getStruct(0) shouldBe inner
+  }
+
+  // ---------------------------------------------------------------------------
+  // fieldIndex
+  // ---------------------------------------------------------------------------
+
+  test("fieldIndex with schema") {
+    val schema = StructType(
+      Seq(
+        StructField("a", IntegerType),
+        StructField("b", StringType),
+        StructField("c", DoubleType)
+      )
+    )
+    val row = Row.fromSeqWithSchema(Seq(1, "hello", 3.14), schema)
+    row.fieldIndex("a") shouldBe 0
+    row.fieldIndex("b") shouldBe 1
+    row.fieldIndex("c") shouldBe 2
+  }
+
+  test("fieldIndex without schema throws") {
+    val row = Row(1, 2, 3)
+    an[UnsupportedOperationException] should be thrownBy
+      row.fieldIndex("x")
+  }
+
+  // ---------------------------------------------------------------------------
+  // anyNull
+  // ---------------------------------------------------------------------------
+
+  test("anyNull detects null values") {
+    Row(1, null, 3).anyNull shouldBe true
+    Row(1, 2, 3).anyNull shouldBe false
+    Row.empty.anyNull shouldBe false
+  }
+
+  // ---------------------------------------------------------------------------
+  // json / prettyJson
+  // ---------------------------------------------------------------------------
+
+  test("json produces JSON string") {
+    val schema = StructType(
+      Seq(
+        StructField("name", StringType),
+        StructField("age", IntegerType)
+      )
+    )
+    val row = Row.fromSeqWithSchema(Seq("Alice", 30), schema)
+    row.json shouldBe """{"name":"Alice","age":30}"""
+  }
+
+  test("prettyJson produces formatted JSON") {
+    val schema = StructType(
+      Seq(
+        StructField("name", StringType),
+        StructField("age", IntegerType)
+      )
+    )
+    val row = Row.fromSeqWithSchema(Seq("Alice", 30), schema)
+    val expected = "{\n  \"name\" : \"Alice\",\n  \"age\" : 30\n}"
+    row.prettyJson shouldBe expected
+  }
+
+  test("json with null values") {
+    val schema = StructType(
+      Seq(
+        StructField("a", StringType),
+        StructField("b", IntegerType)
+      )
+    )
+    val row = Row.fromSeqWithSchema(Seq("hello", null), schema)
+    row.json shouldBe """{"a":"hello","b":null}"""
+  }
+
+  test("json without schema throws") {
+    val row = Row(1, 2)
+    an[UnsupportedOperationException] should be thrownBy row.json
+  }
+
+  test("prettyJson without schema throws") {
+    val row = Row(1, 2)
+    an[UnsupportedOperationException] should be thrownBy row.prettyJson
+  }
+
+  // ---------------------------------------------------------------------------
+  // copy
+  // ---------------------------------------------------------------------------
+
+  test("copy creates independent Row") {
+    val original = Row(1, "hello", 3.14)
+    val copied = original.copy()
+    copied shouldBe original
+    copied should not be theSameInstanceAs(original)
+  }
+
+  // ---------------------------------------------------------------------------
+  // fromTuple
+  // ---------------------------------------------------------------------------
+
+  test("Row.fromTuple creates Row from Product") {
+    val row = Row.fromTuple((1, "hello", 3.14))
+    row.size shouldBe 3
+    row.get(0) shouldBe 1
+    row.get(1) shouldBe "hello"
+    row.get(2) shouldBe 3.14
+  }

@@ -100,6 +100,10 @@ object Encoders:
   def LOCALDATETIME: Encoder[java.time.LocalDateTime] = wrap(LocalDateTimeEncoder)
   def DECIMAL: Encoder[java.math.BigDecimal] = wrap(AgnosticEncoders.DEFAULT_JAVA_DECIMAL_ENCODER)
 
+  // -- Row encoder ------------------------------------------------------------
+
+  def row: Encoder[Row] = wrap(AgnosticEncoders.UnboundRowEncoder)
+
   // -- Tuple encoders -------------------------------------------------------
 
   def tuple[T1, T2](

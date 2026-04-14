@@ -251,6 +251,12 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     cat.getDatabaseExists.getDbName shouldBe "testdb"
   }
 
+  test("catalogExists method exists with correct signature") {
+    val method = classOf[Catalog].getMethod("catalogExists", classOf[String])
+    method should not be null
+    method.getReturnType shouldBe classOf[Boolean]
+  }
+
   test("tableExists builds TableExists proto") {
     val df = testCatalog.catalogDf(_.setTableExists(
       TableExists.newBuilder().setTableName("t1").build()

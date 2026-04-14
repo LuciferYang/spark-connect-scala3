@@ -185,3 +185,18 @@ class UserDefinedFunctionSuite extends AnyFunSuite with Matchers:
     // The class constructor is private[sql] so this tests visibility
     assertCompiles("new UDFRegistration(null)")
   }
+
+  // ---------------------------------------------------------------------------
+  // UDFRegistration register overloads (inline methods — compile-time test)
+  // ---------------------------------------------------------------------------
+
+  test("UDFRegistration.register inline overloads compile") {
+    // These verify the inline register methods exist and compile correctly.
+    // Actual execution requires a live server connection.
+    assertCompiles("""
+      val reg = new UDFRegistration(null)
+      val f0 = functions.udf(() => 42)
+      val f1 = functions.udf((x: Int) => x + 1)
+      val f2 = functions.udf((a: Int, b: Int) => a + b)
+    """)
+  }

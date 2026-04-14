@@ -269,6 +269,21 @@ final class SparkSession private[sql] (
   def interruptOperation(operationId: String): Seq[String] = client.interruptOperation(operationId)
 
   // ---------------------------------------------------------------------------
+  // Time
+  // ---------------------------------------------------------------------------
+
+  /** Executes the given closure and measures wall-clock time, printing it to stdout.
+    *
+    * Returns the result of the closure.
+    */
+  def time[T](f: => T): T =
+    val start = System.nanoTime()
+    val result = f
+    val elapsed = (System.nanoTime() - start) / 1e6
+    println(f"Time taken: $elapsed%.0f ms")
+    result
+
+  // ---------------------------------------------------------------------------
   // Stop
   // ---------------------------------------------------------------------------
 
@@ -365,6 +380,10 @@ object SparkSession:
     def config(key: String, value: String): Builder =
       configs = configs + (key -> value)
       this
+
+    def config(key: String, value: Boolean): Builder = config(key, value.toString)
+    def config(key: String, value: Long): Builder = config(key, value.toString)
+    def config(key: String, value: Double): Builder = config(key, value.toString)
 
     def build(): SparkSession =
       val client = SparkConnectClient.create(url, configs = configs)

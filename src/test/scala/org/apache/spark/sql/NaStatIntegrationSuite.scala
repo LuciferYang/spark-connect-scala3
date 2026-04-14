@@ -223,7 +223,7 @@ class NaStatIntegrationSuite extends IntegrationTestBase:
     val result = df.na.fill(false, Seq("active")).orderBy(col("name")).collect()
     // null booleans should be filled with false
     assert(result(0).getBoolean(1) == false) // Alice's null -> false
-    assert(result(1).getBoolean(1) == true)  // Bob stays true
+    assert(result(1).getBoolean(1) == true) // Bob stays true
   }
 
   test("na.replace(Seq, Map) replaces across multiple columns") {

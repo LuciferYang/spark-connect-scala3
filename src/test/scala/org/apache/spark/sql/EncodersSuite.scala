@@ -158,6 +158,16 @@ class EncodersSuite extends AnyFunSuite with Matchers:
   }
 
   // ---------------------------------------------------------------------------
+  // Row encoder
+  // ---------------------------------------------------------------------------
+
+  test("row returns Row encoder") {
+    val enc = Encoders.row
+    enc should not be null
+    enc.agnosticEncoder shouldBe UnboundRowEncoder
+  }
+
+  // ---------------------------------------------------------------------------
   // Tuple encoders
   // ---------------------------------------------------------------------------
 

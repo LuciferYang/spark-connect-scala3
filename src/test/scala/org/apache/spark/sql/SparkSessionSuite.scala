@@ -598,3 +598,44 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
       .config("spark.baz", "qux")
     builder shouldBe a[SparkSession.Builder]
   }
+
+  // ---------- time ----------
+
+  test("time measures execution and returns result") {
+    val session = stubSession
+    val result = session.time(42)
+    result shouldBe 42
+  }
+
+  test("time returns correct type") {
+    val session = stubSession
+    val result: String = session.time("hello")
+    result shouldBe "hello"
+  }
+
+  // ---------- Builder typed config overloads ----------
+
+  test("Builder.config(Boolean) returns Builder for chaining") {
+    val builder = SparkSession.builder().config("spark.flag", true)
+    builder shouldBe a[SparkSession.Builder]
+  }
+
+  test("Builder.config(Long) returns Builder for chaining") {
+    val builder = SparkSession.builder().config("spark.num", 42L)
+    builder shouldBe a[SparkSession.Builder]
+  }
+
+  test("Builder.config(Double) returns Builder for chaining") {
+    val builder = SparkSession.builder().config("spark.ratio", 3.14)
+    builder shouldBe a[SparkSession.Builder]
+  }
+
+  test("Builder supports chaining all config types") {
+    val builder = SparkSession.builder()
+      .remote("sc://host:1234")
+      .config("spark.str", "value")
+      .config("spark.flag", true)
+      .config("spark.num", 100L)
+      .config("spark.ratio", 0.5)
+    builder shouldBe a[SparkSession.Builder]
+  }
