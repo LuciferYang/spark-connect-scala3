@@ -10,7 +10,7 @@ This project provides that Scala 3 client.
 
 ## Features
 
-- **SparkSession** — `builder().remote("sc://host:port").build()`, static session management (`getActiveSession`, `getDefaultSession`, `active`), `cloneSession()`, `executeCommand` (DeveloperApi)
+- **SparkSession** — `builder().remote("sc://host:port").build()`, `time[T]`, static session management (`getActiveSession`, `getDefaultSession`, `active`), `cloneSession()`, `executeCommand` (DeveloperApi), `Builder.config(Boolean/Long/Double)` overloads
 - **DataFrame** — select, filter, groupBy, join, union, distinct, sort, limit, sample, and more
 - **Dataset[T]** — typed operations with compile-time `Encoder` derivation via `derives Encoder`, `joinWith` (type-safe join), typed `select(TypedColumn)` (1-5 arity), `toLocalIterator`, `toJSON`, `scalar()`, `exists()`
 - **Column** — arithmetic, comparison, logical, string, cast, alias, window, sort operators
@@ -21,9 +21,9 @@ This project provides that Scala 3 client.
 - **DataStreamReader / Writer** — structured streaming read / write with trigger, `foreachBatch`, and `foreach` support
 - **Stateful Streaming** — `mapGroupsWithState`, `flatMapGroupsWithState`, `transformWithState` on `KeyValueGroupedDataset`
 - **StreamingQuery / Manager** — streaming query lifecycle management
-- **Catalog** — full Catalog API: list/get/create/drop databases, tables, views, functions; cache management; table properties; partitions; analyze/truncate
-- **UDF** — register and use JVM lambda UDFs (0–10 arguments)
-- **UDAF** — user-defined aggregate functions via `Aggregator[IN, BUF, OUT]` with `Encoders` factory
+- **Catalog** — full Catalog API: list/get/create/drop databases, tables, views, functions; `catalogExists`; cache management; table properties; partitions; analyze/truncate
+- **UDF** — register and use JVM lambda UDFs (0–10 arguments), `UDFRegistration.register` inline overloads for Function0–10
+- **UDAF** — user-defined aggregate functions via `Aggregator[IN, BUF, OUT]` with `Encoders` factory (including `Encoders.row`)
 - **TypedColumn / Aggregator.toColumn** — type-safe aggregation via `TypedColumn[-T, U]` and `Aggregator.toColumn`
 - **ReduceAggregator** — server-side reduce aggregator for `reduceGroups`
 - **typed object** — typed aggregation functions: `typed.avg`, `typed.count`, `typed.sum`, `typed.sumLong`
@@ -32,7 +32,7 @@ This project provides that Scala 3 client.
 - **DataFrameNaFunctions** — drop / fill / replace null values
 - **DataFrameStatFunctions** — statistical functions (crosstab, freqItems, approxQuantile, etc.)
 - **Window** — window specifications with partitionBy, orderBy, rowsBetween, rangeBetween
-- **Row / StructType** — typed accessors and schema support
+- **Row / StructType** — full typed accessors (`getDecimal`, `getDate`, `getTimestamp`, `getInstant`, `getLocalDate`, `getSeq`, `getList`, `getMap`, `getJavaMap`, `getStruct`, `getAs(fieldName)`, `fieldIndex`, `anyNull`, `json`, `prettyJson`, `copy`) and schema support
 - **Arrow IPC** — createDataFrame with client-side Arrow serialization; server responses deserialized via Arrow
 - **RuntimeConfig** — get / set Spark configuration at runtime
 - **Operation Tags** — `addTag`/`removeTag`/`getTags`/`clearTags` with fine-grained interruption (`interruptAll`/`interruptTag`/`interruptOperation`)
@@ -399,7 +399,7 @@ src/
 ## Supported API
 
 ### SparkSession
-`sql`, `sql(query, args)` (parameterized), `table`, `range` (2/3/4-param), `emptyDataFrame`, `emptyDataset[T]`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `tvf`, `newSession`, `cloneSession`, `version`, `addTag`, `removeTag`, `getTags`, `clearTags`, `interruptAll`, `interruptTag`, `interruptOperation`, `executeCommand`, `stop`, `getActiveSession`, `getDefaultSession`, `active`, `setActiveSession`, `clearActiveSession`, `setDefaultSession`, `clearDefaultSession`
+`sql`, `sql(query, args)` (parameterized), `table`, `range` (2/3/4-param), `emptyDataFrame`, `emptyDataset[T]`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `tvf`, `newSession`, `cloneSession`, `version`, `time[T]`, `addTag`, `removeTag`, `getTags`, `clearTags`, `interruptAll`, `interruptTag`, `interruptOperation`, `executeCommand`, `stop`, `getActiveSession`, `getDefaultSession`, `active`, `setActiveSession`, `clearActiveSession`, `setDefaultSession`, `clearDefaultSession`, `Builder.config(Boolean/Long/Double)`
 
 ### DataFrame Transformations
 `select`, `selectExpr`, `filter`, `where`, `limit`, `offset`, `sort`, `orderBy`, `groupBy`, `rollup`, `cube`, `agg`, `join`, `crossJoin`, `lateralJoin`, `groupingSets`, `withColumn`, `withColumnRenamed`, `withMetadata`, `drop`, `distinct`, `dropDuplicates`, `dropDuplicatesWithinWatermark`, `union`, `unionAll`, `unionByName`, `intersect`, `intersectAll`, `except`, `exceptAll`, `repartition`, `repartitionByRange`, `coalesce`, `sample`, `describe`, `summary`, `alias`, `toDF`, `hint`, `broadcast`, `sortWithinPartitions`, `tail`, `transform`, `transpose`, `zipWithIndex`, `colRegex`, `metadataColumn`, `na`, `stat`, `cache`, `persist`, `unpersist`, `checkpoint`, `localCheckpoint`, `withWatermark`, `writeStream`
@@ -414,7 +414,7 @@ src/
 `===`, `=!=`, `>`, `>=`, `<`, `<=`, `&&`, `||`, `!`, `+`, `-`, `*`, `/`, `%`, `isNull`, `isNotNull`, `isNaN`, `contains`, `startsWith`, `endsWith`, `like`, `rlike`, `isin`, `isin(Dataset)`, `between`, `substr`, `cast`, `alias`, `as`, `asc`, `desc`, `over`, `when`, `otherwise`, `getItem`, `getField`, `withField`, `dropFields`
 
 ### Catalog
-`currentDatabase`, `setCurrentDatabase`, `currentCatalog`, `setCurrentCatalog`, `listDatabases`, `listTables`, `listColumns`, `listFunctions`, `listCatalogs`, `listCachedTables`, `listPartitions`, `listViews`, `getDatabase`, `getTable`, `getFunction`, `getTableProperties`, `getCreateTableString`, `databaseExists`, `tableExists`, `functionExists`, `isCached`, `cacheTable`, `uncacheTable`, `clearCache`, `createTable`, `createExternalTable`, `createDatabase`, `dropDatabase`, `dropTable`, `dropView`, `dropTempView`, `dropGlobalTempView`, `truncateTable`, `analyzeTable`, `refreshTable`, `refreshByPath`, `recoverPartitions`
+`currentDatabase`, `setCurrentDatabase`, `currentCatalog`, `setCurrentCatalog`, `listDatabases`, `listTables`, `listColumns`, `listFunctions`, `listCatalogs`, `listCachedTables`, `listPartitions`, `listViews`, `getDatabase`, `getTable`, `getFunction`, `getTableProperties`, `getCreateTableString`, `catalogExists`, `databaseExists`, `tableExists`, `functionExists`, `isCached`, `cacheTable`, `uncacheTable`, `clearCache`, `createTable`, `createExternalTable`, `createDatabase`, `dropDatabase`, `dropTable`, `dropView`, `dropTempView`, `dropGlobalTempView`, `truncateTable`, `analyzeTable`, `refreshTable`, `refreshByPath`, `recoverPartitions`
 
 ### Functions
 542 functions covering 100% of the official API: aggregates, math, string, date/time, null handling, conditional, collection, map, JSON, XML, URL, variant, regex, window, datasketch, geospatial, UDF, and UDAF — see [`functions.scala`](src/main/scala/org/apache/spark/sql/functions.scala) for the full list.
@@ -439,7 +439,7 @@ src/
 - [x] `foreachBatch` / `foreach` (ForeachWriter)
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
-- [x] Unit tests (1839 tests)
+- [x] Unit tests (1900 tests)
 - [x] Integration tests (Spark 4.1.1)
 - [x] Error handling (retry policies, gRPC exception conversion, reattachable execution, enriched error details via FetchErrorDetails RPC)
 - [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)
@@ -459,6 +459,7 @@ src/
 - [x] Plan Compression (ZSTD with server-config-driven threshold)
 - [x] Phase 3 API Completeness: `cloneSession`, `range(numPartitions)`, `emptyDataset[T]`, typed `select(TypedColumn)` (1-5 arity), `dropDuplicatesWithinWatermark`, `collectAsList`/`takeAsList`, `withMetadata`, `colRegex`, `metadataColumn`, `transpose`, `zipWithIndex`, `isLocal`, static session management, `executeCommand`
 - [x] Scalar / Exists / IN Subqueries (`Dataset.scalar()`, `Dataset.exists()`, `Column.isin(Dataset)` via `SubqueryExpression` + `WithRelations`)
+- [x] Row typed getters (`getDecimal`, `getDate`, `getTimestamp`, `getInstant`, `getLocalDate`, `getSeq`, `getList`, `getMap`, `getJavaMap`, `getStruct`, `getAs(fieldName)`, `fieldIndex`, `anyNull`, `json`, `prettyJson`, `copy`), `Encoders.row`, `SparkSession.time`, `Builder.config(Boolean/Long/Double)`, `UDFRegistration.register` Function0–10 inline overloads, `Catalog.catalogExists`
 
 See [API-GAPS.md](API-GAPS.md) for a detailed comparison with the official Spark Connect client.
 
