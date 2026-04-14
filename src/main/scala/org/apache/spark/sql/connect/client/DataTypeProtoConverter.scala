@@ -53,8 +53,8 @@ object DataTypeProtoConverter:
           StructField(f.getName, fromProto(f.getDataType), f.getNullable)
         }.toSeq)
 
-      case _ =>
-        StringType // fallback for unsupported types
+      case other =>
+        throw UnsupportedOperationException(s"Unsupported proto DataType kind: $other")
 
   /** Convert a Spark SQL DataType to its protobuf representation. */
   def toProto(dt: DataType): ProtoDataType =
@@ -123,6 +123,4 @@ object DataTypeProtoConverter:
         ProtoDataType.newBuilder().setStruct(structBuilder.build()).build()
 
       case null =>
-        ProtoDataType.newBuilder().setString(
-          ProtoDataType.String.getDefaultInstance
-        ).build() // fallback
+        throw IllegalArgumentException("Cannot convert null DataType to proto")

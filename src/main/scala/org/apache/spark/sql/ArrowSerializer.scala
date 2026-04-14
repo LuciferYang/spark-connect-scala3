@@ -75,7 +75,8 @@ private[sql] object ArrowSerializer:
     case _: types.ArrayType   => ArrowType.List.INSTANCE
     case _: types.StructType  => ArrowType.Struct.INSTANCE
     case _: types.MapType     => new ArrowType.Map(false)
-    case _                    => ArrowType.Utf8.INSTANCE // fallback
+    case other                =>
+      throw UnsupportedOperationException(s"Unsupported Spark type for Arrow conversion: $other")
 
   /** Convert a Spark DataType to an Arrow Field with child fields for complex types. */
   private def sparkTypeToArrowField(
@@ -192,4 +193,7 @@ private[sql] object ArrowSerializer:
             val childVec = v.getChildByOrdinal(i).asInstanceOf[FieldVector]
             setArrowValue(childVec, idx, row.get(i), types.StringType)
           structWriter.end()
-        case _ => () // unsupported type
+        case other =>
+          throw UnsupportedOperationException(
+            s"Unsupported Arrow vector type: ${other.getClass.getName}"
+          )
