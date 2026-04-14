@@ -6,7 +6,6 @@ import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.types.*
 
 import java.time.{Instant, LocalDate, LocalDateTime}
-import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 
 /** Converts proto Expression.Literal values to Scala values and DataTypes.
@@ -60,7 +59,6 @@ object LiteralValueProtoConverter:
         )
 
   /** Infer the DataType of a proto Literal. */
-  @nowarn
   def toDataType(literal: Expression.Literal): DataType =
     import Expression.Literal.LiteralTypeCase
     if literal.hasDataType then return DataTypeProtoConverter.fromProto(literal.getDataType)

@@ -48,7 +48,13 @@ lazy val root = (project in file("."))
 
     // Strict warnings-as-errors for main sources: unused symbols + deprecation → compile errors.
     // Test code is relaxed to avoid noise from unused variables in test fixtures.
-    Compile / scalacOptions ++= Seq("-Wunused:all", "-Werror"),
+    // LiteralValueProtoConverter uses proto APIs that are deprecated in some protobuf versions
+    // but not others, so we silence deprecation warnings for that file specifically.
+    Compile / scalacOptions ++= Seq(
+      "-Wunused:all",
+      "-Werror",
+      "-Wconf:cat=deprecation&src=LiteralValueProtoConverter\\.scala:s"
+    ),
     Test / scalacOptions --= Seq("-Wunused:all", "-Werror"),
 
     Compile / mainClass := Some("org.apache.spark.sql.application.ConnectRepl"),
