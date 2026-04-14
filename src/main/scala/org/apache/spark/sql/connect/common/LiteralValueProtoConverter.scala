@@ -60,7 +60,7 @@ object LiteralValueProtoConverter:
         )
 
   /** Infer the DataType of a proto Literal. */
-  @nowarn("msg=deprecated")
+  @nowarn
   def toDataType(literal: Expression.Literal): DataType =
     import Expression.Literal.LiteralTypeCase
     if literal.hasDataType then return DataTypeProtoConverter.fromProto(literal.getDataType)
