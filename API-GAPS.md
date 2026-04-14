@@ -4,10 +4,14 @@ Feature gaps between the Spark Connect Scala 3 client (SC3) and the official Spa
 
 ## Status
 
-All high/medium/low priority API gaps across `SparkSession`, `DataFrame`/`Dataset`, `Column`, `DataFrameReader`/`Writer`, `DataStreamReader`/`Writer`, and `KeyValueGroupedDataset` have been closed. SC3 covers:
+All API gaps have been closed. SC3 covers:
 
 - 542 built-in functions (100%)
-- Full Catalog API (all 37 proto RPCs)
+- Full Catalog API (all 37 proto RPCs + `catalogExists`)
+- Full Row typed getters (`getDecimal`, `getDate`, `getTimestamp`, `getInstant`, `getLocalDate`, `getSeq`, `getList`, `getMap`, `getJavaMap`, `getStruct`, `getAs(fieldName)`, `fieldIndex`, `anyNull`, `json`, `prettyJson`, `copy`)
+- `Encoders.row` for Row encoder
+- `SparkSession.time`, `SparkSession.Builder.config(Boolean/Long/Double)` overloads
+- `UDFRegistration.register` Function0–10 inline overloads
 - Full streaming surface (readStream/writeStream, foreachBatch/foreach, mapGroupsWithState, flatMapGroupsWithState, transformWithState, StreamingQueryListener)
 - Typed API: `Aggregator`, `TypedColumn`, `ReduceAggregator`, typed `select`, `joinWith`
 - Subqueries: `Dataset.scalar()`, `Dataset.exists()`, `Column.isin(Dataset)` via `SubqueryExpression` + `WithRelations`
