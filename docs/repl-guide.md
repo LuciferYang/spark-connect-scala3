@@ -9,7 +9,7 @@ Spark Connect Scala 3 provides an [Ammonite](https://ammonite.io/)-based interac
 | JDK | 17+ |
 | SBT | 1.10+ |
 | Scala | 3.3.7 LTS (managed automatically by SBT) |
-| Spark Connect Server | 4.0.2+, started and listening |
+| Spark Connect Server | 4.1.x+, started and listening |
 
 Start the Spark Connect Server:
 
