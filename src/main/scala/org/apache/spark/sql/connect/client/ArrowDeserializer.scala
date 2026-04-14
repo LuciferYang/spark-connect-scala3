@@ -4,7 +4,9 @@ import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.*
 import org.apache.arrow.vector.complex.*
 import org.apache.arrow.vector.ipc.ArrowStreamReader
+import org.apache.arrow.vector.types.pojo.Schema as ArrowSchema
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.types.*
 
 import java.io.ByteArrayInputStream
 import scala.collection.mutable
@@ -14,13 +16,18 @@ import scala.jdk.CollectionConverters.*
 object ArrowDeserializer:
 
   def fromArrowBatch(data: Array[Byte]): Seq[Row] =
-    if data.isEmpty then return Seq.empty
+    fromArrowBatchWithSchema(data)._1
+
+  /** Deserialize Arrow IPC bytes, returning rows and the inferred StructType schema. */
+  def fromArrowBatchWithSchema(data: Array[Byte]): (Seq[Row], Option[StructType]) =
+    if data.isEmpty then return (Seq.empty, None)
     val allocator = RootAllocator(Long.MaxValue)
     try
       val reader = ArrowStreamReader(ByteArrayInputStream(data), allocator)
       try
         val rows = mutable.ArrayBuffer.empty[Row]
         val root = reader.getVectorSchemaRoot
+        val schema = arrowSchemaToStructType(root.getSchema)
         while reader.loadNextBatch() do
           val numRows = root.getRowCount
           val vectors = root.getFieldVectors.asScala.toSeq
@@ -28,7 +35,7 @@ object ArrowDeserializer:
           while i < numRows do
             rows += Row.fromSeq(vectors.map(v => extractValue(v, i)))
             i += 1
-        rows.toSeq
+        (rows.toSeq, Some(schema))
       finally
         reader.close()
     finally
@@ -55,6 +62,9 @@ object ArrowDeserializer:
       case v: TimeStampMicroVector =>
         java.sql.Timestamp(v.get(index) / 1000L)
 
+      case v: TimeStampMicroTZVector =>
+        java.sql.Timestamp(v.get(index) / 1000L)
+
       case v: TimeStampMilliVector =>
         java.sql.Timestamp(v.get(index))
 
@@ -65,10 +75,14 @@ object ArrowDeserializer:
         java.sql.Timestamp(v.get(index) * 1000L)
 
       case v: MapVector =>
-        extractValue(v.getDataVector, index) match
-          case seq: Seq[?] =>
-            seq.collect { case row: Row if row.size == 2 => row.get(0) -> row.get(1) }.toMap
-          case _ => Map.empty
+        val dataVec = v.getDataVector.asInstanceOf[StructVector]
+        val start = v.getElementStartIndex(index)
+        val end = v.getElementEndIndex(index)
+        (start until end).map { i =>
+          val keyVec = dataVec.getChildByOrdinal(0).asInstanceOf[FieldVector]
+          val valVec = dataVec.getChildByOrdinal(1).asInstanceOf[FieldVector]
+          extractValue(keyVec, i) -> extractValue(valVec, i)
+        }.toMap
 
       case v: ListVector =>
         val inner = v.getDataVector
@@ -83,3 +97,51 @@ object ArrowDeserializer:
       case v =>
         try v.getObject(index)
         catch case _: Exception => null
+
+  /** Convert an Arrow Schema to a Spark StructType. */
+  private def arrowSchemaToStructType(arrowSchema: ArrowSchema): StructType =
+    StructType(arrowSchema.getFields.asScala.map { field =>
+      StructField(field.getName, arrowTypeToSparkType(field), field.isNullable)
+    }.toSeq)
+
+  private def arrowTypeToSparkType(field: org.apache.arrow.vector.types.pojo.Field): DataType =
+    import org.apache.arrow.vector.types.pojo.ArrowType
+    field.getType match
+      case _: ArrowType.Bool                       => BooleanType
+      case i: ArrowType.Int if i.getBitWidth == 8  => ByteType
+      case i: ArrowType.Int if i.getBitWidth == 16 => ShortType
+      case i: ArrowType.Int if i.getBitWidth == 32 => IntegerType
+      case i: ArrowType.Int if i.getBitWidth == 64 => LongType
+      case f: ArrowType.FloatingPoint              =>
+        import org.apache.arrow.vector.types.FloatingPointPrecision
+        f.getPrecision match
+          case FloatingPointPrecision.SINGLE => FloatType
+          case FloatingPointPrecision.DOUBLE => DoubleType
+          case _                             => DoubleType
+      case _: ArrowType.Utf8      => StringType
+      case _: ArrowType.Binary    => BinaryType
+      case _: ArrowType.Date      => DateType
+      case t: ArrowType.Timestamp =>
+        if t.getTimezone == null then TimestampNTZType else TimestampType
+      case d: ArrowType.Decimal => DecimalType(d.getPrecision, d.getScale)
+      case _: ArrowType.Null    => NullType
+      case _: ArrowType.List    =>
+        val children = field.getChildren.asScala
+        if children.nonEmpty then
+          ArrayType(arrowTypeToSparkType(children.head), containsNull = true)
+        else ArrayType(NullType, containsNull = true)
+      case _: ArrowType.Struct =>
+        StructType(field.getChildren.asScala.map { child =>
+          StructField(child.getName, arrowTypeToSparkType(child), child.isNullable)
+        }.toSeq)
+      case _: ArrowType.Map =>
+        val entriesField = field.getChildren.asScala.head
+        val children = entriesField.getChildren.asScala
+        if children.size == 2 then
+          MapType(
+            arrowTypeToSparkType(children(0)),
+            arrowTypeToSparkType(children(1)),
+            valueContainsNull = true
+          )
+        else MapType(NullType, NullType, valueContainsNull = true)
+      case _ => StringType

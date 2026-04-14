@@ -234,7 +234,8 @@ class StreamingReadWriteIntegrationSuite extends IntegrationTestBase:
                 if msg.contains("deserializeLambda") ||
                   msg.contains("Failed to unpack scala udf") ||
                   msg.contains("Failed to load class correctly") ||
-                  msg.contains("cannot be cast to class org.apache.spark.sql.DataFrame") =>
+                  msg.contains("cannot be cast to class org.apache.spark.sql.DataFrame") ||
+                  msg.contains("can not implement org.apache.spark.sql.streaming.OutputMode") =>
               cancel("Scala 3 foreachBatch incompatible with Scala 2.13 server")
             case Some(msg) => fail(s"Query terminated with unexpected error: $msg")
             case None      => fail("Query terminated without exception and isActive is false")
@@ -245,7 +246,10 @@ class StreamingReadWriteIntegrationSuite extends IntegrationTestBase:
             (e.getMessage.contains("deserializeLambda") ||
               e.getMessage.contains("Failed to unpack scala udf") ||
               e.getMessage.contains("Failed to load class correctly") ||
-              e.getMessage.contains("cannot be cast to class org.apache.spark.sql.DataFrame")) =>
+              e.getMessage.contains("cannot be cast to class org.apache.spark.sql.DataFrame") ||
+              e.getMessage.contains(
+                "can not implement org.apache.spark.sql.streaming.OutputMode"
+              )) =>
         cancel("Scala 3 foreachBatch incompatible with Scala 2.13 server")
   }
 

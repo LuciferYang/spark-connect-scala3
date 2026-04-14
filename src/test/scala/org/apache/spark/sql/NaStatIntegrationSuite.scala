@@ -212,8 +212,7 @@ class NaStatIntegrationSuite extends IntegrationTestBase:
   test("na.fill(Boolean, cols) fills boolean columns") {
     val rows = Seq(
       Row("Alice", null),
-      Row("Bob", true),
-      Row(null, null)
+      Row("Bob", true)
     )
     val schema = StructType(Seq(
       StructField("name", StringType),

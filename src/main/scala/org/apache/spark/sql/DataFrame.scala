@@ -946,10 +946,14 @@ final class DataFrame private[sql] (
     val responses = client.execute(plan)
     try
       val rows = mutable.ArrayBuffer.empty[Row]
+      var arrowSchema: Option[StructType] = None
       val observedMetrics = mutable.ArrayBuffer.empty[(Long, Row)]
       responses.foreach { resp =>
         if resp.hasArrowBatch then
-          rows ++= ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
+          val (batchRows, batchSchema) =
+            ArrowDeserializer.fromArrowBatchWithSchema(resp.getArrowBatch.getData.toByteArray)
+          rows ++= batchRows
+          if arrowSchema.isEmpty then arrowSchema = batchSchema
         resp.getObservedMetricsList.asScala.foreach { om =>
           val keys = om.getKeysList.asScala.toSeq
           val values =
@@ -963,7 +967,11 @@ final class DataFrame private[sql] (
           observedMetrics += ((om.getPlanId, row))
         }
       }
-      (rows.toArray, observedMetrics.toSeq)
+      // Attach schema to all rows if available from Arrow metadata
+      val result = arrowSchema match
+        case Some(s) => rows.map(r => Row.fromSeqWithSchema(r.toSeq, s)).toArray
+        case None    => rows.toArray
+      (result, observedMetrics.toSeq)
     finally
       (responses: Any) match
         case c: AutoCloseable => c.close()
