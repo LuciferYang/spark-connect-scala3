@@ -443,7 +443,7 @@ src/
 - [x] Integration tests (Spark 4.1.1)
 - [x] Error handling (retry policies, gRPC exception conversion, reattachable execution, enriched error details via FetchErrorDetails RPC)
 - [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)
-- [ ] Publish to Maven Central
+- [x] Publish to Maven Central (0.1, 0.2)
 - [x] ConnectRepl (Ammonite-based Scala 3 REPL)
 - [x] Observation / CollectMetrics (`Dataset.observe()`)
 - [x] StreamingQueryListener
