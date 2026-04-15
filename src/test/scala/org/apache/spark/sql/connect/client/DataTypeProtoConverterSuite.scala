@@ -66,6 +66,10 @@ class DataTypeProtoConverterSuite extends AnyFunSuite with Matchers:
       NullType,
       ProtoDataType.newBuilder().setNull(ProtoDataType.NULL.getDefaultInstance).build()
     )
+    roundTrip(
+      VariantType,
+      ProtoDataType.newBuilder().setVariant(ProtoDataType.Variant.getDefaultInstance).build()
+    )
   }
 
   test("DecimalType") {
@@ -130,4 +134,10 @@ class DataTypeProtoConverterSuite extends AnyFunSuite with Matchers:
       StructField("name", StringType, nullable = true)
     ))
     DataTypeProtoConverter.fromProto(proto) shouldBe expected
+  }
+
+  test("VariantType full round-trip") {
+    val proto = DataTypeProtoConverter.toProto(VariantType)
+    proto.hasVariant shouldBe true
+    DataTypeProtoConverter.fromProto(proto) shouldBe VariantType
   }

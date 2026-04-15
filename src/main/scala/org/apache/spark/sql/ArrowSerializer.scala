@@ -77,6 +77,7 @@ private[sql] object ArrowSerializer:
       new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, null)
     case d: types.DecimalType => new ArrowType.Decimal(d.precision, d.scale, 128)
     case types.BinaryType     => ArrowType.Binary.INSTANCE
+    case types.VariantType    => ArrowType.Binary.INSTANCE
     case _: types.ArrayType   => ArrowType.List.INSTANCE
     case _: types.StructType  => ArrowType.Struct.INSTANCE
     case _: types.MapType     => new ArrowType.Map(false)

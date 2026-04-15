@@ -24,6 +24,7 @@ object DataTypeProtoConverter:
       case KindCase.TIMESTAMP     => TimestampType
       case KindCase.TIMESTAMP_NTZ => TimestampNTZType
       case KindCase.NULL          => NullType
+      case KindCase.VARIANT       => VariantType
 
       case KindCase.DECIMAL =>
         val d = proto.getDecimal
@@ -86,6 +87,8 @@ object DataTypeProtoConverter:
         ).build()
       case NullType =>
         ProtoDataType.newBuilder().setNull(ProtoDataType.NULL.getDefaultInstance).build()
+      case VariantType =>
+        ProtoDataType.newBuilder().setVariant(ProtoDataType.Variant.getDefaultInstance).build()
 
       case DecimalType(p, s) =>
         ProtoDataType.newBuilder().setDecimal(

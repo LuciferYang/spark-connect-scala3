@@ -19,6 +19,7 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
     TimestampType.typeName shouldBe "timestamp"
     TimestampNTZType.typeName shouldBe "timestamp_ntz"
     NullType.typeName shouldBe "null"
+    VariantType.typeName shouldBe "variant"
   }
 
   test("DecimalType simpleString") {
@@ -116,6 +117,7 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
     TimestampType.sql shouldBe "TIMESTAMP"
     TimestampNTZType.sql shouldBe "TIMESTAMP_NTZ"
     NullType.sql shouldBe "VOID"
+    VariantType.sql shouldBe "VARIANT"
   }
 
   test("DecimalType SQL representation") {
@@ -150,6 +152,7 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
     TimestampType.simpleString shouldBe "timestamp"
     TimestampNTZType.simpleString shouldBe "timestamp_ntz"
     NullType.simpleString shouldBe "null"
+    VariantType.simpleString shouldBe "variant"
   }
 
   test("nested ArrayType simpleString") {

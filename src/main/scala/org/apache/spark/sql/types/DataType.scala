@@ -59,6 +59,10 @@ case object NullType extends DataType:
   def typeName = "null"
   override def sql = "VOID"
 
+case object VariantType extends DataType:
+  def typeName = "variant"
+  override def sql = "VARIANT"
+
 final case class DecimalType(precision: Int, scale: Int) extends DataType:
   def typeName = "decimal"
   override def simpleString = s"decimal($precision,$scale)"

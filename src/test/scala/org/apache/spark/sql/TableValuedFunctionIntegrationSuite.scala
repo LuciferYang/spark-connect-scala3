@@ -222,8 +222,11 @@ class TableValuedFunctionIntegrationSuite extends IntegrationTestBase:
 
   test("tvf.variant_explode on variant data") {
     try
+      // variant_explode is a generator/TVF — must use LATERAL syntax in FROM clause
       val df = spark.sql(
-        """SELECT variant_explode(parse_json('["a","b","c"]')) AS (pos, key, value)"""
+        """SELECT pos, key, value
+          |FROM (SELECT parse_json('["a","b","c"]') AS v),
+          |LATERAL variant_explode(v)""".stripMargin
       )
       assert(df.count() == 3)
     catch

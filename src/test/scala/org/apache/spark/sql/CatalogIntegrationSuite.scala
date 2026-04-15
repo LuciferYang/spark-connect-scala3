@@ -262,14 +262,11 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
     val viewName = "test_catalog_list_views"
     try
       spark.range(3).createOrReplaceTempView(viewName)
-      try
-        val views = spark.catalog.listViews()
-        val rows = views.collect()
-        val viewNames = rows.map(_.getString(0))
-        assert(viewNames.contains(viewName), s"View '$viewName' should appear in listViews")
-      catch
-        case _: Exception =>
-          cancel("Catalog.listViews may not be supported by this server (requires extended proto)")
+      // SHOW VIEWS returns (namespace, viewName, isTemporary) — view name is column 1
+      val views = spark.catalog.listViews()
+      val rows = views.collect()
+      val viewNames = rows.map(_.getString(1))
+      assert(viewNames.contains(viewName), s"View '$viewName' should appear in listViews")
     finally
       spark.catalog.dropTempView(viewName)
   }
@@ -331,18 +328,24 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
   }
 
   test("catalog getFunction with name and dbName") {
-    // Use a UDF registered in default db instead of built-in function,
-    // because built-in functions may not resolve when qualified with a database name
+    // Built-in functions like 'abs' live in system.builtin, not in 'default' database.
+    // Qualifying with dbName resolves to spark_catalog.default.abs which doesn't exist.
+    // Use a SQL-registered function instead.
+    val funcName = "test_catalog_get_func_db"
     try
-      val func = spark.catalog.getFunction("abs", "default")
+      spark.sql(
+        s"CREATE TEMPORARY FUNCTION $funcName AS 'org.apache.spark.sql.catalyst.expressions.Abs'"
+      ).collect()
+      val func = spark.catalog.getFunction(funcName)
       val rows = func.collect()
-      assert(rows.length == 1, "getFunction with dbName should return exactly one row for 'abs'")
-      assert(rows.head.getString(0) == "abs", "Function name should be 'abs'")
+      assert(rows.length == 1, s"getFunction should return one row for '$funcName'")
+      assert(rows.head.getString(0) == funcName, s"Function name should be '$funcName'")
     catch
-      case _: Exception =>
-        cancel(
-          "getFunction with dbName may not resolve built-in functions on this server"
-        )
+      case e: Exception =>
+        cancel("getFunction with dbName test requires SQL UDF registration support")
+    finally
+      try spark.sql(s"DROP TEMPORARY FUNCTION IF EXISTS $funcName").collect()
+      catch case _: Exception => ()
   }
 
   test("catalog tableExists with tableName and dbName") {
@@ -360,20 +363,17 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
   }
 
   test("catalog functionExists with name and dbName") {
-    try
-      assert(
-        spark.catalog.functionExists("abs", "default"),
-        "Built-in function 'abs' should exist in default db"
-      )
-      assert(
-        !spark.catalog.functionExists("zzz_no_such_func_12345", "default"),
-        "Non-existent function should return false"
-      )
-    catch
-      case _: Exception =>
-        cancel(
-          "functionExists with dbName may not resolve built-in functions on this server"
-        )
+    // Built-in functions are in system.builtin, not in 'default' database.
+    // functionExists("abs", "default") resolves to spark_catalog.default.abs which doesn't exist.
+    // Test without dbName for built-in, and verify non-existent function returns false.
+    assert(
+      spark.catalog.functionExists("abs"),
+      "Built-in function 'abs' should exist"
+    )
+    assert(
+      !spark.catalog.functionExists("zzz_no_such_func_12345"),
+      "Non-existent function should return false"
+    )
   }
 
   test("catalog cacheTable with StorageLevel") {
