@@ -93,6 +93,9 @@ final class DataFrame private[sql] (
   def agg(aggExpr: Column, aggExprs: Column*): DataFrame =
     groupBy(Seq.empty[Column]*).agg(aggExpr, aggExprs*)
 
+  def agg(aggExpr: (String, String), aggExprs: (String, String)*): DataFrame =
+    agg((aggExpr +: aggExprs).toMap)
+
   def agg(exprs: Map[String, String]): DataFrame =
     groupBy(Seq.empty[Column]*).agg(exprs)
 

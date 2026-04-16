@@ -2154,3 +2154,12 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     // Grouping with empty cols (no groupBy)
     agg.getGroupingExpressionsCount shouldBe 0
   }
+
+  test("agg((String, String)*) delegates to agg(Map)") {
+    val df = testDf()
+    val result = df.agg("v1" -> "sum", "v2" -> "avg")
+    result.relation.hasAggregate shouldBe true
+    val agg = result.relation.getAggregate
+    agg.getAggregateExpressionsCount shouldBe 2
+    agg.getGroupingExpressionsCount shouldBe 0
+  }

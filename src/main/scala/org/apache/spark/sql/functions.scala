@@ -910,6 +910,12 @@ object functions:
   def approxCountDistinct(col: Column): Column = approx_count_distinct(col)
   @deprecated("Use approx_count_distinct", "2.1.0")
   def approxCountDistinct(col: Column, rsd: Double): Column = approx_count_distinct(col, rsd)
+  @deprecated("Use approx_count_distinct", "2.1.0")
+  def approxCountDistinct(columnName: String): Column =
+    approxCountDistinct(Column(columnName))
+  @deprecated("Use approx_count_distinct", "2.1.0")
+  def approxCountDistinct(columnName: String, rsd: Double): Column =
+    approxCountDistinct(Column(columnName), rsd)
   def variance(col: Column): Column = callFn("variance", col)
   def variance(colName: String): Column = variance(Column(colName))
   def var_pop(col: Column): Column = callFn("var_pop", col)

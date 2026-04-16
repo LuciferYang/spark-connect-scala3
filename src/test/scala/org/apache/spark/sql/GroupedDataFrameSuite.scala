@@ -112,6 +112,24 @@ class GroupedDataFrameSuite extends AnyFunSuite with Matchers:
   }
 
   // ---------------------------------------------------------------------------
+  // agg((String, String), (String, String)*)
+  // ---------------------------------------------------------------------------
+
+  test("agg((String, String)*) delegates to agg(Map)") {
+    val result = stubGrouped.agg("v1" -> "sum", "v2" -> "avg")
+    result.relation.hasAggregate shouldBe true
+    val agg = result.relation.getAggregate
+    agg.getAggregateExpressionsCount shouldBe 2
+  }
+
+  test("agg((String, String)*) with single pair") {
+    val result = stubGrouped.agg("v1" -> "max")
+    result.relation.hasAggregate shouldBe true
+    val agg = result.relation.getAggregate
+    agg.getAggregateExpressionsCount shouldBe 1
+  }
+
+  // ---------------------------------------------------------------------------
   // pivot
   // ---------------------------------------------------------------------------
 

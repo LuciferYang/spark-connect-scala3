@@ -20,6 +20,14 @@ class DeprecationFunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.approxCountDistinct(Column("x"), 0.05), "approx_count_distinct", 2)
   }
 
+  test("approxCountDistinct string overload") {
+    assertFn(functions.approxCountDistinct("x"), "approx_count_distinct", 1)
+  }
+
+  test("approxCountDistinct string overload with rsd") {
+    assertFn(functions.approxCountDistinct("x", 0.05), "approx_count_distinct", 2)
+  }
+
   test("monotonicallyIncreasingId deprecated alias") {
     assertFn(functions.monotonicallyIncreasingId(), "monotonically_increasing_id", 0)
   }

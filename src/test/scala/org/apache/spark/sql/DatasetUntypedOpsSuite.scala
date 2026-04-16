@@ -67,6 +67,13 @@ class DatasetUntypedOpsSuite extends AnyFunSuite with Matchers:
     result shouldBe a[DataFrame]
   }
 
+  test("agg((String, String)*) delegates to agg(Map)") {
+    val ds = testDs()
+    val result = ds.agg("value" -> "count")
+    result shouldBe a[DataFrame]
+    result.relation.hasAggregate shouldBe true
+  }
+
   test("rollup(Column*) delegates to DataFrame") {
     val ds = testDs()
     val gdf = ds.rollup(Column("value"))

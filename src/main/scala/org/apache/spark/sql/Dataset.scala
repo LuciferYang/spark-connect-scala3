@@ -273,6 +273,9 @@ final class Dataset[T: ClassTag] private[sql] (
 
   def agg(aggExpr: Column, aggExprs: Column*): DataFrame = df.agg(aggExpr, aggExprs*)
 
+  def agg(aggExpr: (String, String), aggExprs: (String, String)*): DataFrame =
+    agg((aggExpr +: aggExprs).toMap)
+
   def agg(exprs: Map[String, String]): DataFrame = df.groupBy(Seq.empty[Column]*).agg(exprs)
 
   def rollup(cols: Column*): GroupedDataFrame = df.rollup(cols*)

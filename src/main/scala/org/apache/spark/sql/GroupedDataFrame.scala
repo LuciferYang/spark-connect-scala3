@@ -36,6 +36,9 @@ final class GroupedDataFrame private[sql] (
     val allCols = groupingExprs ++ pivotCol.toSeq ++ allAggs
     df.withRelation(allCols)(_.setAggregate(aggBuilder.build()))
 
+  def agg(aggExpr: (String, String), aggExprs: (String, String)*): DataFrame =
+    agg((aggExpr +: aggExprs).toMap)
+
   def agg(exprs: Map[String, String]): DataFrame =
     val aggCols = exprs.map { (colName, funcName) =>
       Column(Expression.newBuilder().setUnresolvedFunction(
