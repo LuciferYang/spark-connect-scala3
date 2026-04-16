@@ -269,16 +269,23 @@ class ArrowSerializerSuite extends AnyFunSuite with Matchers:
     val schema = StructType(Seq(
       StructField("m", MapType(StringType, IntegerType, valueContainsNull = false))
     ))
-    // MapVector uses an entries struct with "key" and "value" children
-    // The ArrowSerializer creates the map column structure
     val rows = Seq(Row(Map("a" -> 1)))
-    // This may or may not throw depending on the MapVector writer implementation.
-    // We just verify it attempts encoding.
-    try
-      val bytes = ArrowSerializer.encodeRows(rows, schema)
-      bytes should not be empty
-    catch
-      case _: Exception => // MapVector writing may have limitations
+    val bytes = ArrowSerializer.encodeRows(rows, schema)
+    bytes should not be empty
+  }
+
+  test("encodeRows with TimestampNTZType using java.sql.Timestamp") {
+    val schema = StructType(Seq(StructField("ts", TimestampNTZType)))
+    val rows = Seq(Row(java.sql.Timestamp.valueOf("2024-01-15 10:30:00")))
+    val bytes = ArrowSerializer.encodeRows(rows, schema)
+    bytes should not be empty
+  }
+
+  test("encodeRows with TimestampNTZType using Instant") {
+    val schema = StructType(Seq(StructField("ts", TimestampNTZType)))
+    val rows = Seq(Row(java.time.Instant.parse("2024-01-15T10:30:00Z")))
+    val bytes = ArrowSerializer.encodeRows(rows, schema)
+    bytes should not be empty
   }
 
   // ---------------------------------------------------------------------------

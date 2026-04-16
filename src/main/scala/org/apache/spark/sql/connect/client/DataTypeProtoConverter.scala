@@ -26,6 +26,9 @@ object DataTypeProtoConverter:
       case KindCase.NULL          => NullType
       case KindCase.VARIANT       => VariantType
 
+      case KindCase.DAY_TIME_INTERVAL   => DayTimeIntervalType
+      case KindCase.YEAR_MONTH_INTERVAL => YearMonthIntervalType
+
       case KindCase.DECIMAL =>
         val d = proto.getDecimal
         DecimalType(
@@ -89,6 +92,15 @@ object DataTypeProtoConverter:
         ProtoDataType.newBuilder().setNull(ProtoDataType.NULL.getDefaultInstance).build()
       case VariantType =>
         ProtoDataType.newBuilder().setVariant(ProtoDataType.Variant.getDefaultInstance).build()
+
+      case DayTimeIntervalType =>
+        ProtoDataType.newBuilder().setDayTimeInterval(
+          ProtoDataType.DayTimeInterval.getDefaultInstance
+        ).build()
+      case YearMonthIntervalType =>
+        ProtoDataType.newBuilder().setYearMonthInterval(
+          ProtoDataType.YearMonthInterval.getDefaultInstance
+        ).build()
 
       case DecimalType(p, s) =>
         ProtoDataType.newBuilder().setDecimal(

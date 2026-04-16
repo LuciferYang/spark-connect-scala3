@@ -60,10 +60,16 @@ object ArrowDeserializer:
         java.sql.Date(v.get(index).toLong * 86400000L)
 
       case v: TimeStampMicroVector =>
-        java.sql.Timestamp(v.get(index) / 1000L)
+        val micros = v.get(index)
+        val seconds = Math.floorDiv(micros, 1_000_000L)
+        val nanos = Math.floorMod(micros, 1_000_000L) * 1000
+        java.sql.Timestamp.from(java.time.Instant.ofEpochSecond(seconds, nanos))
 
       case v: TimeStampMicroTZVector =>
-        java.sql.Timestamp(v.get(index) / 1000L)
+        val micros = v.get(index)
+        val seconds = Math.floorDiv(micros, 1_000_000L)
+        val nanos = Math.floorMod(micros, 1_000_000L) * 1000
+        java.sql.Timestamp.from(java.time.Instant.ofEpochSecond(seconds, nanos))
 
       case v: TimeStampMilliVector =>
         java.sql.Timestamp(v.get(index))
@@ -93,6 +99,21 @@ object ArrowDeserializer:
       case v: StructVector =>
         val fields = v.getChildrenFromFields.asScala.toSeq
         Row.fromSeq(fields.map(f => extractValue(f, index)))
+
+      case v: DurationVector =>
+        v.getObject(index)
+
+      case v: IntervalYearVector =>
+        v.get(index)
+
+      case v: LargeVarCharVector =>
+        v.getObject(index).toString
+
+      case v: LargeVarBinaryVector =>
+        v.getObject(index)
+
+      case _: NullVector =>
+        null
 
       case v =>
         try v.getObject(index)
@@ -144,4 +165,8 @@ object ArrowDeserializer:
             valueContainsNull = true
           )
         else MapType(NullType, NullType, valueContainsNull = true)
-      case _ => StringType
+      case _: ArrowType.Duration    => DayTimeIntervalType
+      case _: ArrowType.Interval    => YearMonthIntervalType
+      case _: ArrowType.LargeUtf8   => StringType
+      case _: ArrowType.LargeBinary => BinaryType
+      case _                        => StringType

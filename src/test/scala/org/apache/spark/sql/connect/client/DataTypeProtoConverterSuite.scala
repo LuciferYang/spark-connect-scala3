@@ -141,3 +141,29 @@ class DataTypeProtoConverterSuite extends AnyFunSuite with Matchers:
     proto.hasVariant shouldBe true
     DataTypeProtoConverter.fromProto(proto) shouldBe VariantType
   }
+
+  test("DayTimeIntervalType full round-trip") {
+    val proto = DataTypeProtoConverter.toProto(DayTimeIntervalType)
+    proto.hasDayTimeInterval shouldBe true
+    DataTypeProtoConverter.fromProto(proto) shouldBe DayTimeIntervalType
+  }
+
+  test("YearMonthIntervalType full round-trip") {
+    val proto = DataTypeProtoConverter.toProto(YearMonthIntervalType)
+    proto.hasYearMonthInterval shouldBe true
+    DataTypeProtoConverter.fromProto(proto) shouldBe YearMonthIntervalType
+  }
+
+  test("DayTimeIntervalType fromProto") {
+    val proto = ProtoDataType.newBuilder()
+      .setDayTimeInterval(ProtoDataType.DayTimeInterval.getDefaultInstance)
+      .build()
+    DataTypeProtoConverter.fromProto(proto) shouldBe DayTimeIntervalType
+  }
+
+  test("YearMonthIntervalType fromProto") {
+    val proto = ProtoDataType.newBuilder()
+      .setYearMonthInterval(ProtoDataType.YearMonthInterval.getDefaultInstance)
+      .build()
+    DataTypeProtoConverter.fromProto(proto) shouldBe YearMonthIntervalType
+  }

@@ -264,3 +264,25 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
   test("DecimalType typeName") {
     DecimalType(10, 2).typeName shouldBe "decimal"
   }
+
+  // ---------------------------------------------------------------------------
+  // Interval types
+  // ---------------------------------------------------------------------------
+
+  test("DayTimeIntervalType typeName and sql") {
+    DayTimeIntervalType.typeName shouldBe "day_time_interval"
+    DayTimeIntervalType.sql shouldBe "INTERVAL DAY TO SECOND"
+  }
+
+  test("YearMonthIntervalType typeName and sql") {
+    YearMonthIntervalType.typeName shouldBe "year_month_interval"
+    YearMonthIntervalType.sql shouldBe "INTERVAL YEAR TO MONTH"
+  }
+
+  test("DayTimeIntervalType simpleString matches typeName") {
+    DayTimeIntervalType.simpleString shouldBe "day_time_interval"
+  }
+
+  test("YearMonthIntervalType simpleString matches typeName") {
+    YearMonthIntervalType.simpleString shouldBe "year_month_interval"
+  }

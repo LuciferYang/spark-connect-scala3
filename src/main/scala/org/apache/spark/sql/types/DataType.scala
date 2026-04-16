@@ -63,6 +63,14 @@ case object VariantType extends DataType:
   def typeName = "variant"
   override def sql = "VARIANT"
 
+case object DayTimeIntervalType extends DataType:
+  def typeName = "day_time_interval"
+  override def sql = "INTERVAL DAY TO SECOND"
+
+case object YearMonthIntervalType extends DataType:
+  def typeName = "year_month_interval"
+  override def sql = "INTERVAL YEAR TO MONTH"
+
 final case class DecimalType(precision: Int, scale: Int) extends DataType:
   def typeName = "decimal"
   override def simpleString = s"decimal($precision,$scale)"

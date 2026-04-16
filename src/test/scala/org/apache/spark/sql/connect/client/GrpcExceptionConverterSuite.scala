@@ -6,6 +6,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.protobuf.StatusProto
 import org.apache.spark.connect.proto.FetchErrorDetailsResponse
 import org.apache.spark.sql.SparkException
+import org.apache.spark.sql.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -255,5 +256,169 @@ class GrpcExceptionConverterSuite extends AnyFunSuite with Matchers:
       file.foreach(steBuilder.setFileName)
       builder.addStackTrace(steBuilder.build())
     }
+
+    builder.build()
+
+  // ---------- error_type_hierarchy tests ----------
+
+  test("errorsToException produces AnalysisException via error_type_hierarchy") {
+    val sre = makeExceptionWithErrorId(
+      code = Status.Code.INTERNAL.value(),
+      message = "Table not found",
+      errorId = "err-hierarchy-1"
+    )
+    val fetchDetails: String => Option[FetchErrorDetailsResponse] = { _ =>
+      Some(buildFetchErrorDetailsResponse(
+        rootErrorIdx = 0,
+        errors = Seq(
+          buildErrorWithHierarchy(
+            message = "Table not found",
+            errorClass = Some("TABLE_OR_VIEW_NOT_FOUND"),
+            sqlState = Some("42P01"),
+            hierarchy = Seq(
+              "org.apache.spark.sql.AnalysisException",
+              "org.apache.spark.SparkException"
+            )
+          )
+        )
+      ))
+    }
+    val ex = intercept[SparkException] {
+      GrpcExceptionConverter.convert(throw sre, fetchDetails)
+    }
+    ex shouldBe a[AnalysisException]
+    ex.getMessage shouldBe "Table not found"
+    ex.errorClass shouldBe Some("TABLE_OR_VIEW_NOT_FOUND")
+    ex.sqlState shouldBe Some("42P01")
+  }
+
+  test("errorsToException produces SparkArithmeticException via JDK parent key") {
+    val sre = makeExceptionWithErrorId(
+      code = Status.Code.INTERNAL.value(),
+      message = "Division by zero",
+      errorId = "err-hierarchy-2"
+    )
+    val fetchDetails: String => Option[FetchErrorDetailsResponse] = { _ =>
+      Some(buildFetchErrorDetailsResponse(
+        rootErrorIdx = 0,
+        errors = Seq(
+          buildErrorWithHierarchy(
+            message = "Division by zero",
+            errorClass = Some("DIVIDE_BY_ZERO"),
+            hierarchy = Seq(
+              "org.apache.spark.SparkArithmeticException",
+              "java.lang.ArithmeticException",
+              "java.lang.RuntimeException"
+            )
+          )
+        )
+      ))
+    }
+    val ex = intercept[SparkException] {
+      GrpcExceptionConverter.convert(throw sre, fetchDetails)
+    }
+    ex shouldBe a[SparkArithmeticException]
+    ex.getMessage shouldBe "Division by zero"
+  }
+
+  test("errorsToException falls back to SparkException for unknown hierarchy") {
+    val sre = makeExceptionWithErrorId(
+      code = Status.Code.INTERNAL.value(),
+      message = "unknown error",
+      errorId = "err-hierarchy-3"
+    )
+    val fetchDetails: String => Option[FetchErrorDetailsResponse] = { _ =>
+      Some(buildFetchErrorDetailsResponse(
+        rootErrorIdx = 0,
+        errors = Seq(
+          buildErrorWithHierarchy(
+            message = "unknown error",
+            hierarchy = Seq(
+              "com.example.SomeCustomException",
+              "java.lang.Exception"
+            )
+          )
+        )
+      ))
+    }
+    val ex = intercept[SparkException] {
+      GrpcExceptionConverter.convert(throw sre, fetchDetails)
+    }
+    ex.getClass shouldBe classOf[SparkException]
+    ex.getMessage should include("unknown error")
+  }
+
+  test("errorsToException prefers most-specific match in hierarchy") {
+    val sre = makeExceptionWithErrorId(
+      code = Status.Code.INTERNAL.value(),
+      message = "parse error",
+      errorId = "err-hierarchy-4"
+    )
+    val fetchDetails: String => Option[FetchErrorDetailsResponse] = { _ =>
+      Some(buildFetchErrorDetailsResponse(
+        rootErrorIdx = 0,
+        errors = Seq(
+          buildErrorWithHierarchy(
+            message = "parse error",
+            hierarchy = Seq(
+              "org.apache.spark.sql.catalyst.parser.ParseException",
+              "org.apache.spark.sql.AnalysisException",
+              "org.apache.spark.SparkException"
+            )
+          )
+        )
+      ))
+    }
+    val ex = intercept[SparkException] {
+      GrpcExceptionConverter.convert(throw sre, fetchDetails)
+    }
+    ex shouldBe a[ParseException]
+    ex shouldBe a[AnalysisException]
+    ex shouldBe a[SparkException]
+  }
+
+  test("errorsToException falls back to SparkException with empty hierarchy") {
+    val sre = makeExceptionWithErrorId(
+      code = Status.Code.INTERNAL.value(),
+      message = "no hierarchy",
+      errorId = "err-hierarchy-5"
+    )
+    val fetchDetails: String => Option[FetchErrorDetailsResponse] = { _ =>
+      Some(buildFetchErrorDetailsResponse(
+        rootErrorIdx = 0,
+        errors = Seq(
+          buildErrorWithHierarchy(
+            message = "no hierarchy",
+            errorClass = Some("SOME_ERROR"),
+            hierarchy = Seq.empty
+          )
+        )
+      ))
+    }
+    val ex = intercept[SparkException] {
+      GrpcExceptionConverter.convert(throw sre, fetchDetails)
+    }
+    ex.getClass shouldBe classOf[SparkException]
+    ex.errorClass shouldBe Some("SOME_ERROR")
+  }
+
+  private def buildErrorWithHierarchy(
+      message: String,
+      errorClass: Option[String] = None,
+      sqlState: Option[String] = None,
+      params: Map[String, String] = Map.empty,
+      hierarchy: Seq[String] = Seq.empty
+  ): FetchErrorDetailsResponse.Error =
+    val builder = FetchErrorDetailsResponse.Error.newBuilder()
+      .setMessage(message)
+
+    if errorClass.isDefined || sqlState.isDefined || params.nonEmpty then
+      val stBuilder = FetchErrorDetailsResponse.SparkThrowable.newBuilder()
+      errorClass.foreach(stBuilder.setErrorClass)
+      sqlState.foreach(stBuilder.setSqlState)
+      params.foreach((k, v) => stBuilder.putMessageParameters(k, v))
+      builder.setSparkThrowable(stBuilder.build())
+
+    hierarchy.foreach(builder.addErrorTypeHierarchy)
 
     builder.build()

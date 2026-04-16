@@ -12,12 +12,13 @@ import org.apache.arrow.vector.{
   IntVector,
   SmallIntVector,
   TimeStampMicroTZVector,
+  TimeStampMicroVector,
   TinyIntVector,
   VarBinaryVector,
   VarCharVector,
   VectorSchemaRoot
 }
-import org.apache.arrow.vector.complex.{ListVector, StructVector}
+import org.apache.arrow.vector.complex.{ListVector, MapVector, StructVector}
 import org.apache.arrow.vector.ipc.ArrowStreamWriter
 import org.apache.arrow.vector.types.FloatingPointPrecision
 import org.apache.arrow.vector.types.pojo.{ArrowType, Field, FieldType, Schema as ArrowSchema}
@@ -75,14 +76,17 @@ private[sql] object ArrowSerializer:
       new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, "UTC")
     case types.TimestampNTZType =>
       new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, null)
-    case d: types.DecimalType => new ArrowType.Decimal(d.precision, d.scale, 128)
-    case types.BinaryType     => ArrowType.Binary.INSTANCE
-    case types.VariantType    => ArrowType.Binary.INSTANCE
-    case _: types.ArrayType   => ArrowType.List.INSTANCE
-    case _: types.StructType  => ArrowType.Struct.INSTANCE
-    case _: types.MapType     => new ArrowType.Map(false)
-    case other                =>
-      throw UnsupportedOperationException(s"Unsupported Spark type for Arrow conversion: $other")
+    case d: types.DecimalType      => new ArrowType.Decimal(d.precision, d.scale, 128)
+    case types.BinaryType          => ArrowType.Binary.INSTANCE
+    case types.VariantType         => ArrowType.Binary.INSTANCE
+    case _: types.ArrayType        => ArrowType.List.INSTANCE
+    case _: types.StructType       => ArrowType.Struct.INSTANCE
+    case _: types.MapType          => new ArrowType.Map(false)
+    case types.DayTimeIntervalType =>
+      new ArrowType.Duration(org.apache.arrow.vector.types.TimeUnit.MICROSECOND)
+    case types.YearMonthIntervalType =>
+      new ArrowType.Interval(org.apache.arrow.vector.types.IntervalUnit.YEAR_MONTH)
+    case types.NullType => ArrowType.Null.INSTANCE
 
   /** Convert a Spark DataType to an Arrow Field with child fields for complex types. */
   private def sparkTypeToArrowField(
@@ -153,6 +157,15 @@ private[sql] object ArrowSerializer:
             case n: Number => n.longValue()
             case _         => value.toString.toLong
           v.setSafe(idx, micros)
+        case v: TimeStampMicroVector =>
+          val micros = value match
+            case ts: java.sql.Timestamp =>
+              ts.getTime * 1000 + (ts.getNanos / 1000) % 1000
+            case inst: java.time.Instant =>
+              inst.getEpochSecond * 1_000_000 + inst.getNano / 1000
+            case n: Number => n.longValue()
+            case _         => value.toString.toLong
+          v.setSafe(idx, micros)
         case v: DecimalVector =>
           val bd = value match
             case d: BigDecimal           => d.underlying()
@@ -162,6 +175,24 @@ private[sql] object ArrowSerializer:
         case v: VarBinaryVector =>
           val bytes = value.asInstanceOf[Array[Byte]]
           v.setSafe(idx, bytes, 0, bytes.length)
+        case v: MapVector =>
+          val entries = value match
+            case m: Map[?, ?]           => m.toSeq
+            case m: java.util.Map[?, ?] =>
+              import scala.jdk.CollectionConverters.*
+              m.asScala.toSeq
+            case _ =>
+              throw IllegalArgumentException(s"Cannot convert ${value.getClass} to Map")
+          val mt = dt.asInstanceOf[types.MapType]
+          val dataVec = v.getDataVector.asInstanceOf[StructVector]
+          val keyVec = dataVec.getChildByOrdinal(0).asInstanceOf[FieldVector]
+          val valVec = dataVec.getChildByOrdinal(1).asInstanceOf[FieldVector]
+          val offset = v.startNewValue(idx)
+          for ((kv, i) <- entries.zipWithIndex) do
+            val (key, valu) = kv
+            setArrowValue(keyVec, offset + i, key, mt.keyType)
+            setArrowValue(valVec, offset + i, valu, mt.valueType)
+          v.endValue(idx, entries.size)
         case v: ListVector =>
           val listWriter = v.getWriter
           val items = value match

@@ -5,6 +5,7 @@ import io.grpc.StatusRuntimeException
 import io.grpc.protobuf.StatusProto
 import org.apache.spark.connect.proto.FetchErrorDetailsResponse
 import org.apache.spark.sql.SparkException
+import org.apache.spark.sql.*
 
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -16,6 +17,49 @@ import scala.util.control.NonFatal
   * `FetchErrorDetails` RPC to reconstruct the full exception chain with server-side stack traces.
   */
 object GrpcExceptionConverter:
+
+  /** Factory constructors keyed by upstream fully-qualified class names. */
+  private type ExFactory =
+    (String, Throwable, Option[String], Option[String], Map[String, String]) => SparkException
+
+  private val errorFactory: Map[String, ExFactory] = Map(
+    "org.apache.spark.sql.AnalysisException" ->
+      ((m, c, ec, ss, mp) => AnalysisException(m, c, ec, ss, mp)),
+    "org.apache.spark.sql.catalyst.parser.ParseException" ->
+      ((m, c, ec, ss, mp) => ParseException(m, c, ec, ss, mp)),
+    "org.apache.spark.sql.streaming.StreamingQueryException" ->
+      ((m, c, ec, ss, mp) => StreamingQueryException(m, c, ec, ss, mp)),
+    "org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException" ->
+      ((m, c, ec, ss, mp) => NamespaceAlreadyExistsException(m, c, ec, ss, mp)),
+    "org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException" ->
+      ((m, c, ec, ss, mp) => TableAlreadyExistsException(m, c, ec, ss, mp)),
+    "org.apache.spark.sql.catalyst.analysis.TempTableAlreadyExistsException" ->
+      ((m, c, ec, ss, mp) => TempTableAlreadyExistsException(m, c, ec, ss, mp)),
+    "org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException" ->
+      ((m, c, ec, ss, mp) => NoSuchDatabaseException(m, c, ec, ss, mp)),
+    "org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException" ->
+      ((m, c, ec, ss, mp) => NoSuchNamespaceException(m, c, ec, ss, mp)),
+    "org.apache.spark.sql.catalyst.analysis.NoSuchTableException" ->
+      ((m, c, ec, ss, mp) => NoSuchTableException(m, c, ec, ss, mp)),
+    "java.lang.NumberFormatException" ->
+      ((m, c, ec, ss, mp) => SparkNumberFormatException(m, c, ec, ss, mp)),
+    "java.lang.IllegalArgumentException" ->
+      ((m, c, ec, ss, mp) => SparkIllegalArgumentException(m, c, ec, ss, mp)),
+    "java.lang.ArithmeticException" ->
+      ((m, c, ec, ss, mp) => SparkArithmeticException(m, c, ec, ss, mp)),
+    "java.lang.UnsupportedOperationException" ->
+      ((m, c, ec, ss, mp) => SparkUnsupportedOperationException(m, c, ec, ss, mp)),
+    "java.lang.ArrayIndexOutOfBoundsException" ->
+      ((m, c, ec, ss, mp) => SparkArrayIndexOutOfBoundsException(m, c, ec, ss, mp)),
+    "java.time.DateTimeException" ->
+      ((m, c, ec, ss, mp) => SparkDateTimeException(m, c, ec, ss, mp)),
+    "org.apache.spark.SparkRuntimeException" ->
+      ((m, c, ec, ss, mp) => SparkRuntimeException(m, c, ec, ss, mp)),
+    "org.apache.spark.SparkUpgradeException" ->
+      ((m, c, ec, ss, mp) => SparkUpgradeException(m, c, ec, ss, mp)),
+    "org.apache.spark.SparkException" ->
+      ((m, c, ec, ss, mp) => SparkException(m, c, ec, ss, mp))
+  )
 
   /** Wrap `fn` so that any `StatusRuntimeException` is converted to a `SparkException`. */
   def convert[T](fn: => T): T =
@@ -81,7 +125,9 @@ object GrpcExceptionConverter:
     try Some(errorsToException(resp, resp.getRootErrorIdx, originalCause))
     catch case NonFatal(_) => None
 
-  /** Recursively build a SparkException from the error list. */
+  /** Recursively build a SparkException from the error list, using error_type_hierarchy to select
+    * the most specific exception type.
+    */
   private def errorsToException(
       resp: FetchErrorDetailsResponse,
       errorIdx: Int,
@@ -116,6 +162,25 @@ object GrpcExceptionConverter:
       )
     }.toArray
 
-    val ex = SparkException(message, cause, errorClass, sqlState, msgParams)
+    // Walk error_type_hierarchy (most-specific first), find first match in errorFactory
+    val hierarchy = error.getErrorTypeHierarchyList.asScala
+    val factoryOpt = hierarchy.collectFirst {
+      case cls if errorFactory.contains(cls) => errorFactory(cls)
+    }
+
+    val ex = factoryOpt match
+      case Some(factory) =>
+        factory(message, cause, errorClass, sqlState, msgParams)
+      case None if hierarchy.nonEmpty =>
+        // No factory found — prepend class name to message for diagnostics
+        val className = hierarchy.headOption.getOrElse("")
+        val prefixed =
+          if className.nonEmpty && !message.startsWith(s"[$className]")
+          then s"[$className] $message"
+          else message
+        SparkException(prefixed, cause, errorClass, sqlState, msgParams)
+      case None =>
+        SparkException(message, cause, errorClass, sqlState, msgParams)
+
     ex.setServerStackTrace(serverTrace)
     ex

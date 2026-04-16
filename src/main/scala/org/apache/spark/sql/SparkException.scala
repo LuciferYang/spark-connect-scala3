@@ -31,3 +31,151 @@ class SparkException(
     val proxy = SparkException(message, null, errorClass, sqlState, messageParameters)
     proxy.setStackTrace(getStackTrace)
     proxy
+
+// ---------------------------------------------------------------------------
+// Exception subclasses — mirrors upstream hierarchy for typed error handling
+// ---------------------------------------------------------------------------
+
+class AnalysisException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class ParseException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends AnalysisException(message, cause, errorClass, sqlState, messageParameters)
+
+class StreamingQueryException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class SparkRuntimeException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class SparkUpgradeException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class SparkArithmeticException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class SparkNumberFormatException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class SparkIllegalArgumentException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class SparkUnsupportedOperationException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class SparkArrayIndexOutOfBoundsException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class SparkDateTimeException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class SparkNoSuchElementException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends SparkException(message, cause, errorClass, sqlState, messageParameters)
+
+class NamespaceAlreadyExistsException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends AnalysisException(message, cause, errorClass, sqlState, messageParameters)
+
+class TableAlreadyExistsException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends AnalysisException(message, cause, errorClass, sqlState, messageParameters)
+
+class TempTableAlreadyExistsException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends AnalysisException(message, cause, errorClass, sqlState, messageParameters)
+
+class NoSuchDatabaseException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends AnalysisException(message, cause, errorClass, sqlState, messageParameters)
+
+class NoSuchNamespaceException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends AnalysisException(message, cause, errorClass, sqlState, messageParameters)
+
+class NoSuchTableException(
+    message: String,
+    cause: Throwable = null,
+    errorClass: Option[String] = None,
+    sqlState: Option[String] = None,
+    messageParameters: Map[String, String] = Map.empty
+) extends AnalysisException(message, cause, errorClass, sqlState, messageParameters)
