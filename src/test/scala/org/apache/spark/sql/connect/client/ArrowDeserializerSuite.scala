@@ -40,9 +40,13 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("TimeStampMicroVector preserves microsecond precision") {
-    val field = Field("ts", FieldType.nullable(
-      new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, null)
-    ), java.util.Collections.emptyList())
+    val field = Field(
+      "ts",
+      FieldType.nullable(
+        new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, null)
+      ),
+      java.util.Collections.emptyList()
+    )
 
     // 1_706_000_000_000_999L = a timestamp with 999 microseconds
     val inputMicros = 1_706_000_000_000_999L
@@ -63,9 +67,13 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
   }
 
   test("TimeStampMicroTZVector preserves microsecond precision") {
-    val field = Field("ts", FieldType.nullable(
-      new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, "UTC")
-    ), java.util.Collections.emptyList())
+    val field = Field(
+      "ts",
+      FieldType.nullable(
+        new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, "UTC")
+      ),
+      java.util.Collections.emptyList()
+    )
 
     val inputMicros = 1_706_000_000_000_999L
 
@@ -88,8 +96,11 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("LargeVarCharVector deserializes to String") {
-    val field = Field("s", FieldType.nullable(ArrowType.LargeUtf8.INSTANCE),
-      java.util.Collections.emptyList())
+    val field = Field(
+      "s",
+      FieldType.nullable(ArrowType.LargeUtf8.INSTANCE),
+      java.util.Collections.emptyList()
+    )
 
     val bytes = encodeArrowBatch(field) { (vec, root) =>
       val lv = vec.asInstanceOf[LargeVarCharVector]
@@ -109,8 +120,11 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("NullVector deserializes to null") {
-    val field = Field("n", FieldType.nullable(ArrowType.Null.INSTANCE),
-      java.util.Collections.emptyList())
+    val field = Field(
+      "n",
+      FieldType.nullable(ArrowType.Null.INSTANCE),
+      java.util.Collections.emptyList()
+    )
 
     val bytes = encodeArrowBatch(field) { (vec, root) =>
       vec.asInstanceOf[NullVector]
@@ -130,9 +144,13 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("arrowTypeToSparkType: Duration maps to DayTimeIntervalType") {
-    val field = Field("d", FieldType.nullable(
-      new ArrowType.Duration(org.apache.arrow.vector.types.TimeUnit.MICROSECOND)
-    ), java.util.Collections.emptyList())
+    val field = Field(
+      "d",
+      FieldType.nullable(
+        new ArrowType.Duration(org.apache.arrow.vector.types.TimeUnit.MICROSECOND)
+      ),
+      java.util.Collections.emptyList()
+    )
 
     val bytes = encodeArrowBatch(field) { (vec, root) =>
       val dv = vec.asInstanceOf[DurationVector]
@@ -147,8 +165,11 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
   }
 
   test("arrowTypeToSparkType: LargeBinary maps to BinaryType") {
-    val field = Field("b", FieldType.nullable(ArrowType.LargeBinary.INSTANCE),
-      java.util.Collections.emptyList())
+    val field = Field(
+      "b",
+      FieldType.nullable(ArrowType.LargeBinary.INSTANCE),
+      java.util.Collections.emptyList()
+    )
 
     val bytes = encodeArrowBatch(field) { (vec, root) =>
       val lv = vec.asInstanceOf[LargeVarBinaryVector]
