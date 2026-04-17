@@ -2163,3 +2163,59 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     agg.getAggregateExpressionsCount shouldBe 2
     agg.getGroupingExpressionsCount shouldBe 0
   }
+
+  // ---------------------------------------------------------------------------
+  // P2 Batch 3: DataFrame Java interop + lateralJoin
+  // ---------------------------------------------------------------------------
+
+  test("lateralJoin(right, joinType) builds LateralJoin proto") {
+    val df = testDf()
+    val right = testDf()
+    val result = df.lateralJoin(right, "left")
+    result.relation.hasLateralJoin shouldBe true
+    val lj = result.relation.getLateralJoin
+    lj.getJoinType shouldBe Join.JoinType.JOIN_TYPE_LEFT_OUTER
+    lj.hasJoinCondition shouldBe false
+  }
+
+  test("lateralJoin(right, joinType) rejects unsupported type") {
+    val df = testDf()
+    val right = testDf()
+    assertThrows[IllegalArgumentException] {
+      df.lateralJoin(right, "full")
+    }
+  }
+
+  test("agg(java.util.Map) delegates to agg(Map)") {
+    val df = testDf()
+    val jMap = new java.util.HashMap[String, String]()
+    jMap.put("v1", "sum")
+    jMap.put("v2", "avg")
+    val result = df.agg(jMap)
+    result.relation.hasAggregate shouldBe true
+    result.relation.getAggregate.getAggregateExpressionsCount shouldBe 2
+  }
+
+  test("withColumns(java.util.Map) delegates to withColumns(Map)") {
+    val df = testDf()
+    val jMap = new java.util.HashMap[String, Column]()
+    jMap.put("a", Column.lit(1))
+    jMap.put("b", Column.lit(2))
+    val result = df.withColumns(jMap)
+    result.relation.hasWithColumns shouldBe true
+  }
+
+  test("withColumnsRenamed(java.util.Map) delegates to withColumnsRenamed(Map)") {
+    val df = testDf()
+    val jMap = new java.util.HashMap[String, String]()
+    jMap.put("old1", "new1")
+    val result = df.withColumnsRenamed(jMap)
+    result.relation.hasWithColumnsRenamed shouldBe true
+  }
+
+  test("dropDuplicates(Array) delegates to dropDuplicates(Seq)") {
+    val df = testDf()
+    val result = df.dropDuplicates(Array("id"))
+    result.relation.hasDeduplicate shouldBe true
+    result.relation.getDeduplicate.getColumnNamesList.asScala shouldBe Seq("id")
+  }

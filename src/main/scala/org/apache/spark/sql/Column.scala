@@ -60,6 +60,9 @@ class Column private[sql] (
   def ===(other: Column): Column = fn("==", other)
   def =!=(other: Column): Column = !(this === other)
 
+  @deprecated("Use =!= instead", "1.0.0")
+  def !==(other: Column): Column = this =!= other
+
   /** Null-safe equality (NULL <=> NULL is true). */
   def <=>(other: Any): Column = fn("<=>", Column.lit(other))
 
@@ -353,6 +356,9 @@ class Column private[sql] (
     aliases.foreach(aliasBuilder.addName)
     withExpr(Expression.newBuilder().setAlias(aliasBuilder.build()).build())
 
+  /** Assign multiple aliases from an Array (Java-friendly). */
+  def as(aliases: Array[String]): Column = as(aliases.toSeq)
+
   /** Assign an alias with metadata (JSON string). */
   def as(alias: String, metadata: String): Column =
     withExpr(Expression.newBuilder().setAlias(
@@ -366,6 +372,16 @@ class Column private[sql] (
   /** Provide a type hint to generate a TypedColumn for Dataset operations. */
   def as[U: Encoder]: TypedColumn[Any, U] =
     TypedColumn(expr, summon[Encoder[U]], subqueryRelations)
+
+  // ---------------------------------------------------------------------------
+  // Column transforms
+  // ---------------------------------------------------------------------------
+
+  /** Apply a transformation function to this Column. */
+  def transform(f: Column => Column): Column = f(this)
+
+  /** Mark this column as an outer reference (no-op for Connect clients). */
+  def outer(): Column = this
 
   // ---------------------------------------------------------------------------
   // Sort

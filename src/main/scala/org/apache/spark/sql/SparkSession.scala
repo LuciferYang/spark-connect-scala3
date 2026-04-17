@@ -81,6 +81,23 @@ final class SparkSession private[sql] (
         .build()
     )
 
+  /** Execute a SQL query with positional parameters from an Array. */
+  def sql(query: String, args: Array[?]): DataFrame =
+    val sqlBuilder = SQL.newBuilder().setQuery(query)
+    args.foreach(v => sqlBuilder.addPosArguments(Column.lit(v).expr))
+    DataFrame(
+      this,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+        .setSql(sqlBuilder.build())
+        .build()
+    )
+
+  /** Java-friendly variant of sql with named parameters using java.util.Map. */
+  def sql(query: String, args: java.util.Map[String, Any]): DataFrame =
+    import scala.jdk.CollectionConverters.*
+    sql(query, args.asScala.toMap)
+
   // ---------------------------------------------------------------------------
   // Table / Range / Empty
   // ---------------------------------------------------------------------------
@@ -156,6 +173,11 @@ final class SparkSession private[sql] (
         .build()
     )
 
+  /** Java-friendly variant of createDataFrame using java.util.List. */
+  def createDataFrame(rows: java.util.List[Row], schema: types.StructType): DataFrame =
+    import scala.jdk.CollectionConverters.*
+    createDataFrame(rows.asScala.toSeq, schema)
+
   // ---------------------------------------------------------------------------
   // createDataset (typed)
   // ---------------------------------------------------------------------------
@@ -166,6 +188,11 @@ final class SparkSession private[sql] (
     val rows = data.map(enc.toRow)
     val df = createDataFrame(rows, enc.schema)
     Dataset(df, enc)
+
+  /** Java-friendly variant of createDataset using java.util.List. */
+  def createDataset[T: Encoder: scala.reflect.ClassTag](data: java.util.List[T]): Dataset[T] =
+    import scala.jdk.CollectionConverters.*
+    createDataset(data.asScala.toSeq)
 
   // ---------------------------------------------------------------------------
   // Table-Valued Functions
@@ -384,6 +411,14 @@ object SparkSession:
     def config(key: String, value: Boolean): Builder = config(key, value.toString)
     def config(key: String, value: Long): Builder = config(key, value.toString)
     def config(key: String, value: Double): Builder = config(key, value.toString)
+
+    def config(map: Map[String, Any]): Builder =
+      map.foreach((k, v) => config(k, v.toString))
+      this
+
+    def config(map: java.util.Map[String, Any]): Builder =
+      import scala.jdk.CollectionConverters.*
+      config(map.asScala.toMap)
 
     def build(): SparkSession =
       val client = SparkConnectClient.create(url, configs = configs)

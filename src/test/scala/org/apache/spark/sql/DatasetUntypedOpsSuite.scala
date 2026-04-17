@@ -152,3 +152,115 @@ class DatasetUntypedOpsSuite extends AnyFunSuite with Matchers:
     unionResult.df.relation.getSetOp.getSetOpType shouldBe
       unionAllResult.df.relation.getSetOp.getSetOpType
   }
+
+  // ---------------------------------------------------------------------------
+  // P2 Batch 5: Dataset delegates + Java interop
+  // ---------------------------------------------------------------------------
+
+  test("unpivot(4-arg) delegates to DataFrame") {
+    val ds = testDs()
+    val result = ds.unpivot(
+      Array(Column("id")),
+      Array(Column("v1")),
+      "var",
+      "val"
+    )
+    result.relation.hasUnpivot shouldBe true
+  }
+
+  test("unpivot(3-arg) delegates to DataFrame") {
+    val ds = testDs()
+    val result = ds.unpivot(Array(Column("id")), "var", "val")
+    result.relation.hasUnpivot shouldBe true
+  }
+
+  test("melt(4-arg) delegates to DataFrame") {
+    val ds = testDs()
+    val result = ds.melt(
+      Array(Column("id")),
+      Array(Column("v1")),
+      "var",
+      "val"
+    )
+    result.relation.hasUnpivot shouldBe true
+  }
+
+  test("melt(3-arg) delegates to DataFrame") {
+    val ds = testDs()
+    val result = ds.melt(Array(Column("id")), "var", "val")
+    result.relation.hasUnpivot shouldBe true
+  }
+
+  test("transpose(indexColumn) delegates to DataFrame") {
+    val ds = testDs()
+    val result = ds.transpose(Column("id"))
+    result.relation.hasTranspose shouldBe true
+  }
+
+  test("transpose() delegates to DataFrame") {
+    val ds = testDs()
+    val result = ds.transpose()
+    result.relation.hasTranspose shouldBe true
+  }
+
+  test("lateralJoin(right) delegates to DataFrame") {
+    val ds = testDs()
+    val right = ds.toDF()
+    val result = ds.lateralJoin(right)
+    result.relation.hasLateralJoin shouldBe true
+  }
+
+  test("lateralJoin(right, joinType) delegates to DataFrame") {
+    val ds = testDs()
+    val right = ds.toDF()
+    val result = ds.lateralJoin(right, "left")
+    result.relation.hasLateralJoin shouldBe true
+    result.relation.getLateralJoin.getJoinType shouldBe Join.JoinType.JOIN_TYPE_LEFT_OUTER
+  }
+
+  test("lateralJoin(right, condition, joinType) delegates to DataFrame") {
+    val ds = testDs()
+    val right = ds.toDF()
+    val result = ds.lateralJoin(right, Column.lit(true), "cross")
+    result.relation.hasLateralJoin shouldBe true
+  }
+
+  test("agg(java.util.Map) delegates to Scala Map agg") {
+    val ds = testDs()
+    val jMap = new java.util.HashMap[String, String]()
+    jMap.put("value", "count")
+    val result = ds.agg(jMap)
+    result shouldBe a[DataFrame]
+    result.relation.hasAggregate shouldBe true
+  }
+
+  test("withColumns(java.util.Map) delegates to Scala Map withColumns") {
+    val ds = testDs()
+    val jMap = new java.util.HashMap[String, Column]()
+    jMap.put("a", Column.lit(1))
+    val result = ds.withColumns(jMap)
+    result.relation.hasWithColumns shouldBe true
+  }
+
+  test("withColumnsRenamed(java.util.Map) delegates to Scala Map withColumnsRenamed") {
+    val ds = testDs()
+    val jMap = new java.util.HashMap[String, String]()
+    jMap.put("value", "v")
+    val result = ds.withColumnsRenamed(jMap)
+    result.relation.hasWithColumnsRenamed shouldBe true
+  }
+
+  test("dropDuplicates(Array) delegates to dropDuplicates(Seq)") {
+    val ds = testDs()
+    val result = ds.dropDuplicates(Array("value"))
+    val rel = result.df.relation
+    rel.hasDeduplicate shouldBe true
+    import scala.jdk.CollectionConverters.*
+    rel.getDeduplicate.getColumnNamesList.asScala shouldBe Seq("value")
+  }
+
+  test("randomSplit(Array[Double]) uses seed=0") {
+    val ds = testDs()
+    val splits = ds.randomSplit(Array(0.5, 0.5))
+    splits.length shouldBe 2
+  }

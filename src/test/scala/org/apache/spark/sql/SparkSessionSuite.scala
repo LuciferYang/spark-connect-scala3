@@ -639,3 +639,59 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
       .config("spark.ratio", 0.5)
     builder shouldBe a[SparkSession.Builder]
   }
+
+  // ---------------------------------------------------------------------------
+  // P2 Batch 6: SparkSession overloads
+  // ---------------------------------------------------------------------------
+
+  test("createDataFrame(java.util.List, StructType) delegates to Seq overload") {
+    val session = stubSession
+    val schema = org.apache.spark.sql.types.StructType(Seq(
+      org.apache.spark.sql.types.StructField("id", org.apache.spark.sql.types.IntegerType)
+    ))
+    val javaList = java.util.Arrays.asList(Row(1), Row(2))
+    val df = session.createDataFrame(javaList, schema)
+    df.relation.hasLocalRelation shouldBe true
+    df.relation.getLocalRelation.hasData shouldBe true
+  }
+
+  test("createDataset(java.util.List) delegates to Seq overload") {
+    val session = stubSession
+    val javaList = java.util.Arrays.asList(1, 2, 3)
+    val ds = session.createDataset(javaList)
+    ds.df.relation.hasLocalRelation shouldBe true
+    ds.df.relation.getLocalRelation.hasData shouldBe true
+  }
+
+  test("sql(query, Array) builds SQL with positional arguments") {
+    val session = stubSession
+    val df = session.sql("SELECT ?", Array[Any](42))
+    val rel = df.relation
+    rel.hasSql shouldBe true
+    rel.getSql.getPosArgumentsCount shouldBe 1
+    rel.getSql.getPosArguments(0).getLiteral.hasInteger shouldBe true
+  }
+
+  test("sql(query, java.util.Map) delegates to sql(query, Map)") {
+    val session = stubSession
+    val jMap = new java.util.HashMap[String, Any]()
+    jMap.put("name", "hello")
+    val df = session.sql("SELECT :name", jMap)
+    val rel = df.relation
+    rel.hasSql shouldBe true
+    rel.getSql.getNamedArgumentsMap.containsKey("name") shouldBe true
+  }
+
+  test("Builder.config(Map[String, Any]) sets multiple configs") {
+    val builder = SparkSession.builder()
+      .config(Map("spark.a" -> "1", "spark.b" -> 2))
+    builder shouldBe a[SparkSession.Builder]
+  }
+
+  test("Builder.config(java.util.Map[String, Any]) sets multiple configs") {
+    val jMap = new java.util.HashMap[String, Any]()
+    jMap.put("spark.a", "1")
+    jMap.put("spark.b", 2)
+    val builder = SparkSession.builder().config(jMap)
+    builder shouldBe a[SparkSession.Builder]
+  }

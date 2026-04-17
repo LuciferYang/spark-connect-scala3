@@ -53,6 +53,11 @@ final class GroupedDataFrame private[sql] (
     else
       agg(aggCols.head, aggCols.tail*)
 
+  /** Java-friendly variant of agg using java.util.Map. */
+  def agg(exprs: java.util.Map[String, String]): DataFrame =
+    import scala.jdk.CollectionConverters.*
+    agg(exprs.asScala.toMap)
+
   // Convenience methods
   def count(): DataFrame = agg(functions.count(functions.lit(1)).as("count"))
 

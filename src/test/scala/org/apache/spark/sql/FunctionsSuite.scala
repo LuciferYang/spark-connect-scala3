@@ -1939,6 +1939,21 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.kll_sketch_agg_double(Column("x")), "kll_sketch_agg_double", 1)
   }
 
+  test("kll_sketch_agg_bigint string overloads") {
+    assertFn(functions.kll_sketch_agg_bigint("x"), "kll_sketch_agg_bigint", 1)
+    assertFn(functions.kll_sketch_agg_bigint("x", 200), "kll_sketch_agg_bigint", 2)
+  }
+
+  test("kll_sketch_agg_float string overloads") {
+    assertFn(functions.kll_sketch_agg_float("x"), "kll_sketch_agg_float", 1)
+    assertFn(functions.kll_sketch_agg_float("x", 200), "kll_sketch_agg_float", 2)
+  }
+
+  test("kll_sketch_agg_double string overloads") {
+    assertFn(functions.kll_sketch_agg_double("x"), "kll_sketch_agg_double", 1)
+    assertFn(functions.kll_sketch_agg_double("x", 200), "kll_sketch_agg_double", 2)
+  }
+
   test("kll_merge_agg_bigint") {
     assertFn(functions.kll_merge_agg_bigint(Column("x"), Column("k")), "kll_merge_agg_bigint", 2)
     assertFn(functions.kll_merge_agg_bigint(Column("x"), 200), "kll_merge_agg_bigint", 2)

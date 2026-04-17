@@ -1308,6 +1308,15 @@ object functions:
   def kll_sketch_agg_double(e: Column, k: Int): Column =
     callFn("kll_sketch_agg_double", e, Column.lit(k))
   def kll_sketch_agg_double(e: Column): Column = callFn("kll_sketch_agg_double", e)
+  def kll_sketch_agg_bigint(colName: String): Column = kll_sketch_agg_bigint(Column(colName))
+  def kll_sketch_agg_bigint(colName: String, k: Int): Column =
+    kll_sketch_agg_bigint(Column(colName), k)
+  def kll_sketch_agg_float(colName: String): Column = kll_sketch_agg_float(Column(colName))
+  def kll_sketch_agg_float(colName: String, k: Int): Column =
+    kll_sketch_agg_float(Column(colName), k)
+  def kll_sketch_agg_double(colName: String): Column = kll_sketch_agg_double(Column(colName))
+  def kll_sketch_agg_double(colName: String, k: Int): Column =
+    kll_sketch_agg_double(Column(colName), k)
   def kll_merge_agg_bigint(e: Column, k: Column): Column =
     callFn("kll_merge_agg_bigint", e, k)
   def kll_merge_agg_bigint(e: Column, k: Int): Column =

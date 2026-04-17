@@ -796,3 +796,30 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     val fn = c.expr.getUnresolvedFunction
     fn.getArgumentsCount shouldBe 3
   }
+
+  // ---------- P2 Batch 1: transform, outer, as(Array), !== ----------
+
+  test("transform applies function to column") {
+    val c = Column("x").transform(_.cast("string"))
+    c.expr.hasCast shouldBe true
+    c.expr.getCast.getTypeStr shouldBe "string"
+  }
+
+  test("outer returns this column (no-op)") {
+    val c = Column("x")
+    c.outer() should be theSameInstanceAs c
+  }
+
+  test("as(Array[String]) creates Alias with multiple names") {
+    val c = Column("x").as(Array("a", "b", "c"))
+    c.expr.hasAlias shouldBe true
+    c.expr.getAlias.getNameList.asScala.toSeq shouldBe Seq("a", "b", "c")
+  }
+
+  test("!== is deprecated alias for =!=") {
+    val c = Column("a") !== Column("b")
+    c.expr.hasUnresolvedFunction shouldBe true
+    c.expr.getUnresolvedFunction.getFunctionName shouldBe "not"
+    val inner = c.expr.getUnresolvedFunction.getArguments(0)
+    inner.getUnresolvedFunction.getFunctionName shouldBe "=="
+  }

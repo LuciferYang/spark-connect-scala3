@@ -476,3 +476,15 @@ class GroupedDataFrameSuite extends AnyFunSuite with Matchers:
     agg.getGroupType shouldBe Aggregate.GroupType.GROUP_TYPE_PIVOT
     agg.getPivot.getValuesCount shouldBe 2
   }
+
+  // ---------- P2 Batch 4: GroupedDataFrame Java interop ----------
+
+  test("agg(java.util.Map) delegates to agg(Map)") {
+    val grouped = stubGrouped
+    val jMap = new java.util.HashMap[String, String]()
+    jMap.put("v1", "sum")
+    jMap.put("v2", "avg")
+    val result = grouped.agg(jMap)
+    result.relation.hasAggregate shouldBe true
+    result.relation.getAggregate.getAggregateExpressionsCount shouldBe 2
+  }

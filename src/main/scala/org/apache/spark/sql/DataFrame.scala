@@ -99,6 +99,10 @@ final class DataFrame private[sql] (
   def agg(exprs: Map[String, String]): DataFrame =
     groupBy(Seq.empty[Column]*).agg(exprs)
 
+  /** Java-friendly variant of agg using java.util.Map. */
+  def agg(exprs: java.util.Map[String, String]): DataFrame =
+    agg(exprs.asScala.toMap)
+
   def join(right: DataFrame, joinExpr: Column, joinType: String = "inner"): DataFrame =
     withRelation(Seq(joinExpr))(_.setJoin(
       Join.newBuilder()
@@ -197,6 +201,10 @@ final class DataFrame private[sql] (
 
   def dropDuplicates(col1: String, cols: String*): DataFrame =
     dropDuplicates(col1 +: cols)
+
+  /** Java-friendly variant of dropDuplicates using Array. */
+  def dropDuplicates(colNames: Array[String]): DataFrame =
+    dropDuplicates(colNames.toSeq)
 
   def dropDuplicatesWithinWatermark(): DataFrame =
     withRelation(_.setDeduplicate(
@@ -424,6 +432,19 @@ final class DataFrame private[sql] (
       .setLeft(relation).setRight(right.relation)
       .setJoinType(Join.JoinType.JOIN_TYPE_INNER).build()))
 
+  /** Lateral join without condition, with a specified join type. */
+  def lateralJoin(right: DataFrame, joinType: String): DataFrame =
+    val jt = toJoinType(joinType)
+    jt match
+      case Join.JoinType.JOIN_TYPE_INNER | Join.JoinType.JOIN_TYPE_LEFT_OUTER |
+          Join.JoinType.JOIN_TYPE_CROSS => // ok
+      case _ => throw IllegalArgumentException(
+          s"Unsupported lateral join type: $joinType. Only inner, left, and cross are supported."
+        )
+    withRelation(_.setLateralJoin(LateralJoin.newBuilder()
+      .setLeft(relation).setRight(right.relation)
+      .setJoinType(jt).build()))
+
   /** Group by grouping sets. */
   def groupingSets(groupingSets: Seq[Seq[Column]], cols: Column*): GroupedDataFrame =
     val gsProtos = groupingSets.map { gs =>
@@ -508,7 +529,9 @@ final class DataFrame private[sql] (
     }
     withRelation(_.setWithColumnsRenamed(builder.build()))
 
-  /** Add or replace multiple columns at once. */
+  /** Java-friendly variant of withColumnsRenamed using java.util.Map. */
+  def withColumnsRenamed(colsMap: java.util.Map[String, String]): DataFrame =
+    withColumnsRenamed(colsMap.asScala.toMap)
   def withColumns(colsMap: Map[String, Column]): DataFrame =
     val builder = WithColumns.newBuilder().setInput(relation)
     colsMap.foreach { (name, col) =>
@@ -520,6 +543,10 @@ final class DataFrame private[sql] (
       )
     }
     withRelation(colsMap.values.toSeq)(_.setWithColumns(builder.build()))
+
+  /** Java-friendly variant of withColumns using java.util.Map. */
+  def withColumns(colsMap: java.util.Map[String, Column]): DataFrame =
+    withColumns(colsMap.asScala.toMap)
 
   /** Drop columns by Column expression. */
   def drop(cols: Column*)(using DummyImplicit): DataFrame =

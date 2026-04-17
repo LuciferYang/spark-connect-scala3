@@ -375,11 +375,82 @@ final class Dataset[T: ClassTag] private[sql] (
   def withColumns(colsMap: Map[String, Column]): DataFrame =
     df.withColumns(colsMap)
 
+  /** Java-friendly variant of agg using java.util.Map. */
+  def agg(exprs: java.util.Map[String, String]): DataFrame =
+    import scala.jdk.CollectionConverters.*
+    agg(exprs.asScala.toMap)
+
+  /** Java-friendly variant of withColumns using java.util.Map. */
+  def withColumns(colsMap: java.util.Map[String, Column]): DataFrame =
+    import scala.jdk.CollectionConverters.*
+    withColumns(colsMap.asScala.toMap)
+
+  /** Java-friendly variant of withColumnsRenamed using java.util.Map. */
+  def withColumnsRenamed(colsMap: java.util.Map[String, String]): DataFrame =
+    import scala.jdk.CollectionConverters.*
+    withColumnsRenamed(colsMap.asScala.toMap)
+
+  /** Java-friendly variant of dropDuplicates using Array. */
+  def dropDuplicates(colNames: Array[String]): Dataset[T] =
+    Dataset(df.dropDuplicates(colNames.toSeq), encoder)
+
+  /** Java-friendly randomSplit without seed. */
+  def randomSplit(weights: Array[Double]): Array[Dataset[T]] =
+    randomSplit(weights, 0L)
+
   /** Select columns matching a regex pattern. */
   def colRegex(colName: String): Column = df.colRegex(colName)
 
   /** Access a metadata column by name. */
   def metadataColumn(colName: String): Column = df.metadataColumn(colName)
+
+  /** Unpivot from wide to long format. */
+  def unpivot(
+      ids: Array[Column],
+      values: Array[Column],
+      variableColumnName: String,
+      valueColumnName: String
+  ): DataFrame = df.unpivot(ids, values, variableColumnName, valueColumnName)
+
+  /** Unpivot — all non-id columns become values. */
+  def unpivot(
+      ids: Array[Column],
+      variableColumnName: String,
+      valueColumnName: String
+  ): DataFrame = df.unpivot(ids, variableColumnName, valueColumnName)
+
+  /** Alias for unpivot. */
+  def melt(
+      ids: Array[Column],
+      values: Array[Column],
+      variableColumnName: String,
+      valueColumnName: String
+  ): DataFrame = df.melt(ids, values, variableColumnName, valueColumnName)
+
+  /** Alias for unpivot (all non-id columns become values). */
+  def melt(
+      ids: Array[Column],
+      variableColumnName: String,
+      valueColumnName: String
+  ): DataFrame = df.melt(ids, variableColumnName, valueColumnName)
+
+  /** Transpose from wide to tall format. */
+  def transpose(indexColumn: Column): DataFrame = df.transpose(indexColumn)
+
+  /** Transpose from wide to tall format (no index column). */
+  def transpose(): DataFrame = df.transpose()
+
+  /** Lateral join with condition and join type. */
+  def lateralJoin(right: DataFrame, condition: Column, joinType: String = "inner"): DataFrame =
+    df.lateralJoin(right, condition, joinType)
+
+  /** Lateral join without condition, with join type. */
+  def lateralJoin(right: DataFrame, joinType: String): DataFrame =
+    df.lateralJoin(right, joinType)
+
+  /** Lateral join without condition (defaults to inner). */
+  def lateralJoin(right: DataFrame): DataFrame =
+    df.lateralJoin(right)
 
   def drop(colNames: String*): DataFrame = df.drop(colNames*)
 
