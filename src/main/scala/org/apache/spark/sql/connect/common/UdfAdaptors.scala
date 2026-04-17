@@ -81,3 +81,16 @@ final class MapValuesFlatMapAdaptor[K, U](
     with Serializable:
   def apply(k: K, iter: Iterator[Any]): IterableOnce[U] =
     flatMapFunc(k, iter.map(valueMapFunc))
+
+/** Adaptor for `KVGD.cogroup` — wraps a `(K, Iterator[V], Iterator[U]) => IterableOnce[R]` function
+  * into a top-level serializable Function3.
+  *
+  * Without this, the raw Scala 3 lambda serializes as `LambdaSerializationProxy` which the Scala
+  * 2.13 server cannot cast to `scala.Function3`.
+  */
+final class CoGroupAdaptor[K, V, U, R](
+    val func: (K, Iterator[V], Iterator[U]) => IterableOnce[R]
+) extends ((K, Iterator[V], Iterator[U]) => IterableOnce[R])
+    with Serializable:
+  def apply(k: K, left: Iterator[V], right: Iterator[U]): IterableOnce[R] =
+    func(k, left, right)

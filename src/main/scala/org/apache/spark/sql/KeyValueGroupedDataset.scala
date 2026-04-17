@@ -15,6 +15,7 @@ import org.apache.spark.connect.proto.{
 import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.{
+  CoGroupAdaptor,
   CountGroupsAdaptor,
   MapGroupsAdaptor,
   MapValuesFlatMapAdaptor,
@@ -248,7 +249,13 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       return cogroupLocal(other, func, outEnc)
     val thisGroupingUdf = buildGroupingUdf(keyAg, valueAg)
     val otherGroupingUdf = other.buildGroupingUdf(keyAg, otherValueAg)
-    val cogroupUdf = buildCoGroupUdf(func.asInstanceOf[AnyRef], keyAg, valueAg, otherValueAg, outAg)
+    val cogroupUdf = buildCoGroupUdf(
+      new CoGroupAdaptor(func).asInstanceOf[AnyRef],
+      keyAg,
+      valueAg,
+      otherValueAg,
+      outAg
+    )
     val builder = CoGroupMap
       .newBuilder()
       .setInput(ds.df.relation)
@@ -289,7 +296,13 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       return cogroupLocal(other, func, outEnc)
     val thisGroupingUdf = buildGroupingUdf(keyAg, valueAg)
     val otherGroupingUdf = other.buildGroupingUdf(keyAg, otherValueAg)
-    val cogroupUdf = buildCoGroupUdf(func, keyAg, valueAg, otherValueAg, outAg)
+    val cogroupUdf = buildCoGroupUdf(
+      new CoGroupAdaptor(func).asInstanceOf[AnyRef],
+      keyAg,
+      valueAg,
+      otherValueAg,
+      outAg
+    )
     val builder = CoGroupMap
       .newBuilder()
       .setInput(ds.df.relation)
