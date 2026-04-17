@@ -3,6 +3,7 @@ package org.apache.spark.sql
 import com.google.protobuf.ByteString
 import org.apache.spark.connect.proto.{
   Aggregate,
+  CoGroupMap,
   CommonInlineUserDefinedFunction,
   Expression,
   GroupMap,
@@ -232,16 +233,115 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val newDf = DataFrame(ds.sparkSession, relation)
     Dataset(newDf, outEnc)
 
-  /** Co-group with another KeyValueGroupedDataset and apply a function.
-    *
-    * Falls back to client-side implementation since CoGroupMap requires additional proto support.
-    */
+  /** Co-group with another KeyValueGroupedDataset and apply a function. */
   @nowarn("msg=unused.*parameter")
   def cogroup[U: Encoder: ClassTag, R: Encoder: ClassTag](
       other: KeyValueGroupedDataset[K, U]
   )(func: (K, Iterator[V], Iterator[U]) => IterableOnce[R]): Dataset[R] =
     val outEnc = summon[Encoder[R]]
-    cogroupLocal(other, func, outEnc)
+    val otherEnc = other.valueEncoder
+    val keyAg = keyEncoder.agnosticEncoder
+    val valueAg = valueEncoder.agnosticEncoder
+    val otherValueAg = otherEnc.agnosticEncoder
+    val outAg = outEnc.agnosticEncoder
+    if keyAg == null || valueAg == null || otherValueAg == null || outAg == null then
+      return cogroupLocal(other, func, outEnc)
+    val thisGroupingUdf = buildGroupingUdf(keyAg, valueAg)
+    val otherGroupingUdf = other.buildGroupingUdf(keyAg, otherValueAg)
+    val cogroupUdf = buildCoGroupUdf(func.asInstanceOf[AnyRef], keyAg, valueAg, otherValueAg, outAg)
+    val builder = CoGroupMap
+      .newBuilder()
+      .setInput(ds.df.relation)
+      .setOther(other.ds.df.relation)
+      .addInputGroupingExpressions(
+        Expression.newBuilder().setCommonInlineUserDefinedFunction(thisGroupingUdf).build()
+      )
+      .addOtherGroupingExpressions(
+        Expression.newBuilder().setCommonInlineUserDefinedFunction(otherGroupingUdf).build()
+      )
+      .setFunc(cogroupUdf)
+    val relation = Relation
+      .newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(ds.sparkSession.nextPlanId()).build())
+      .setCoGroupMap(builder.build())
+      .build()
+    val newDf = DataFrame(ds.sparkSession, relation)
+    Dataset(newDf, outEnc)
+
+  /** Co-group with sorting within each group.
+    *
+    * Sorts this group's values by `thisSortExprs` and the other group's values by `otherSortExprs`
+    * before applying the function.
+    */
+  @nowarn("msg=unused.*parameter")
+  def cogroupSorted[U: Encoder: ClassTag, R: Encoder: ClassTag](
+      other: KeyValueGroupedDataset[K, U]
+  )(thisSortExprs: Column*)(otherSortExprs: Column*)(
+      func: (K, Iterator[V], Iterator[U]) => IterableOnce[R]
+  ): Dataset[R] =
+    val outEnc = summon[Encoder[R]]
+    val otherEnc = other.valueEncoder
+    val keyAg = keyEncoder.agnosticEncoder
+    val valueAg = valueEncoder.agnosticEncoder
+    val otherValueAg = otherEnc.agnosticEncoder
+    val outAg = outEnc.agnosticEncoder
+    if keyAg == null || valueAg == null || otherValueAg == null || outAg == null then
+      return cogroupLocal(other, func, outEnc)
+    val thisGroupingUdf = buildGroupingUdf(keyAg, valueAg)
+    val otherGroupingUdf = other.buildGroupingUdf(keyAg, otherValueAg)
+    val cogroupUdf = buildCoGroupUdf(func, keyAg, valueAg, otherValueAg, outAg)
+    val builder = CoGroupMap
+      .newBuilder()
+      .setInput(ds.df.relation)
+      .setOther(other.ds.df.relation)
+      .addInputGroupingExpressions(
+        Expression.newBuilder().setCommonInlineUserDefinedFunction(thisGroupingUdf).build()
+      )
+      .addOtherGroupingExpressions(
+        Expression.newBuilder().setCommonInlineUserDefinedFunction(otherGroupingUdf).build()
+      )
+      .setFunc(cogroupUdf)
+    thisSortExprs.foreach(c => builder.addInputSortingExpressions(c.expr))
+    otherSortExprs.foreach(c => builder.addOtherSortingExpressions(c.expr))
+    val relation = Relation
+      .newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(ds.sparkSession.nextPlanId()).build())
+      .setCoGroupMap(builder.build())
+      .build()
+    val newDf = DataFrame(ds.sparkSession, relation)
+    Dataset(newDf, outEnc)
+
+  // ---------------------------------------------------------------------------
+  // Java Functional Interface Overloads
+  //
+  // Only overloads with distinct parameter shapes (not SAM-ambiguous with
+  // Scala function types) are provided. For mapGroups, flatMapGroups, and
+  // reduceGroups, Java callers should use the Scala function overloads
+  // directly (Scala 3 auto-converts Java lambdas).
+  // ---------------------------------------------------------------------------
+
+  /** CoGroup using a Java CoGroupFunction. */
+  def cogroup[U: Encoder: ClassTag, R: Encoder: ClassTag](
+      other: KeyValueGroupedDataset[K, U],
+      func: org.apache.spark.api.java.function.CoGroupFunction[K, V, U, R]
+  ): Dataset[R] =
+    import scala.jdk.CollectionConverters.*
+    cogroup(other)((key: K, left: Iterator[V], right: Iterator[U]) =>
+      func.call(key, left.asJava, right.asJava).asScala
+    )
+
+  /** CogroupSorted using a Java CoGroupFunction. */
+  def cogroupSorted[U: Encoder: ClassTag, R: Encoder: ClassTag](
+      other: KeyValueGroupedDataset[K, U],
+      thisSortExprs: Array[Column],
+      otherSortExprs: Array[Column],
+      func: org.apache.spark.api.java.function.CoGroupFunction[K, V, U, R]
+  ): Dataset[R] =
+    import scala.jdk.CollectionConverters.*
+    cogroupSorted(other)(thisSortExprs.toSeq*)(otherSortExprs.toSeq*)(
+      (key: K, left: Iterator[V], right: Iterator[U]) =>
+        func.call(key, left.asJava, right.asJava).asScala
+    )
 
   // ---------------------------------------------------------------------------
   // Typed aggregation (agg with TypedColumn)
@@ -793,6 +893,31 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     CommonInlineUserDefinedFunction
       .newBuilder()
       .setFunctionName("flatMapGroups")
+      .setDeterministic(true)
+      .setScalarScalaUdf(scalaUdf.build())
+      .build()
+
+  /** Build the co-group map function UDF proto.
+    *
+    * inputEncoders order: keyEncoder, valueEncoder, otherValueEncoder (matches server expectation).
+    */
+  private def buildCoGroupUdf(
+      func: AnyRef,
+      keyAg: AgnosticEncoder[?],
+      valueAg: AgnosticEncoder[?],
+      otherValueAg: AgnosticEncoder[?],
+      outAg: AgnosticEncoder[?]
+  ): CommonInlineUserDefinedFunction =
+    val packet = UdfPacket(func, Seq(keyAg, valueAg, otherValueAg), outAg)
+    val payload = UdfPacket.serialize(packet)
+    val scalaUdf = ScalarScalaUDF
+      .newBuilder()
+      .setPayload(ByteString.copyFrom(payload))
+      .setOutputType(DataTypeProtoConverter.toProto(outAg.dataType))
+      .setNullable(true)
+    CommonInlineUserDefinedFunction
+      .newBuilder()
+      .setFunctionName("cogroup")
       .setDeterministic(true)
       .setScalarScalaUdf(scalaUdf.build())
       .build()

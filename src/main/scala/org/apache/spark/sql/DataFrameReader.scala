@@ -67,6 +67,8 @@ final class DataFrameReader private[sql] (private val session: SparkSession):
   def text(paths: String*): DataFrame = format("text").load(paths)
   def xml(paths: String*): DataFrame = format("xml").load(paths)
   def textFile(path: String): DataFrame = format("text").load(path).select(Column("value"))
+  def textFile(paths: String*)(using DummyImplicit): DataFrame =
+    format("text").load(paths).select(Column("value"))
 
   /** Load a table from a JDBC data source.
     *

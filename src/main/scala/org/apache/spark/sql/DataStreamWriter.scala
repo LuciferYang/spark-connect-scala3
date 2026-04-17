@@ -32,6 +32,7 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
   private var name: String = ""
   private var opts: Map[String, String] = Map.empty
   private var partitionCols: Seq[String] = Seq.empty
+  private var clusteringCols: Seq[String] = Seq.empty
   private var foreachBatchPayload: Option[Array[Byte]] = None
   private var foreachWriterPayload: Option[Array[Byte]] = None
 
@@ -68,6 +69,10 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
 
   def partitionBy(colNames: String*): DataStreamWriter =
     partitionCols = colNames.toSeq
+    this
+
+  def clusterBy(colName: String, colNames: String*): DataStreamWriter =
+    clusteringCols = (colName +: colNames).toSeq
     this
 
   /** Set a function to process each micro-batch DataFrame with its batch ID. */
@@ -125,6 +130,7 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
     if name.nonEmpty then builder.setQueryName(name)
     opts.foreach((k, v) => builder.putOptions(k, v))
     partitionCols.foreach(builder.addPartitioningColumnNames)
+    clusteringCols.foreach(builder.addClusteringColumnNames)
     triggerOpt.foreach(setTrigger(builder, _))
     foreachWriterPayload.foreach { payload =>
       val scalaWriterBuilder = ScalarScalaUDF

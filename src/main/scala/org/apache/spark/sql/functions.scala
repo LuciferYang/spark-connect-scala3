@@ -52,10 +52,14 @@ object functions:
   def max(col: Column): Column = callFn("max", col)
   def max(colName: String): Column = max(Column(colName))
   def first(col: Column): Column = callFn("first", col)
+  def first(col: Column, ignoreNulls: Boolean): Column =
+    callFn("first", col, Column.lit(ignoreNulls))
   def first(colName: String): Column = first(Column(colName))
   def first(colName: String, ignoreNulls: Boolean): Column =
     callFn("first", Column(colName), Column.lit(ignoreNulls))
   def last(col: Column): Column = callFn("last", col)
+  def last(col: Column, ignoreNulls: Boolean): Column =
+    callFn("last", col, Column.lit(ignoreNulls))
   def last(colName: String): Column = last(Column(colName))
   def last(colName: String, ignoreNulls: Boolean): Column =
     callFn("last", Column(colName), Column.lit(ignoreNulls))
@@ -68,6 +72,7 @@ object functions:
   def collect_set(col: Column): Column = callFn("collect_set", col)
   def collect_set(colName: String): Column = collect_set(Column(colName))
   def any_value(col: Column): Column = callFn("any_value", col)
+  def any_value(col: Column, ignoreNulls: Column): Column = callFn("any_value", col, ignoreNulls)
   def count_if(col: Column): Column = callFn("count_if", col)
   def product(col: Column): Column = callFn("product", col)
   def every(col: Column): Column = callFn("every", col)
@@ -78,7 +83,10 @@ object functions:
   def bit_or(col: Column): Column = callFn("bit_or", col)
   def bit_xor(col: Column): Column = callFn("bit_xor", col)
   def first_value(col: Column): Column = callFn("first_value", col)
+  def first_value(col: Column, ignoreNulls: Column): Column =
+    callFn("first_value", col, ignoreNulls)
   def last_value(col: Column): Column = callFn("last_value", col)
+  def last_value(col: Column, ignoreNulls: Column): Column = callFn("last_value", col, ignoreNulls)
   def max_by(e: Column, ord: Column): Column = callFn("max_by", e, ord)
   def max_by(e: Column, ord: Column, k: Int): Column = callFn("max_by", e, ord, Column.lit(k))
   def max_by(e: Column, ord: Column, k: Column): Column = callFn("max_by", e, ord, k)
@@ -151,6 +159,13 @@ object functions:
   def sqrt(col: Column): Column = callFn("sqrt", col)
   def sqrt(colName: String): Column = sqrt(Column(colName))
   def pow(l: Column, r: Column): Column = callFn("power", l, r)
+  def pow(l: Column, r: Double): Column = pow(l, Column.lit(r))
+  def pow(l: Double, r: Column): Column = pow(Column.lit(l), r)
+  def pow(l: Column, r: String): Column = pow(l, Column(r))
+  def pow(l: String, r: Column): Column = pow(Column(l), r)
+  def pow(l: String, r: String): Column = pow(Column(l), Column(r))
+  def pow(l: String, r: Double): Column = pow(Column(l), Column.lit(r))
+  def pow(l: Double, r: String): Column = pow(Column.lit(l), Column(r))
   def round(col: Column, scale: Int = 0): Column = callFn("round", col, Column.lit(scale))
   def floor(col: Column): Column = callFn("floor", col)
   def floor(colName: String): Column = floor(Column(colName))
@@ -177,6 +192,13 @@ object functions:
   def expm1(col: Column): Column = callFn("expm1", col)
   def expm1(colName: String): Column = expm1(Column(colName))
   def hypot(l: Column, r: Column): Column = callFn("hypot", l, r)
+  def hypot(l: Column, r: Double): Column = hypot(l, Column.lit(r))
+  def hypot(l: Double, r: Column): Column = hypot(Column.lit(l), r)
+  def hypot(l: Column, r: String): Column = hypot(l, Column(r))
+  def hypot(l: String, r: Column): Column = hypot(Column(l), r)
+  def hypot(l: String, r: String): Column = hypot(Column(l), Column(r))
+  def hypot(l: String, r: Double): Column = hypot(Column(l), Column.lit(r))
+  def hypot(l: Double, r: String): Column = hypot(Column.lit(l), Column(r))
   def pmod(dividend: Column, divisor: Column): Column =
     callFn("pmod", dividend, divisor)
   def sign(col: Column): Column = callFn("sign", col)
@@ -188,6 +210,13 @@ object functions:
   def ceiling(e: Column): Column = callFn("ceiling", e)
   def ln(e: Column): Column = callFn("ln", e)
   def power(l: Column, r: Column): Column = callFn("power", l, r)
+  def power(l: Column, r: Double): Column = power(l, Column.lit(r))
+  def power(l: Double, r: Column): Column = power(Column.lit(l), r)
+  def power(l: Column, r: String): Column = power(l, Column(r))
+  def power(l: String, r: Column): Column = power(Column(l), r)
+  def power(l: String, r: String): Column = power(Column(l), Column(r))
+  def power(l: String, r: Double): Column = power(Column(l), Column.lit(r))
+  def power(l: Double, r: String): Column = power(Column.lit(l), Column(r))
   def negative(e: Column): Column = callFn("negative", e)
   def positive(e: Column): Column = callFn("positive", e)
   def try_mod(left: Column, right: Column): Column = callFn("try_mod", left, right)
@@ -207,8 +236,14 @@ object functions:
   def upper(col: Column): Column = callFn("upper", col)
   def lower(col: Column): Column = callFn("lower", col)
   def trim(col: Column): Column = callFn("trim", col)
+  def trim(e: Column, trimString: String): Column = callFn("trim", Column.lit(trimString), e)
+  def trim(e: Column, trimCol: Column): Column = callFn("trim", trimCol, e)
   def ltrim(col: Column): Column = callFn("ltrim", col)
+  def ltrim(e: Column, trimString: String): Column = callFn("ltrim", Column.lit(trimString), e)
+  def ltrim(e: Column, trimCol: Column): Column = callFn("ltrim", trimCol, e)
   def rtrim(col: Column): Column = callFn("rtrim", col)
+  def rtrim(e: Column, trimString: String): Column = callFn("rtrim", Column.lit(trimString), e)
+  def rtrim(e: Column, trimCol: Column): Column = callFn("rtrim", trimCol, e)
   def substring(col: Column, pos: Int, len: Int): Column =
     callFn("substring", col, Column.lit(pos), Column.lit(len))
   def length(col: Column): Column = callFn("length", col)
@@ -450,8 +485,53 @@ object functions:
 
   def from_json(col: Column, schema: String): Column =
     callFn("from_json", col, Column.lit(schema))
+  def from_json(e: Column, schema: Column): Column =
+    callFn("from_json", e, schema)
+  def from_json(e: Column, schema: types.StructType): Column =
+    from_json(e, schema.toDDL)
+  def from_json(e: Column, schema: types.DataType): Column =
+    from_json(e, schema.sql)
+  def from_json(e: Column, schema: types.StructType, options: Map[String, String]): Column =
+    callFn("from_json", e, Column.lit(schema.toDDL), optionsMapColumn(options))
+  def from_json(e: Column, schema: types.DataType, options: Map[String, String]): Column =
+    callFn("from_json", e, Column.lit(schema.sql), optionsMapColumn(options))
+  def from_json(e: Column, schema: String, options: Map[String, String]): Column =
+    callFn("from_json", e, Column.lit(schema), optionsMapColumn(options))
+  def from_json(
+      e: Column,
+      schema: Column,
+      options: java.util.Map[String, String]
+  ): Column =
+    import scala.jdk.CollectionConverters.*
+    callFn("from_json", e, schema, optionsMapColumn(options.asScala.toMap))
+  def from_json(
+      e: Column,
+      schema: types.StructType,
+      options: java.util.Map[String, String]
+  ): Column =
+    import scala.jdk.CollectionConverters.*
+    from_json(e, schema.toDDL, options.asScala.toMap)
+  def from_json(
+      e: Column,
+      schema: types.DataType,
+      options: java.util.Map[String, String]
+  ): Column =
+    import scala.jdk.CollectionConverters.*
+    from_json(e, schema.sql, options.asScala.toMap)
+  def from_json(
+      e: Column,
+      schema: String,
+      options: java.util.Map[String, String]
+  ): Column =
+    import scala.jdk.CollectionConverters.*
+    from_json(e, schema, options.asScala.toMap)
 
   def to_json(col: Column): Column = callFn("to_json", col)
+  def to_json(e: Column, options: Map[String, String]): Column =
+    callFn("to_json", e, optionsMapColumn(options))
+  def to_json(e: Column, options: java.util.Map[String, String]): Column =
+    import scala.jdk.CollectionConverters.*
+    to_json(e, options.asScala.toMap)
 
   def json_tuple(col: Column, fields: String*): Column =
     callFn("json_tuple", (col +: fields.map(Column.lit(_)))*)
@@ -461,6 +541,11 @@ object functions:
 
   def schema_of_json(json: String): Column =
     callFn("schema_of_json", Column.lit(json))
+  def schema_of_json(json: Column): Column =
+    callFn("schema_of_json", json)
+  def schema_of_json(json: Column, options: java.util.Map[String, String]): Column =
+    import scala.jdk.CollectionConverters.*
+    callFn("schema_of_json", json, optionsMapColumn(options.asScala.toMap))
   def json_array_length(e: Column): Column = callFn("json_array_length", e)
   def json_object_keys(e: Column): Column = callFn("json_object_keys", e)
 
@@ -470,9 +555,26 @@ object functions:
 
   def from_csv(col: Column, schema: String): Column =
     callFn("from_csv", col, Column.lit(schema))
+  def from_csv(e: Column, schema: types.StructType, options: Map[String, String]): Column =
+    callFn("from_csv", e, Column.lit(schema.toDDL), optionsMapColumn(options))
+  def from_csv(
+      e: Column,
+      schema: Column,
+      options: java.util.Map[String, String]
+  ): Column =
+    import scala.jdk.CollectionConverters.*
+    callFn("from_csv", e, schema, optionsMapColumn(options.asScala.toMap))
   def to_csv(col: Column): Column = callFn("to_csv", col)
+  def to_csv(e: Column, options: java.util.Map[String, String]): Column =
+    import scala.jdk.CollectionConverters.*
+    callFn("to_csv", e, optionsMapColumn(options.asScala.toMap))
   def schema_of_csv(csv: String): Column =
     callFn("schema_of_csv", Column.lit(csv))
+  def schema_of_csv(csv: Column): Column =
+    callFn("schema_of_csv", csv)
+  def schema_of_csv(csv: Column, options: java.util.Map[String, String]): Column =
+    import scala.jdk.CollectionConverters.*
+    callFn("schema_of_csv", csv, optionsMapColumn(options.asScala.toMap))
 
   // ---------------------------------------------------------------------------
   // XML functions
@@ -482,9 +584,37 @@ object functions:
   def xpath_string(col: Column, path: Column): Column =
     callFn("xpath_string", col, path)
   def from_xml(e: Column, schema: Column): Column = callFn("from_xml", e, schema)
+  def from_xml(e: Column, schema: types.StructType): Column =
+    from_xml(e, Column.lit(schema.toDDL))
+  def from_xml(
+      e: Column,
+      schema: String,
+      options: java.util.Map[String, String]
+  ): Column =
+    import scala.jdk.CollectionConverters.*
+    callFn("from_xml", e, Column.lit(schema), optionsMapColumn(options.asScala.toMap))
+  def from_xml(
+      e: Column,
+      schema: Column,
+      options: java.util.Map[String, String]
+  ): Column =
+    import scala.jdk.CollectionConverters.*
+    callFn("from_xml", e, schema, optionsMapColumn(options.asScala.toMap))
+  def from_xml(
+      e: Column,
+      schema: types.StructType,
+      options: java.util.Map[String, String]
+  ): Column =
+    from_xml(e, schema.toDDL, options)
   def to_xml(e: Column): Column = callFn("to_xml", e)
+  def to_xml(e: Column, options: java.util.Map[String, String]): Column =
+    import scala.jdk.CollectionConverters.*
+    callFn("to_xml", e, optionsMapColumn(options.asScala.toMap))
   def schema_of_xml(xml: Column): Column = callFn("schema_of_xml", xml)
   def schema_of_xml(xml: String): Column = callFn("schema_of_xml", Column.lit(xml))
+  def schema_of_xml(xml: Column, options: java.util.Map[String, String]): Column =
+    import scala.jdk.CollectionConverters.*
+    callFn("schema_of_xml", xml, optionsMapColumn(options.asScala.toMap))
   def xpath_boolean(xml: Column, path: Column): Column =
     callFn("xpath_boolean", xml, path)
   def xpath_double(xml: Column, path: Column): Column =
@@ -847,6 +977,13 @@ object functions:
   def atan(col: Column): Column = callFn("atan", col)
   def atan(colName: String): Column = atan(Column(colName))
   def atan2(l: Column, r: Column): Column = callFn("atan2", l, r)
+  def atan2(l: Column, r: Double): Column = atan2(l, Column.lit(r))
+  def atan2(l: Double, r: Column): Column = atan2(Column.lit(l), r)
+  def atan2(l: Column, r: String): Column = atan2(l, Column(r))
+  def atan2(l: String, r: Column): Column = atan2(Column(l), r)
+  def atan2(l: String, r: String): Column = atan2(Column(l), Column(r))
+  def atan2(l: String, r: Double): Column = atan2(Column(l), Column.lit(r))
+  def atan2(l: Double, r: String): Column = atan2(Column.lit(l), Column(r))
   def sinh(col: Column): Column = callFn("sinh", col)
   def sinh(colName: String): Column = sinh(Column(colName))
   def cosh(col: Column): Column = callFn("cosh", col)
@@ -1469,17 +1606,27 @@ object functions:
     lead(Column(colName), offset)
   def lead(colName: String, offset: Int, defaultValue: Any): Column =
     callFn("lead", Column(colName), Column.lit(offset), Column.lit(defaultValue))
+  def lead(col: Column, offset: Int, defaultValue: Any): Column =
+    callFn("lead", col, Column.lit(offset), Column.lit(defaultValue))
+  def lead(col: Column, offset: Int, defaultValue: Any, ignoreNulls: Boolean): Column =
+    callFn("lead", col, Column.lit(offset), Column.lit(defaultValue), Column.lit(ignoreNulls))
   def lag(col: Column, offset: Int = 1): Column =
     callFn("lag", col, Column.lit(offset))
   def lag(colName: String, offset: Int): Column =
     lag(Column(colName), offset)
   def lag(colName: String, offset: Int, defaultValue: Any): Column =
     callFn("lag", Column(colName), Column.lit(offset), Column.lit(defaultValue))
+  def lag(col: Column, offset: Int, defaultValue: Any): Column =
+    callFn("lag", col, Column.lit(offset), Column.lit(defaultValue))
+  def lag(col: Column, offset: Int, defaultValue: Any, ignoreNulls: Boolean): Column =
+    callFn("lag", col, Column.lit(offset), Column.lit(defaultValue), Column.lit(ignoreNulls))
   def ntile(n: Int): Column = callFn("ntile", Column.lit(n))
   def percent_rank(): Column = callFn("percent_rank")
   def cume_dist(): Column = callFn("cume_dist")
   def nth_value(col: Column, offset: Int): Column =
     callFn("nth_value", col, Column.lit(offset))
+  def nth_value(col: Column, offset: Int, ignoreNulls: Boolean): Column =
+    callFn("nth_value", col, Column.lit(offset), Column.lit(ignoreNulls))
 
   // ---------------------------------------------------------------------------
   // Helper
@@ -1487,6 +1634,11 @@ object functions:
 
   private def callFn(name: String, cols: Column*): Column =
     callFn(name, isDistinct = false, cols*)
+
+  private def optionsMapColumn(options: Map[String, String]): Column =
+    val entries = options.iterator.flatMap((k, v) => Seq(Column.lit(k), Column.lit(v))).toSeq
+    if entries.isEmpty then callFn("map")
+    else callFn("map", entries*)
 
   private def callFn(name: String, isDistinct: Boolean, cols: Column*): Column =
     val builder = Expression.UnresolvedFunction.newBuilder()
@@ -1672,6 +1824,84 @@ object functions:
 
   // ---------------------------------------------------------------------------
   // User-Defined Aggregate Functions (UDAF)
+  // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // Java UDF overloads (UDF0–UDF9 with explicit DataType)
+  // ---------------------------------------------------------------------------
+
+  /** Create a UDF from a Java UDF0 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF0[?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF1 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF1[?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF2 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF2[?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF3 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF3[?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF4 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF4[?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF5 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF5[?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF6 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF6[?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF7 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF7[?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF8 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF8[?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF9 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF9[?, ?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  // ---------------------------------------------------------------------------
+  // User-Defined Aggregate Functions (UDAF) (continued)
   // ---------------------------------------------------------------------------
 
   /** Create a UDAF from an `Aggregator` with an implicit input encoder.

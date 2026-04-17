@@ -152,6 +152,21 @@ final class Dataset[T: ClassTag] private[sql] (
     )
 
   // ---------------------------------------------------------------------------
+  // Java Functional Interface Overloads
+  //
+  // Only overloads that do NOT cause SAM ambiguity with Scala function types
+  // are provided here. For filter, map, foreach, foreachPartition,
+  // mapPartitions, and groupByKey, Java callers should use the Scala function
+  // overloads directly (Scala 3 auto-converts Java lambdas).
+  // ---------------------------------------------------------------------------
+
+  /** Reduce using a Java ReduceFunction. */
+  def reduce(func: org.apache.spark.api.java.function.ReduceFunction[T])(using
+      DummyImplicit
+  ): T =
+    reduce((a: T, b: T) => func.call(a, b))
+
+  // ---------------------------------------------------------------------------
   // Untyped Transformations (delegate to DataFrame)
   // ---------------------------------------------------------------------------
 

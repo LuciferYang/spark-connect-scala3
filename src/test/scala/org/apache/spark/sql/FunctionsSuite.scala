@@ -2506,3 +2506,107 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.theta_union_agg("x"), "theta_union_agg", 1)
     assertFn(functions.theta_union_agg("x", 4096), "theta_union_agg", 2)
   }
+
+  // ==================== P1 Batch 1: Window + Aggregate ignoreNulls overloads ====================
+
+  test("first/last with Column ignoreNulls") {
+    assertFn(functions.first(Column("x"), ignoreNulls = true), "first", 2)
+    assertFn(functions.last(Column("x"), ignoreNulls = true), "last", 2)
+  }
+
+  test("first_value/last_value/any_value with ignoreNulls Column") {
+    assertFn(functions.first_value(Column("x"), Column.lit(true)), "first_value", 2)
+    assertFn(functions.last_value(Column("x"), Column.lit(false)), "last_value", 2)
+    assertFn(functions.any_value(Column("x"), Column.lit(true)), "any_value", 2)
+  }
+
+  test("lead/lag with Column defaultValue and ignoreNulls") {
+    assertFn(functions.lead(Column("x"), 2, 0), "lead", 3)
+    assertFn(functions.lead(Column("x"), 2, 0, ignoreNulls = true), "lead", 4)
+    assertFn(functions.lag(Column("x"), 1, "d"), "lag", 3)
+    assertFn(functions.lag(Column("x"), 1, "d", ignoreNulls = true), "lag", 4)
+  }
+
+  test("nth_value with ignoreNulls") {
+    assertFn(functions.nth_value(Column("x"), 3, ignoreNulls = true), "nth_value", 3)
+  }
+
+  // ==================== P1 Batch 2: Math multi-type overloads ====================
+
+  test("pow multi-type overloads") {
+    assertFn(functions.pow(Column("a"), 2.0), "power", 2)
+    assertFn(functions.pow(2.0, Column("b")), "power", 2)
+    assertFn(functions.pow(Column("a"), "b"), "power", 2)
+    assertFn(functions.pow("a", Column("b")), "power", 2)
+    assertFn(functions.pow("a", "b"), "power", 2)
+    assertFn(functions.pow("a", 2.0), "power", 2)
+    assertFn(functions.pow(2.0, "b"), "power", 2)
+  }
+
+  test("hypot multi-type overloads") {
+    assertFn(functions.hypot(Column("a"), 2.0), "hypot", 2)
+    assertFn(functions.hypot(2.0, Column("b")), "hypot", 2)
+    assertFn(functions.hypot(Column("a"), "b"), "hypot", 2)
+    assertFn(functions.hypot("a", Column("b")), "hypot", 2)
+    assertFn(functions.hypot("a", "b"), "hypot", 2)
+    assertFn(functions.hypot("a", 2.0), "hypot", 2)
+    assertFn(functions.hypot(2.0, "b"), "hypot", 2)
+  }
+
+  test("atan2 multi-type overloads") {
+    assertFn(functions.atan2(Column("a"), 2.0), "atan2", 2)
+    assertFn(functions.atan2(2.0, Column("b")), "atan2", 2)
+    assertFn(functions.atan2(Column("a"), "b"), "atan2", 2)
+    assertFn(functions.atan2("a", Column("b")), "atan2", 2)
+    assertFn(functions.atan2("a", "b"), "atan2", 2)
+    assertFn(functions.atan2("a", 2.0), "atan2", 2)
+    assertFn(functions.atan2(2.0, "b"), "atan2", 2)
+  }
+
+  test("power alias overloads") {
+    assertFn(functions.power(Column("a"), Column("b")), "power", 2)
+    assertFn(functions.power(Column("a"), 2.0), "power", 2)
+    assertFn(functions.power("a", "b"), "power", 2)
+  }
+
+  // ==================== P1 Batch 3: Trim + JSON/XML/CSV overloads ====================
+
+  test("trim with trimString and trimCol") {
+    assertFn(functions.trim(Column("x"), " "), "trim", 2)
+    assertFn(functions.trim(Column("x"), Column.lit(" ")), "trim", 2)
+    assertFn(functions.ltrim(Column("x"), " "), "ltrim", 2)
+    assertFn(functions.ltrim(Column("x"), Column.lit(" ")), "ltrim", 2)
+    assertFn(functions.rtrim(Column("x"), " "), "rtrim", 2)
+    assertFn(functions.rtrim(Column("x"), Column.lit(" ")), "rtrim", 2)
+  }
+
+  test("from_json overloads") {
+    assertFn(functions.from_json(Column("j"), Column.lit("struct<a:int>")), "from_json", 2)
+    assertFn(
+      functions.from_json(Column("j"), "struct<a:int>", Map("mode" -> "PERMISSIVE")),
+      "from_json",
+      3
+    )
+  }
+
+  test("to_json/to_csv/to_xml with options") {
+    assertFn(functions.to_json(Column("s"), Map("pretty" -> "true")), "to_json", 2)
+  }
+
+  test("schema_of_json/csv/xml with options") {
+    assertFn(
+      functions.schema_of_json(Column.lit("{}"), new java.util.HashMap[String, String]()),
+      "schema_of_json",
+      2
+    )
+    assertFn(
+      functions.schema_of_csv(Column.lit("a,b"), new java.util.HashMap[String, String]()),
+      "schema_of_csv",
+      2
+    )
+    assertFn(
+      functions.schema_of_xml(Column.lit("<r/>"), new java.util.HashMap[String, String]()),
+      "schema_of_xml",
+      2
+    )
+  }
