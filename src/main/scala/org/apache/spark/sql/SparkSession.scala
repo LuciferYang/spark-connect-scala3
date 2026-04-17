@@ -366,6 +366,36 @@ final class SparkSession private[sql] (
       case Some(rel) => DataFrame(this, rel)
       case None      => emptyDataFrame
 
+  // ---------------------------------------------------------------------------
+  // Unsupported Operations (compatibility stubs)
+  // ---------------------------------------------------------------------------
+
+  /** Not supported in Spark Connect. */
+  def sparkContext: Nothing =
+    throw UnsupportedOperationException("sparkContext is not supported in Spark Connect")
+
+  /** Not supported in Spark Connect. */
+  def sharedState: Nothing =
+    throw UnsupportedOperationException("sharedState is not supported in Spark Connect")
+
+  /** Not supported in Spark Connect. */
+  def sessionState: Nothing =
+    throw UnsupportedOperationException("sessionState is not supported in Spark Connect")
+
+  /** Not supported in Spark Connect. */
+  def listenerManager: Nothing =
+    throw UnsupportedOperationException("listenerManager is not supported in Spark Connect")
+
+  /** Not supported in Spark Connect. */
+  def experimental: Nothing =
+    throw UnsupportedOperationException("experimental is not supported in Spark Connect")
+
+  /** Not supported in Spark Connect. */
+  def baseRelationToDataFrame: Nothing =
+    throw UnsupportedOperationException(
+      "baseRelationToDataFrame is not supported in Spark Connect"
+    )
+
 object SparkSession:
   private val activeSession = InheritableThreadLocal[SparkSession]()
   private val defaultSession = AtomicReference[SparkSession]()

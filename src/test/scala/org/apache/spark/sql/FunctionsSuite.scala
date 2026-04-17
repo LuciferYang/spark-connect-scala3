@@ -564,6 +564,12 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.covar_samp(Column("a"), Column("b")), "covar_samp", 2)
   }
 
+  test("corr/covar_pop/covar_samp string overloads") {
+    assertFn(functions.corr("a", "b"), "corr", 2)
+    assertFn(functions.covar_pop("a", "b"), "covar_pop", 2)
+    assertFn(functions.covar_samp("a", "b"), "covar_samp", 2)
+  }
+
   test("grouping and grouping_id") {
     assertFn(functions.grouping(Column("x")), "grouping", 1)
     assertFn(functions.grouping_id(Column("a"), Column("b")), "grouping_id", 2)

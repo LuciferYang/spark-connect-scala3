@@ -264,3 +264,22 @@ class DatasetUntypedOpsSuite extends AnyFunSuite with Matchers:
     val splits = ds.randomSplit(Array(0.5, 0.5))
     splits.length shouldBe 2
   }
+
+  // ---------------------------------------------------------------------------
+  // P3d: Unsupported operation stubs
+  // ---------------------------------------------------------------------------
+
+  test("rdd throws UnsupportedOperationException") {
+    val ds = testDs()
+    an[UnsupportedOperationException] should be thrownBy ds.rdd
+  }
+
+  test("toJavaRDD throws UnsupportedOperationException") {
+    val ds = testDs()
+    an[UnsupportedOperationException] should be thrownBy ds.toJavaRDD
+  }
+
+  test("javaRDD throws UnsupportedOperationException") {
+    val ds = testDs()
+    an[UnsupportedOperationException] should be thrownBy ds.javaRDD
+  }

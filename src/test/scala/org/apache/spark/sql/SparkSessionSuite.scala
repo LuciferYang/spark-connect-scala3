@@ -695,3 +695,35 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
     val builder = SparkSession.builder().config(jMap)
     builder shouldBe a[SparkSession.Builder]
   }
+
+  // ---------- Unsupported operation stubs ----------
+
+  test("sparkContext throws UnsupportedOperationException") {
+    val session = stubSession
+    an[UnsupportedOperationException] should be thrownBy session.sparkContext
+  }
+
+  test("sharedState throws UnsupportedOperationException") {
+    val session = stubSession
+    an[UnsupportedOperationException] should be thrownBy session.sharedState
+  }
+
+  test("sessionState throws UnsupportedOperationException") {
+    val session = stubSession
+    an[UnsupportedOperationException] should be thrownBy session.sessionState
+  }
+
+  test("listenerManager throws UnsupportedOperationException") {
+    val session = stubSession
+    an[UnsupportedOperationException] should be thrownBy session.listenerManager
+  }
+
+  test("experimental throws UnsupportedOperationException") {
+    val session = stubSession
+    an[UnsupportedOperationException] should be thrownBy session.experimental
+  }
+
+  test("baseRelationToDataFrame throws UnsupportedOperationException") {
+    val session = stubSession
+    an[UnsupportedOperationException] should be thrownBy session.baseRelationToDataFrame
+  }

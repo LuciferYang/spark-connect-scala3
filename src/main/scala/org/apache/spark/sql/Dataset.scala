@@ -755,6 +755,21 @@ final class Dataset[T: ClassTag] private[sql] (
 
   override def toString: String = df.toString
 
+  // ---------------------------------------------------------------------------
+  // Unsupported Operations (compatibility stubs)
+  // ---------------------------------------------------------------------------
+
+  /** Not supported in Spark Connect. */
+  def rdd: Nothing =
+    throw UnsupportedOperationException("rdd is not supported in Spark Connect")
+
+  /** Not supported in Spark Connect. */
+  def toJavaRDD: Nothing =
+    throw UnsupportedOperationException("toJavaRDD is not supported in Spark Connect")
+
+  /** Not supported in Spark Connect. Alias for `toJavaRDD`. */
+  def javaRDD: Nothing = toJavaRDD
+
 object Dataset:
   private[sql] def apply[T: ClassTag](df: DataFrame, encoder: Encoder[T]): Dataset[T] =
     new Dataset(df, encoder)

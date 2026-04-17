@@ -71,8 +71,8 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
     partitionCols = colNames.toSeq
     this
 
-  def clusterBy(colName: String, colNames: String*): DataStreamWriter =
-    clusteringCols = (colName +: colNames).toSeq
+  def clusterBy(colNames: String*): DataStreamWriter =
+    clusteringCols = colNames.toSeq
     this
 
   /** Set a function to process each micro-batch DataFrame with its batch ID. */
