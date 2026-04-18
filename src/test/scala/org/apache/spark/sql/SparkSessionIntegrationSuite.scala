@@ -288,3 +288,68 @@ class SparkSessionIntegrationSuite extends IntegrationTestBase:
         case Some(s) => SparkSession.setActiveSession(s)
         case None    => SparkSession.clearActiveSession()
   }
+
+  // ---------------------------------------------------------------------------
+  // P2: SparkSession Java interop + sql overloads
+  // ---------------------------------------------------------------------------
+
+  test("sql(query, Array) with positional parameters") {
+    val result = spark.sql("SELECT ? + ? AS sum", Array(1, 2)).collect()
+    assert(result.length == 1)
+    assert(result(0).getInt(0) == 3)
+  }
+
+  test("sql(query, java.util.Map) with named parameters") {
+    val jMap = new java.util.HashMap[String, Any]()
+    jMap.put("x", 42)
+    val result = spark.sql("SELECT :x AS val", jMap).collect()
+    assert(result.length == 1)
+    assert(result(0).getInt(0) == 42)
+  }
+
+  test("createDataFrame(java.util.List, StructType)") {
+    val rows = new java.util.ArrayList[Row]()
+    rows.add(Row(1, "a"))
+    rows.add(Row(2, "b"))
+    val schema = StructType(Seq(StructField("id", IntegerType), StructField("s", StringType)))
+    val result = spark.createDataFrame(rows, schema).collect()
+    assert(result.length == 2)
+    assert(result(0).getInt(0) == 1)
+  }
+
+  test("createDataset(java.util.List)") {
+    val data = new java.util.ArrayList[Int]()
+    data.add(10)
+    data.add(20)
+    data.add(30)
+    val ds = spark.createDataset(data)
+    assert(ds.collect().toSet == Set(10, 20, 30))
+  }
+
+  // ---------------------------------------------------------------------------
+  // P3d: SparkSession UnsupportedOp stubs
+  // ---------------------------------------------------------------------------
+
+  test("sparkContext throws UnsupportedOperationException") {
+    assertThrows[UnsupportedOperationException](spark.sparkContext)
+  }
+
+  test("sharedState throws UnsupportedOperationException") {
+    assertThrows[UnsupportedOperationException](spark.sharedState)
+  }
+
+  test("sessionState throws UnsupportedOperationException") {
+    assertThrows[UnsupportedOperationException](spark.sessionState)
+  }
+
+  test("listenerManager throws UnsupportedOperationException") {
+    assertThrows[UnsupportedOperationException](spark.listenerManager)
+  }
+
+  test("experimental throws UnsupportedOperationException") {
+    assertThrows[UnsupportedOperationException](spark.experimental)
+  }
+
+  test("baseRelationToDataFrame throws UnsupportedOperationException") {
+    assertThrows[UnsupportedOperationException](spark.baseRelationToDataFrame)
+  }

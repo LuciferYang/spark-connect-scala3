@@ -130,3 +130,44 @@ class FunctionsIntegrationSuite extends IntegrationTestBase:
     assert(result(0).getInt(0) == 1)
     assert(result(1).getInt(0) == 2)
   }
+
+  // ---------------------------------------------------------------------------
+  // P3a: corr / covar_pop / covar_samp string overloads
+  // ---------------------------------------------------------------------------
+
+  test("corr(String, String) computes correlation") {
+    val rows = Seq(Row(1.0, 1.0), Row(2.0, 2.0), Row(3.0, 3.0))
+    val schema = StructType(Seq(
+      StructField("x", DoubleType),
+      StructField("y", DoubleType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.select(corr("x", "y")).collect()
+    assert(result.length == 1)
+    assert(math.abs(result(0).getDouble(0) - 1.0) < 0.001)
+  }
+
+  test("covar_pop(String, String) computes population covariance") {
+    val rows = Seq(Row(1.0, 2.0), Row(2.0, 4.0), Row(3.0, 6.0))
+    val schema = StructType(Seq(
+      StructField("x", DoubleType),
+      StructField("y", DoubleType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.select(covar_pop("x", "y")).collect()
+    assert(result.length == 1)
+    // covar_pop of perfectly linear data (y=2x): var(x) * 2 = 2/3 * 2 = 4/3 ≈ 1.333
+    assert(result(0).getDouble(0) > 0)
+  }
+
+  test("covar_samp(String, String) computes sample covariance") {
+    val rows = Seq(Row(1.0, 2.0), Row(2.0, 4.0), Row(3.0, 6.0))
+    val schema = StructType(Seq(
+      StructField("x", DoubleType),
+      StructField("y", DoubleType)
+    ))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.select(covar_samp("x", "y")).collect()
+    assert(result.length == 1)
+    assert(result(0).getDouble(0) > 0)
+  }

@@ -216,3 +216,15 @@ class GroupedDataFrameIntegrationSuite extends IntegrationTestBase:
     // With explicit pivot values, columns should be predictable
     assert(result(0).getString(0) == "Alice")
   }
+
+  // ---------------------------------------------------------------------------
+  // P2: GroupedDataFrame Java interop
+  // ---------------------------------------------------------------------------
+
+  test("agg(java.util.Map) on GroupedDataFrame") {
+    val jMap = new java.util.HashMap[String, String]()
+    jMap.put("value", "sum")
+    val result = groupTestDf.groupBy(col("group")).agg(jMap).orderBy(col("group")).collect()
+    assert(result.length == 2)
+    assert(result(0).getString(0) == "A")
+  }

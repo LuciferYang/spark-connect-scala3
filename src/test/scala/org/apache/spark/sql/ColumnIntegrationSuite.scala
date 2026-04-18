@@ -425,3 +425,37 @@ class ColumnIntegrationSuite extends IntegrationTestBase:
     assert(result(1).getInt(0) == 50) // arr[1] = 50
     assert(result(2).getInt(0) == 90) // arr[2] = 90
   }
+
+  // ---------------------------------------------------------------------------
+  // P2: Column.transform, outer, as(Array), deprecated !==
+  // ---------------------------------------------------------------------------
+
+  test("transform applies function to Column") {
+    val df = spark.range(3).select(col("id"))
+    val result = df.select(col("id").transform(c => c + Column.lit(1)).as("inc")).collect()
+    assert(result.map(_.getLong(0)).toSet == Set(1L, 2L, 3L))
+  }
+
+  test("outer is identity for Connect clients") {
+    val df = spark.range(3).select(col("id"))
+    val result = df.select(col("id").outer().as("v")).collect()
+    assert(result.map(_.getLong(0)).toSet == Set(0L, 1L, 2L))
+  }
+
+  test("as(Array[String]) aliases generator output columns") {
+    // as(Array) is used with generator functions like explode
+    val df = spark.sql("SELECT array(1, 2, 3) AS arr")
+    val result = df.select(explode(col("arr")).as(Array("val"))).collect()
+    assert(result.length == 3)
+    assert(result.map(_.getInt(0)).toSet == Set(1, 2, 3))
+  }
+
+  test("deprecated !== produces same result as =!=") {
+    val df = spark.range(5).select(col("id"))
+    val r1 = df.filter(col("id") =!= Column.lit(2)).count()
+    @annotation.nowarn("msg=deprecated")
+    val notEqCol = col("id") !== Column.lit(2)
+    val r2 = df.filter(notEqCol).count()
+    assert(r1 == r2)
+    assert(r1 == 4)
+  }

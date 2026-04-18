@@ -1399,3 +1399,59 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     }
     assert(result == 10L)
   }
+
+  // ---------------------------------------------------------------------------
+  // P2: DataFrame Java interop + lateralJoin(right, joinType)
+  // ---------------------------------------------------------------------------
+
+  test("lateralJoin(right, joinType) produces lateral join") {
+    val df = spark.range(3).toDF("id")
+    val lateral = spark.sql("SELECT * FROM LATERAL (SELECT id + 1 AS id2)")
+    // Just validate the 2-arg overload compiles and does not throw
+    // lateralJoin with string joinType
+    val result = df.lateralJoin(spark.range(1).toDF("x"), "inner")
+    assert(result.count() == 3)
+  }
+
+  test("agg(java.util.Map) delegates to Scala Map agg") {
+    val rows = Seq(Row("a", 1), Row("a", 2), Row("b", 3))
+    val schema = StructType(Seq(StructField("k", StringType), StructField("v", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+    val jMap = new java.util.HashMap[String, String]()
+    jMap.put("v", "sum")
+    val result = df.agg(jMap).collect()
+    assert(result.length == 1)
+  }
+
+  test("withColumns(java.util.Map) adds columns") {
+    val df = spark.range(3).toDF("id")
+    val jMap = new java.util.HashMap[String, Column]()
+    jMap.put("doubled", col("id") * Column.lit(2))
+    val result = df.withColumns(jMap).collect()
+    assert(result.length == 3)
+    assert(result(0).schema.get.fieldNames.contains("doubled"))
+  }
+
+  test("withColumnsRenamed(java.util.Map) renames columns") {
+    val df = spark.range(3).toDF("id")
+    val jMap = new java.util.HashMap[String, String]()
+    jMap.put("id", "my_id")
+    val result = df.withColumnsRenamed(jMap)
+    assert(result.columns.contains("my_id"))
+    assert(!result.columns.contains("id"))
+  }
+
+  test("dropDuplicates(Array) deduplicates by columns") {
+    val rows = Seq(Row("a", 1), Row("a", 2), Row("b", 1))
+    val schema = StructType(Seq(StructField("k", StringType), StructField("v", IntegerType)))
+    val df = spark.createDataFrame(rows, schema)
+    val result = df.dropDuplicates(Array("k")).collect()
+    assert(result.length == 2)
+  }
+
+  test("randomSplit(Array[Double]) without seed") {
+    val df = spark.range(100).toDF("id")
+    val splits = df.randomSplit(Array(0.5, 0.5))
+    assert(splits.length == 2)
+    assert(splits(0).count() + splits(1).count() == 100)
+  }
