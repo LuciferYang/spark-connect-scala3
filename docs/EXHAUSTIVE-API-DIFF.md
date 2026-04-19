@@ -19,8 +19,8 @@ Generated: 2026-04-19
 | Not applicable (server-only) | 25 |
 | Deliberate design difference | 20 |
 | Present with different signature | 56 |
-| **True gaps remaining** | **31 → 11** |
-| **API coverage** | **97.4% → 99.1%** |
+| **True gaps remaining** | **31 → 9** |
+| **API coverage** | **97.4% → 99.3%** |
 
 ---
 
@@ -39,14 +39,14 @@ Generated: 2026-04-19
 | 7 | `Row` | `merge(other: Row)` | Merge two Row instances | **Done** |
 | 8 | `Row` | `unapplySeq` | Pattern matching extractor | **Done** |
 
-### Priority B: Niche / Advanced (12 → 4 remaining)
+### Priority B: Niche / Advanced (12 → 2 remaining)
 
 | # | Class | Method | Description | Status |
 |---|-------|--------|-------------|--------|
 | 9 | `Column` | `explain(extended)` | Print expression tree (debug) | **Done** |
 | 10 | `DataFrame`/`Dataset` | `randomSplitAsList(weights)` | Java `List[DataFrame]` return variant | **Done** |
-| 11 | `DataFrameStatFunctions` | `bloomFilter(col, ...)` | Build Bloom filter (3 overloads) | Deferred (needs spark-sketch dep) |
-| 12 | `DataFrameStatFunctions` | `countMinSketch(col, ...)` | Build Count-Min Sketch (3 overloads) | Deferred (needs spark-sketch dep) |
+| 11 | `DataFrameStatFunctions` | `bloomFilter(col, ...)` | Build Bloom filter (4 overloads) | **Done** |
+| 12 | `DataFrameStatFunctions` | `countMinSketch(col, ...)` | Build Count-Min Sketch (4 overloads) | **Done** |
 | 13 | `DataFrameWriter` | `xml(path)` | Write to XML format | **Done** |
 | 14 | `Observation` | `getAsJava` | Return `java.util.Map` instead of Scala Map | **Done** |
 | 15 | `Encoders` | `CHAR` | CharType encoder constant | **Done** |
@@ -128,11 +128,10 @@ Methods in SC3 not in official (SC3-specific additions):
 
 ## Recommended Next Steps
 
-### Remaining 11 gaps (all deferred):
+### Remaining 9 gaps (all deferred):
 
 | Category | Items | Reason |
 |----------|-------|--------|
-| **bloomFilter/countMinSketch** | #11, #12 | Needs `spark-sketch` dependency; not even in official Connect client |
 | **GroupedDataFrame.as[K]** | #5 | Needs `KeyValueGroupedDatasetImpl` with column-expression support |
 | **Deprecated explode** | #28-31 | Needs TypeTag machinery in Scala 3; deprecated since 2.0 |
 | **Spatial types** | #21-25 | `@Unstable`; complex type infrastructure (Geometry/Geography) |
