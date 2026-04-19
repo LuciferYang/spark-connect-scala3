@@ -19,7 +19,7 @@ jobs:
         run: |
           cd spark-upstream
           git sparse-checkout init
-          git sparse-checkout set sql/connect/common/src/main/protobuf/spark/connect
+          git sparse-checkout set sql/connect/common/src/main/protobuf/spark/connect common/sketch/src/main/java
           cd ..
 
       - name: Set up JDK 17

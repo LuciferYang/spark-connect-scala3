@@ -102,6 +102,10 @@ lazy val root = (project in file("."))
       baseDirectory.value / "spark-upstream" / "sql" / "connect" / "common" / "src" / "main" / "protobuf"
     ),
 
+    // Include spark-sketch Java sources from the spark-upstream submodule (BloomFilter, CountMinSketch).
+    Compile / unmanagedSourceDirectories +=
+      baseDirectory.value / "spark-upstream" / "common" / "sketch" / "src" / "main" / "java",
+
     // gRPC Java codegen plugin
     libraryDependencies += "io.grpc" % "protoc-gen-grpc-java" % grpcVersion asProtocPlugin(),
 
@@ -118,15 +122,17 @@ lazy val root = (project in file("."))
       "org\\.apache\\.spark\\.sql\\.streaming\\.StreamingQueryListenerBus"  // requires live server
     ).mkString(";"),
 
-    // JVM options for Apache Arrow
+    // JVM options for Apache Arrow + spark-sketch (sun.misc.Unsafe)
     Test / javaOptions ++= Seq(
-      "--add-opens=java.base/java.nio=ALL-UNNAMED"
+      "--add-opens=java.base/java.nio=ALL-UNNAMED",
+      "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
     ),
     Test / fork := true,
 
-    // Run options for Arrow
+    // Run options for Arrow + spark-sketch
     run / javaOptions ++= Seq(
-      "--add-opens=java.base/java.nio=ALL-UNNAMED"
+      "--add-opens=java.base/java.nio=ALL-UNNAMED",
+      "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
     ),
     run / fork := true,
 

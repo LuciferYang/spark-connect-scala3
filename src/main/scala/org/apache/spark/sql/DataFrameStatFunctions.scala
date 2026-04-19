@@ -1,6 +1,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
+import org.apache.spark.util.sketch.{BloomFilter, CountMinSketch}
 
 /** Statistic functions for DataFrames. Access via `df.stat`.
   */
@@ -92,3 +93,48 @@ final class DataFrameStatFunctions private[sql] (df: DataFrame):
   /** Returns a stratified sample without replacement using column name. */
   def sampleBy[T](col: String, fractions: Map[T, Double], seed: Long): DataFrame =
     sampleBy(Column(col), fractions, seed)
+
+  // -- Count-Min Sketch -------------------------------------------------------
+
+  /** Builds a Count-min Sketch over a specified column. */
+  def countMinSketch(colName: String, depth: Int, width: Int, seed: Int): CountMinSketch =
+    countMinSketch(Column(colName), depth, width, seed)
+
+  /** Builds a Count-min Sketch over a specified column. */
+  def countMinSketch(colName: String, eps: Double, confidence: Double, seed: Int): CountMinSketch =
+    countMinSketch(Column(colName), eps, confidence, seed)
+
+  /** Builds a Count-min Sketch over a specified column. */
+  def countMinSketch(col: Column, depth: Int, width: Int, seed: Int): CountMinSketch =
+    val eps = 2.0 / width
+    val confidence = 1 - 1 / Math.pow(2, depth)
+    countMinSketch(col, eps, confidence, seed)
+
+  /** Builds a Count-min Sketch over a specified column. */
+  def countMinSketch(col: Column, eps: Double, confidence: Double, seed: Int): CountMinSketch =
+    import functions.{count_min_sketch, lit}
+    val cms = count_min_sketch(col, lit(eps), lit(confidence), lit(seed))
+    val bytes = df.select(cms).head().get(0).asInstanceOf[Array[Byte]]
+    CountMinSketch.readFrom(bytes)
+
+  // -- Bloom Filter ------------------------------------------------------------
+
+  /** Builds a Bloom filter over a specified column. */
+  def bloomFilter(colName: String, expectedNumItems: Long, fpp: Double): BloomFilter =
+    bloomFilter(Column(colName), expectedNumItems, fpp)
+
+  /** Builds a Bloom filter over a specified column. */
+  def bloomFilter(col: Column, expectedNumItems: Long, fpp: Double): BloomFilter =
+    val numBits = BloomFilter.optimalNumOfBits(expectedNumItems, fpp)
+    bloomFilter(col, expectedNumItems, numBits)
+
+  /** Builds a Bloom filter over a specified column. */
+  def bloomFilter(colName: String, expectedNumItems: Long, numBits: Long): BloomFilter =
+    bloomFilter(Column(colName), expectedNumItems, numBits)
+
+  /** Builds a Bloom filter over a specified column. */
+  def bloomFilter(col: Column, expectedNumItems: Long, numBits: Long): BloomFilter =
+    import functions.{bloom_filter_agg, lit}
+    val bf = bloom_filter_agg(col, lit(expectedNumItems), lit(numBits))
+    val bytes = df.select(bf).head().get(0).asInstanceOf[Array[Byte]]
+    BloomFilter.readFrom(bytes)

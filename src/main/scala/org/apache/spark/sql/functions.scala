@@ -116,6 +116,8 @@ object functions:
     callFn("string_agg_distinct", e, delimiter)
   def histogram_numeric(e: Column, nBins: Column): Column =
     callFn("histogram_numeric", e, nBins)
+  def bloom_filter_agg(e: Column, expectedNumItems: Column, numBits: Column): Column =
+    callFn("bloom_filter_agg", e, expectedNumItems, numBits)
   def count_min_sketch(e: Column, eps: Column, confidence: Column, seed: Column): Column =
     callFn("count_min_sketch", e, eps, confidence, seed)
   def count_min_sketch(e: Column, eps: Column, confidence: Column): Column =

@@ -237,3 +237,63 @@ class NaStatIntegrationSuite extends IntegrationTestBase:
     val row0 = result.find(r => r.getString(0) == "x" || r.getString(1) == "x")
     assert(row0.isDefined)
   }
+
+  // ---------------------------------------------------------------------------
+  // BloomFilter & CountMinSketch
+  // ---------------------------------------------------------------------------
+
+  private def sketchTestDf: DataFrame =
+    val rows = (1 to 1000).map(i => Row(i.toLong))
+    val schema = StructType(Seq(StructField("id", types.LongType)))
+    spark.createDataFrame(rows, schema)
+
+  test("stat.bloomFilter(colName, expectedNumItems, fpp)") {
+    val bf = sketchTestDf.stat.bloomFilter("id", 1000L, 0.01)
+    assert(bf.mightContain(1L))
+    assert(bf.mightContain(500L))
+    assert(bf.mightContain(1000L))
+    assert(bf.expectedFpp() <= 0.05)
+  }
+
+  test("stat.bloomFilter(col, expectedNumItems, fpp)") {
+    val bf = sketchTestDf.stat.bloomFilter(col("id"), 1000L, 0.01)
+    assert(bf.mightContain(1L))
+    assert(bf.mightContain(1000L))
+  }
+
+  test("stat.bloomFilter(colName, expectedNumItems, numBits)") {
+    val bf = sketchTestDf.stat.bloomFilter("id", 1000L, 8192L)
+    assert(bf.mightContain(1L))
+    assert(bf.mightContain(500L))
+  }
+
+  test("stat.bloomFilter(col, expectedNumItems, numBits)") {
+    val bf = sketchTestDf.stat.bloomFilter(col("id"), 1000L, 8192L)
+    assert(bf.mightContain(1L))
+  }
+
+  test("stat.countMinSketch(colName, eps, confidence, seed)") {
+    val cms = sketchTestDf.stat.countMinSketch("id", 0.01, 0.99, 42)
+    // Each value appears exactly once
+    assert(cms.estimateCount(1L) >= 1)
+    assert(cms.estimateCount(500L) >= 1)
+    assert(cms.totalCount() == 1000L)
+  }
+
+  test("stat.countMinSketch(col, eps, confidence, seed)") {
+    val cms = sketchTestDf.stat.countMinSketch(col("id"), 0.01, 0.99, 42)
+    assert(cms.estimateCount(1L) >= 1)
+    assert(cms.totalCount() == 1000L)
+  }
+
+  test("stat.countMinSketch(colName, depth, width, seed)") {
+    val cms = sketchTestDf.stat.countMinSketch("id", 5, 100, 42)
+    assert(cms.estimateCount(1L) >= 1)
+    assert(cms.totalCount() == 1000L)
+  }
+
+  test("stat.countMinSketch(col, depth, width, seed)") {
+    val cms = sketchTestDf.stat.countMinSketch(col("id"), 5, 100, 42)
+    assert(cms.estimateCount(1L) >= 1)
+    assert(cms.totalCount() == 1000L)
+  }
