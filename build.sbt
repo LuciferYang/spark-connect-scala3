@@ -106,6 +106,15 @@ lazy val root = (project in file("."))
     Compile / unmanagedSourceDirectories +=
       baseDirectory.value / "spark-upstream" / "common" / "sketch" / "src" / "main" / "java",
 
+    // Include Spark annotation and spatial value classes from the spark-upstream submodule.
+    Compile / unmanagedSourceDirectories +=
+      baseDirectory.value / "spark-upstream" / "common" / "tags" / "src" / "main" / "java",
+    Compile / unmanagedSources ++= {
+      val typesDir = baseDirectory.value / "spark-upstream" / "sql" / "api" / "src" / "main" / "java" /
+        "org" / "apache" / "spark" / "sql" / "types"
+      Seq(typesDir / "Geometry.java", typesDir / "Geography.java")
+    },
+
     // gRPC Java codegen plugin
     libraryDependencies += "io.grpc" % "protoc-gen-grpc-java" % grpcVersion asProtocPlugin(),
 
