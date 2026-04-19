@@ -286,3 +286,73 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
   test("YearMonthIntervalType simpleString matches typeName") {
     YearMonthIntervalType.simpleString shouldBe "year_month_interval"
   }
+
+  // ---------------------------------------------------------------------------
+  // Spatial types
+  // ---------------------------------------------------------------------------
+
+  test("GeometryType default srid") {
+    val dt = GeometryType()
+    dt.srid shouldBe 0
+    dt.typeName shouldBe "geometry(0)"
+    dt.sql shouldBe "GEOMETRY(0)"
+  }
+
+  test("GeometryType custom srid") {
+    val dt = GeometryType(4326)
+    dt.srid shouldBe 4326
+    dt.typeName shouldBe "geometry(4326)"
+    dt.sql shouldBe "GEOMETRY(4326)"
+  }
+
+  test("GeographyType default srid") {
+    val dt = GeographyType()
+    dt.srid shouldBe 4326
+    dt.typeName shouldBe "geography(4326)"
+    dt.sql shouldBe "GEOGRAPHY(4326)"
+  }
+
+  test("GeographyType custom srid") {
+    val dt = GeographyType(0)
+    dt.srid shouldBe 0
+    dt.typeName shouldBe "geography(0)"
+    dt.sql shouldBe "GEOGRAPHY(0)"
+  }
+
+  test("Geometry value class") {
+    val geom = Geometry.fromWKB(Array[Byte](1, 2, 3), 4326)
+    geom.getSrid shouldBe 4326
+    geom.getBytes shouldBe Array[Byte](1, 2, 3)
+  }
+
+  test("Geometry value class default srid") {
+    val geom = Geometry.fromWKB(Array[Byte](1, 2, 3))
+    geom.getSrid shouldBe 0
+  }
+
+  test("Geography value class") {
+    val geog = Geography.fromWKB(Array[Byte](4, 5, 6), 4326)
+    geog.getSrid shouldBe 4326
+    geog.getBytes shouldBe Array[Byte](4, 5, 6)
+  }
+
+  test("Geography value class default srid") {
+    val geog = Geography.fromWKB(Array[Byte](4, 5, 6))
+    geog.getSrid shouldBe 4326
+  }
+
+  test("Geometry equality") {
+    val a = Geometry.fromWKB(Array[Byte](1, 2), 4326)
+    val b = Geometry.fromWKB(Array[Byte](1, 2), 4326)
+    val c = Geometry.fromWKB(Array[Byte](1, 2), 0)
+    a shouldBe b
+    a should not be c
+  }
+
+  test("Geography equality") {
+    val a = Geography.fromWKB(Array[Byte](1, 2), 4326)
+    val b = Geography.fromWKB(Array[Byte](1, 2), 4326)
+    val c = Geography.fromWKB(Array[Byte](3, 4), 4326)
+    a shouldBe b
+    a should not be c
+  }

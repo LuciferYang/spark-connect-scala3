@@ -33,6 +33,9 @@ object DataTypeProtoConverter:
       case KindCase.VAR_CHAR => VarcharType(proto.getVarChar.getLength)
       case KindCase.TIME     => TimeType(proto.getTime.getPrecision)
 
+      case KindCase.GEOMETRY  => GeometryType(proto.getGeometry.getSrid)
+      case KindCase.GEOGRAPHY => GeographyType(proto.getGeography.getSrid)
+
       case KindCase.DECIMAL =>
         val d = proto.getDecimal
         DecimalType(
@@ -117,6 +120,15 @@ object DataTypeProtoConverter:
       case TimeType(precision) =>
         ProtoDataType.newBuilder().setTime(
           ProtoDataType.Time.newBuilder().setPrecision(precision).build()
+        ).build()
+
+      case GeometryType(srid) =>
+        ProtoDataType.newBuilder().setGeometry(
+          ProtoDataType.Geometry.newBuilder().setSrid(srid).build()
+        ).build()
+      case GeographyType(srid) =>
+        ProtoDataType.newBuilder().setGeography(
+          ProtoDataType.Geography.newBuilder().setSrid(srid).build()
         ).build()
 
       case DecimalType(p, s) =>

@@ -88,6 +88,20 @@ final case class TimeType(precision: Int = TimeType.DEFAULT_PRECISION) extends D
 object TimeType:
   val DEFAULT_PRECISION: Int = 6
 
+final case class GeometryType(srid: Int = GeometryType.DEFAULT_SRID) extends DataType:
+  def typeName = s"geometry($srid)"
+  override def sql = s"GEOMETRY($srid)"
+
+object GeometryType:
+  val DEFAULT_SRID: Int = 0
+
+final case class GeographyType(srid: Int = GeographyType.DEFAULT_SRID) extends DataType:
+  def typeName = s"geography($srid)"
+  override def sql = s"GEOGRAPHY($srid)"
+
+object GeographyType:
+  val DEFAULT_SRID: Int = 4326
+
 final case class DecimalType(precision: Int, scale: Int) extends DataType:
   def typeName = "decimal"
   override def simpleString = s"decimal($precision,$scale)"

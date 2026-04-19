@@ -234,6 +234,18 @@ object AgnosticEncoders:
   case object LocalTimeEncoder
       extends LeafEncoder[java.time.LocalTime](TimeType(), "LocalTimeEncoder")
 
+  case class GeometryEncoder(dt: GeometryType)
+      extends ParameterizedEncoder[Geometry](dt, "GeometryEncoder"):
+    @throws[ObjectStreamException]
+    private def writeReplace(): AnyRef =
+      SpatialEncoderProxy("GeometryEncoder", dt.srid)
+
+  case class GeographyEncoder(dt: GeographyType)
+      extends ParameterizedEncoder[Geography](dt, "GeographyEncoder"):
+    @throws[ObjectStreamException]
+    private def writeReplace(): AnyRef =
+      SpatialEncoderProxy("GeographyEncoder", dt.srid)
+
   // Convenience constants
   val STRICT_DATE_ENCODER: DateEncoder = DateEncoder(false)
   val STRICT_LOCAL_DATE_ENCODER: LocalDateEncoder = LocalDateEncoder(false)
@@ -665,3 +677,44 @@ final class MapEncoderProxy(
       valueEncoder,
       java.lang.Boolean.valueOf(valueContainsNull)
     )
+
+/** Serialization proxy for spatial [[AgnosticEncoder]] instances (Geometry/Geography).
+  *
+  * The server-side `GeometryEncoder` / `GeographyEncoder` take a `GeometryType(srid)` /
+  * `GeographyType(srid)` as their single constructor argument. This proxy reconstructs the spatial
+  * DataType and then the encoder via reflection.
+  */
+@SerialVersionUID(1L)
+final class SpatialEncoderProxy(
+    val encoderName: String,
+    val srid: Int
+) extends Serializable:
+
+  @throws[ObjectStreamException]
+  private def readResolve(): AnyRef =
+    val cl = getClass.getClassLoader match
+      case null => ClassLoader.getSystemClassLoader
+      case c    => Option(c.getParent).getOrElse(c)
+    // Determine the spatial DataType class name based on the encoder name
+    val dtClassName = encoderName match
+      case "GeometryEncoder"  => "org.apache.spark.sql.types.GeometryType"
+      case "GeographyEncoder" => "org.apache.spark.sql.types.GeographyType"
+      case other              => throw ClassNotFoundException(s"Unknown spatial encoder: $other")
+    // Reconstruct the spatial DataType via its apply(srid) companion
+    val dtCompanionClass = Class.forName(s"$dtClassName$$", true, cl)
+    val dtModule = dtCompanionClass.getField("MODULE$").get(null)
+    val applyMethod = dtCompanionClass.getMethod("apply", classOf[Int])
+    val dt = applyMethod.invoke(dtModule, java.lang.Integer.valueOf(srid))
+    // Reconstruct the encoder
+    val encClassName =
+      s"org.apache.spark.sql.catalyst.encoders.AgnosticEncoders$$$encoderName"
+    val encClass = Class.forName(encClassName, true, cl)
+    val dtBaseClass = Class.forName(dtClassName, true, cl)
+    val ctor = encClass.getConstructors
+      .find { c =>
+        c.getParameterCount == 1 && c.getParameterTypes()(0).isAssignableFrom(dtBaseClass)
+      }
+      .getOrElse(
+        throw ClassNotFoundException(s"No matching constructor for $encoderName")
+      )
+    ctor.newInstance(dt)

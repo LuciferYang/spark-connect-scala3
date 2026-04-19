@@ -305,3 +305,23 @@ class RowSuite extends AnyFunSuite with Matchers:
     row.get(1) shouldBe "hello"
     row.get(2) shouldBe 3.14
   }
+
+  // ---------------------------------------------------------------------------
+  // Spatial type getters
+  // ---------------------------------------------------------------------------
+
+  test("Row.getGeometry returns Geometry value") {
+    val geom = Geometry.fromWKB(Array[Byte](1, 2, 3), 4326)
+    val row = Row(geom)
+    row.getGeometry(0) shouldBe geom
+    row.getGeometry(0).getSrid shouldBe 4326
+    row.getGeometry(0).getBytes shouldBe Array[Byte](1, 2, 3)
+  }
+
+  test("Row.getGeography returns Geography value") {
+    val geog = Geography.fromWKB(Array[Byte](4, 5, 6), 4326)
+    val row = Row(geog)
+    row.getGeography(0) shouldBe geog
+    row.getGeography(0).getSrid shouldBe 4326
+    row.getGeography(0).getBytes shouldBe Array[Byte](4, 5, 6)
+  }

@@ -90,7 +90,9 @@ private[sql] object ArrowSerializer:
       new ArrowType.Interval(org.apache.arrow.vector.types.IntervalUnit.YEAR_MONTH)
     case _: types.TimeType =>
       new ArrowType.Time(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, 64)
-    case types.NullType => ArrowType.Null.INSTANCE
+    case _: types.GeometryType  => ArrowType.Binary.INSTANCE
+    case _: types.GeographyType => ArrowType.Binary.INSTANCE
+    case types.NullType         => ArrowType.Null.INSTANCE
 
   /** Convert a Spark DataType to an Arrow Field with child fields for complex types. */
   private def sparkTypeToArrowField(

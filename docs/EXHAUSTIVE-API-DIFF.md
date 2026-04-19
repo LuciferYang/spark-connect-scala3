@@ -19,8 +19,8 @@ Generated: 2026-04-19
 | Not applicable (server-only) | 25 |
 | Deliberate design difference | 20 |
 | Present with different signature | 56 |
-| **True gaps remaining** | **31 → 9** |
-| **API coverage** | **97.4% → 99.3%** |
+| **True gaps remaining** | **31 → 5** |
+| **API coverage** | **97.4% → 99.6%** |
 
 ---
 
@@ -56,15 +56,15 @@ Generated: 2026-04-19
 | 19 | `Encoders` | `LOCALTIME` | LocalTimeType encoder constant | **Done** |
 | 20 | `Encoders` | `tuple[T1]` | Single-element tuple encoder | **Done** |
 
-### Priority C: Spatial / Rarely Used (5)
+### Priority C: Spatial / Rarely Used (5 → 1 remaining)
 
-| # | Class | Method | Description | Effort |
+| # | Class | Method | Description | Status |
 |---|-------|--------|-------------|--------|
-| 21 | `Encoders` | `GEOGRAPHY` | GeographyType encoder constant | Low |
-| 22 | `Encoders` | `GEOMETRY` | GeometryType encoder constant | Low |
-| 23 | `Encoders` | `udt[T]` | User-defined type encoder | Medium |
-| 24 | `Row` | `getGeography` | Get geography column value | Medium |
-| 25 | `Row` | `getGeometry` | Get geometry column value | Medium |
+| 21 | `Encoders` | `GEOGRAPHY` | GeographyType encoder constant | **Done** |
+| 22 | `Encoders` | `GEOMETRY` | GeometryType encoder constant | **Done** |
+| 23 | `Encoders` | `udt[T]` | User-defined type encoder | Deferred |
+| 24 | `Row` | `getGeography` | Get geography column value | **Done** |
+| 25 | `Row` | `getGeometry` | Get geometry column value | **Done** |
 
 ### Priority D: Deprecated but Still Present (6 → 4 remaining)
 
@@ -128,10 +128,10 @@ Methods in SC3 not in official (SC3-specific additions):
 
 ## Recommended Next Steps
 
-### Remaining 9 gaps (all deferred):
+### Remaining 5 gaps (all deferred):
 
 | Category | Items | Reason |
 |----------|-------|--------|
 | **GroupedDataFrame.as[K]** | #5 | Needs `KeyValueGroupedDatasetImpl` with column-expression support |
 | **Deprecated explode** | #28-31 | Needs TypeTag machinery in Scala 3; deprecated since 2.0 |
-| **Spatial types** | #21-25 | `@Unstable`; complex type infrastructure (Geometry/Geography) |
+| **Encoders.udt** | #23 | Needs UDT infrastructure |

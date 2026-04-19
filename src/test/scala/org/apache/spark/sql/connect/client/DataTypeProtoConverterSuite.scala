@@ -167,3 +167,35 @@ class DataTypeProtoConverterSuite extends AnyFunSuite with Matchers:
       .build()
     DataTypeProtoConverter.fromProto(proto) shouldBe YearMonthIntervalType
   }
+
+  test("GeometryType full round-trip") {
+    val dt = GeometryType(4326)
+    val proto = DataTypeProtoConverter.toProto(dt)
+    proto.hasGeometry shouldBe true
+    proto.getGeometry.getSrid shouldBe 4326
+    DataTypeProtoConverter.fromProto(proto) shouldBe dt
+  }
+
+  test("GeometryType default srid round-trip") {
+    val dt = GeometryType()
+    val proto = DataTypeProtoConverter.toProto(dt)
+    proto.hasGeometry shouldBe true
+    proto.getGeometry.getSrid shouldBe 0
+    DataTypeProtoConverter.fromProto(proto) shouldBe dt
+  }
+
+  test("GeographyType full round-trip") {
+    val dt = GeographyType(4326)
+    val proto = DataTypeProtoConverter.toProto(dt)
+    proto.hasGeography shouldBe true
+    proto.getGeography.getSrid shouldBe 4326
+    DataTypeProtoConverter.fromProto(proto) shouldBe dt
+  }
+
+  test("GeographyType default srid round-trip") {
+    val dt = GeographyType()
+    val proto = DataTypeProtoConverter.toProto(dt)
+    proto.hasGeography shouldBe true
+    proto.getGeography.getSrid shouldBe 4326
+    DataTypeProtoConverter.fromProto(proto) shouldBe dt
+  }

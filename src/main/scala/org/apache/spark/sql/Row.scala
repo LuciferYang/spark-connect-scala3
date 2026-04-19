@@ -67,6 +67,12 @@ final class Row private (
 
   def getStruct(i: Int): Row = get(i).asInstanceOf[Row]
 
+  def getGeometry(i: Int): org.apache.spark.sql.types.Geometry =
+    get(i).asInstanceOf[org.apache.spark.sql.types.Geometry]
+
+  def getGeography(i: Int): org.apache.spark.sql.types.Geography =
+    get(i).asInstanceOf[org.apache.spark.sql.types.Geography]
+
   def fieldIndex(name: String): Int =
     schema match
       case Some(s) => s.fieldIndex(name)

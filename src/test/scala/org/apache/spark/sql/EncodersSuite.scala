@@ -264,3 +264,19 @@ class EncodersSuite extends AnyFunSuite with Matchers:
       enc.toRow(42)
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Spatial type encoders
+  // ---------------------------------------------------------------------------
+
+  test("GEOMETRY returns correct encoder") {
+    val enc = Encoders.GEOMETRY
+    enc.schema shouldBe StructType(Seq(StructField("value", GeometryType())))
+    enc.agnosticEncoder shouldBe a[GeometryEncoder]
+  }
+
+  test("GEOGRAPHY returns correct encoder") {
+    val enc = Encoders.GEOGRAPHY
+    enc.schema shouldBe StructType(Seq(StructField("value", GeographyType())))
+    enc.agnosticEncoder shouldBe a[GeographyEncoder]
+  }

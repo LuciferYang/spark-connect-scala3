@@ -111,6 +111,13 @@ object Encoders:
   def VARCHAR(length: Int): Encoder[String] = wrap(AgnosticEncoders.VarcharEncoder(length))
   def LOCALTIME: Encoder[java.time.LocalTime] = wrap(AgnosticEncoders.LocalTimeEncoder)
 
+  // -- Spatial types -----------------------------------------------------------
+
+  def GEOMETRY: Encoder[org.apache.spark.sql.types.Geometry] =
+    wrap(AgnosticEncoders.GeometryEncoder(org.apache.spark.sql.types.GeometryType()))
+  def GEOGRAPHY: Encoder[org.apache.spark.sql.types.Geography] =
+    wrap(AgnosticEncoders.GeographyEncoder(org.apache.spark.sql.types.GeographyType()))
+
   // -- Row encoder ------------------------------------------------------------
 
   def row: Encoder[Row] = wrap(AgnosticEncoders.UnboundRowEncoder)
