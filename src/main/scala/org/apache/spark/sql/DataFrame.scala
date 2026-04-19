@@ -7,7 +7,7 @@ import org.apache.spark.sql.connect.client.{
   SparkConnectClient
 }
 import org.apache.spark.sql.connect.common.LiteralValueProtoConverter
-import org.apache.spark.sql.types.{StructField, StructType}
+import org.apache.spark.sql.types.{GeographyType, GeometryType, StructField, StructType}
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -630,7 +630,7 @@ final class DataFrame private[sql] (
   def collect(): Array[Row] =
     val (rows, observed) = executeAndCollect(relation)
     if observed.nonEmpty then session.processObservedMetrics(observed)
-    rows
+    applySpatialConversions(rows, schema)
 
   def collectAsList(): java.util.List[Row] = java.util.Arrays.asList(collect()*)
 
@@ -1025,6 +1025,29 @@ final class DataFrame private[sql] (
         case st: StructType => Some(st)
         case _              => None
     else None
+
+  /** Convert raw Array[Byte] values to Geometry/Geography objects where the schema requires it. */
+  private def applySpatialConversions(rows: Array[Row], schema: StructType): Array[Row] =
+    val spatialIndices = schema.fields.zipWithIndex.collect {
+      case (f, i) if f.dataType.isInstanceOf[GeometryType]  => (i, true)
+      case (f, i) if f.dataType.isInstanceOf[GeographyType] => (i, false)
+    }
+    if spatialIndices.isEmpty then return rows
+    rows.map { row =>
+      val values = row.toSeq.toArray
+      spatialIndices.foreach { case (idx, isGeometry) =>
+        if values(idx) != null then
+          val bytes = values(idx).asInstanceOf[Array[Byte]]
+          val srid = schema.fields(idx).dataType match
+            case g: GeometryType  => g.srid
+            case g: GeographyType => g.srid
+            case _                => 0
+          values(idx) =
+            if isGeometry then types.Geometry.fromWKB(bytes, srid)
+            else types.Geography.fromWKB(bytes, srid)
+      }
+      Row.fromSeqWithSchema(values.toIndexedSeq, schema)
+    }
 
   private[sql] def withRelation(f: Relation.Builder => Relation.Builder): DataFrame =
     val builder = Relation.newBuilder()

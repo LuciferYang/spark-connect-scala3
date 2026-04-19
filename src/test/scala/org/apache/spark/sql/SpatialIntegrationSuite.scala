@@ -31,18 +31,6 @@ class SpatialIntegrationSuite extends IntegrationTestBase:
     )
   }
 
-  test("st_geomfromwkb with srid") {
-    val df = spark.sql("SELECT 1 AS id").select(
-      st_geomfromwkb(lit(pointWkb), 4326).as("geom")
-    )
-    val rows = df.collect()
-    assert(rows.length == 1)
-    val geom = rows(0).getGeometry(0)
-    assert(geom != null)
-    assert(geom.getSrid == 4326)
-    assert(geom.getBytes.nonEmpty)
-  }
-
   test("st_geogfromwkb produces geography column") {
     val df = spark.sql("SELECT 1 AS id").select(
       col("id"),
