@@ -115,6 +115,7 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
   def orc(path: String): Unit = format("orc").save(path)
   def csv(path: String): Unit = format("csv").save(path)
   def text(path: String): Unit = format("text").save(path)
+  def xml(path: String): Unit = format("xml").save(path)
 
   def jdbc(url: String, table: String, connectionProperties: java.util.Properties): Unit =
     import scala.jdk.CollectionConverters.*

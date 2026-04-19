@@ -39,6 +39,16 @@ case object StringType extends DataType:
   def typeName = "string"
   override def sql = "STRING"
 
+final case class CharType(length: Int) extends DataType:
+  require(length >= 0, "The length of char type cannot be negative.")
+  def typeName = s"char($length)"
+  override def sql = s"CHAR($length)"
+
+final case class VarcharType(length: Int) extends DataType:
+  require(length >= 0, "The length of varchar type cannot be negative.")
+  def typeName = s"varchar($length)"
+  override def sql = s"VARCHAR($length)"
+
 case object BinaryType extends DataType:
   def typeName = "binary"
   override def sql = "BINARY"
@@ -70,6 +80,13 @@ case object DayTimeIntervalType extends DataType:
 case object YearMonthIntervalType extends DataType:
   def typeName = "year_month_interval"
   override def sql = "INTERVAL YEAR TO MONTH"
+
+final case class TimeType(precision: Int = TimeType.DEFAULT_PRECISION) extends DataType:
+  def typeName = s"time($precision)"
+  override def sql = s"TIME($precision)"
+
+object TimeType:
+  val DEFAULT_PRECISION: Int = 6
 
 final case class DecimalType(precision: Int, scale: Int) extends DataType:
   def typeName = "decimal"

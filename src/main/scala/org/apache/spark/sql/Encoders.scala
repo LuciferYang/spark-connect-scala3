@@ -100,11 +100,25 @@ object Encoders:
   def LOCALDATETIME: Encoder[java.time.LocalDateTime] = wrap(LocalDateTimeEncoder)
   def DECIMAL: Encoder[java.math.BigDecimal] = wrap(AgnosticEncoders.DEFAULT_JAVA_DECIMAL_ENCODER)
 
+  // -- Interval types ---------------------------------------------------------
+
+  def DURATION: Encoder[java.time.Duration] = wrap(AgnosticEncoders.DayTimeIntervalEncoder)
+  def PERIOD: Encoder[java.time.Period] = wrap(AgnosticEncoders.YearMonthIntervalEncoder)
+
+  // -- Char / Varchar / Time types -------------------------------------------
+
+  def CHAR(length: Int): Encoder[String] = wrap(AgnosticEncoders.CharEncoder(length))
+  def VARCHAR(length: Int): Encoder[String] = wrap(AgnosticEncoders.VarcharEncoder(length))
+  def LOCALTIME: Encoder[java.time.LocalTime] = wrap(AgnosticEncoders.LocalTimeEncoder)
+
   // -- Row encoder ------------------------------------------------------------
 
   def row: Encoder[Row] = wrap(AgnosticEncoders.UnboundRowEncoder)
 
   // -- Tuple encoders -------------------------------------------------------
+
+  def tuple[T1](e1: Encoder[T1]): Encoder[Tuple1[T1]] =
+    wrap(tupleProductEncoder[Tuple1[T1]](asAgnostic(e1)))
 
   def tuple[T1, T2](
       e1: Encoder[T1],

@@ -13,6 +13,9 @@ final class StreamingQuery private[sql] (
     val name: Option[String]
 ):
 
+  /** The SparkSession associated with this streaming query. */
+  def sparkSession: SparkSession = session
+
   /** Whether the query is currently active. */
   def isActive: Boolean =
     val result = executeQueryCmd(_.setStatus(true))

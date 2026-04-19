@@ -91,6 +91,9 @@ final class Row private (
       case None =>
         throw UnsupportedOperationException("json requires a Row with schema")
 
+  /** Alias for `json`. */
+  def toJson: String = json
+
   def prettyJson: String =
     schema match
       case Some(s) =>
@@ -149,3 +152,19 @@ object Row:
   def fromTuple(t: Product): Row = fromSeq(t.productIterator.toSeq)
 
   val empty: Row = new Row(IndexedSeq.empty)
+
+  /** Pattern-matching extractor for Row values.
+    *
+    * {{{
+    *   row match { case Row(x, y, z) => ... }
+    * }}}
+    */
+  def unapplySeq(row: Row): Some[Seq[Any]] = Some(row.toSeq)
+
+  /** Merge multiple rows into one by concatenating their fields.
+    *
+    * The resulting Row has no schema.
+    */
+  @deprecated("This method is deprecated and will be removed in future versions.", "3.0.0")
+  def merge(rows: Row*): Row =
+    fromSeq(rows.flatMap(_.toSeq))

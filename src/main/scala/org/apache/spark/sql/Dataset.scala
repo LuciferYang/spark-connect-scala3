@@ -301,6 +301,10 @@ final class Dataset[T: ClassTag] private[sql] (
 
   def cube(col1: String, cols: String*): GroupedDataFrame = df.cube(col1, cols*)
 
+  /** Group by grouping sets. */
+  def groupingSets(groupingSets: Seq[Seq[Column]], cols: Column*): GroupedDataFrame =
+    df.groupingSets(groupingSets, cols*)
+
   def offset(n: Int): Dataset[T] = Dataset(df.offset(n), encoder)
 
   def to(schema: types.StructType): DataFrame = df.to(schema)
@@ -710,11 +714,27 @@ final class Dataset[T: ClassTag] private[sql] (
   def createTempView(viewName: String): Unit = df.createTempView(viewName)
   def createOrReplaceTempView(viewName: String): Unit = df.createOrReplaceTempView(viewName)
 
+  /** @deprecated Use `createOrReplaceTempView` instead. */
+  @deprecated("Use createOrReplaceTempView instead", "2.0.0")
+  def registerTempTable(tableName: String): Unit = df.registerTempTable(tableName)
+
   // ---------------------------------------------------------------------------
   // Writer
   // ---------------------------------------------------------------------------
 
   def write: DataFrameWriter = df.write
+
+  /** MERGE INTO DML. */
+  def mergeInto(table: String, condition: Column): MergeIntoWriter =
+    df.mergeInto(table, condition)
+
+  /** Attach metadata (as JSON string) to a column. */
+  def withMetadata(columnName: String, metadata: String): DataFrame =
+    df.withMetadata(columnName, metadata)
+
+  /** Randomly split into multiple Datasets, returned as a Java List. */
+  def randomSplitAsList(weights: Array[Double], seed: Long): java.util.List[Dataset[T]] =
+    java.util.Arrays.asList(randomSplit(weights, seed)*)
 
   // ---------------------------------------------------------------------------
   // Helpers

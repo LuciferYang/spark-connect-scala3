@@ -63,16 +63,18 @@ private[sql] object ArrowSerializer:
       allocator.close()
 
   private def sparkTypeToArrow(dt: types.DataType): ArrowType = dt match
-    case types.BooleanType   => ArrowType.Bool.INSTANCE
-    case types.ByteType      => new ArrowType.Int(8, true)
-    case types.ShortType     => new ArrowType.Int(16, true)
-    case types.IntegerType   => new ArrowType.Int(32, true)
-    case types.LongType      => new ArrowType.Int(64, true)
-    case types.FloatType     => new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)
-    case types.DoubleType    => new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)
-    case types.StringType    => ArrowType.Utf8.INSTANCE
-    case types.DateType      => new ArrowType.Date(org.apache.arrow.vector.types.DateUnit.DAY)
-    case types.TimestampType =>
+    case types.BooleanType    => ArrowType.Bool.INSTANCE
+    case types.ByteType       => new ArrowType.Int(8, true)
+    case types.ShortType      => new ArrowType.Int(16, true)
+    case types.IntegerType    => new ArrowType.Int(32, true)
+    case types.LongType       => new ArrowType.Int(64, true)
+    case types.FloatType      => new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)
+    case types.DoubleType     => new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)
+    case types.StringType     => ArrowType.Utf8.INSTANCE
+    case _: types.CharType    => ArrowType.Utf8.INSTANCE
+    case _: types.VarcharType => ArrowType.Utf8.INSTANCE
+    case types.DateType       => new ArrowType.Date(org.apache.arrow.vector.types.DateUnit.DAY)
+    case types.TimestampType  =>
       new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, "UTC")
     case types.TimestampNTZType =>
       new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, null)
@@ -86,6 +88,8 @@ private[sql] object ArrowSerializer:
       new ArrowType.Duration(org.apache.arrow.vector.types.TimeUnit.MICROSECOND)
     case types.YearMonthIntervalType =>
       new ArrowType.Interval(org.apache.arrow.vector.types.IntervalUnit.YEAR_MONTH)
+    case _: types.TimeType =>
+      new ArrowType.Time(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, 64)
     case types.NullType => ArrowType.Null.INSTANCE
 
   /** Convert a Spark DataType to an Arrow Field with child fields for complex types. */

@@ -44,6 +44,15 @@ final class Observation(val name: String):
         case Some(s) => row.getValuesMap[Any](s.fields.map(_.name).toSeq)
         case None    => Map.empty
 
+  /** Get the observed metrics as a `java.util.Map[String, Any]`.
+    *
+    * Java-friendly variant of `get`. Blocks until the first action completes.
+    */
+  @throws[InterruptedException]
+  def getAsJava: java.util.Map[String, Any] =
+    import scala.jdk.CollectionConverters.*
+    get.asJava
+
   /** Mark this Observation as registered. Each Observation can only be used once. */
   private[sql] def markRegistered(): Unit =
     if !registered.compareAndSet(false, true) then

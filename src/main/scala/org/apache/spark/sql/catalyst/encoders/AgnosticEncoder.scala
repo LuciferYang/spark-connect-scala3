@@ -205,6 +205,35 @@ object AgnosticEncoders:
   case object ScalaBigIntEncoder
       extends LeafEncoder[BigInt](DecimalType.DEFAULT, "ScalaBigIntEncoder")
 
+  case object DayTimeIntervalEncoder
+      extends LeafEncoder[java.time.Duration](DayTimeIntervalType, "DayTimeIntervalEncoder")
+
+  case object YearMonthIntervalEncoder
+      extends LeafEncoder[java.time.Period](YearMonthIntervalType, "YearMonthIntervalEncoder")
+
+  case class CharEncoder(length: Int)
+      extends LeafEncoder[String](CharType(length), "CharEncoder"):
+    @throws[ObjectStreamException]
+    override protected def writeReplace(): AnyRef =
+      ParameterizedEncoderProxy(
+        "CharEncoder",
+        Array(java.lang.Integer.valueOf(length)),
+        Array(classOf[Int])
+      )
+
+  case class VarcharEncoder(length: Int)
+      extends LeafEncoder[String](VarcharType(length), "VarcharEncoder"):
+    @throws[ObjectStreamException]
+    override protected def writeReplace(): AnyRef =
+      ParameterizedEncoderProxy(
+        "VarcharEncoder",
+        Array(java.lang.Integer.valueOf(length)),
+        Array(classOf[Int])
+      )
+
+  case object LocalTimeEncoder
+      extends LeafEncoder[java.time.LocalTime](TimeType(), "LocalTimeEncoder")
+
   // Convenience constants
   val STRICT_DATE_ENCODER: DateEncoder = DateEncoder(false)
   val STRICT_LOCAL_DATE_ENCODER: LocalDateEncoder = LocalDateEncoder(false)

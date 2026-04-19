@@ -29,6 +29,10 @@ object DataTypeProtoConverter:
       case KindCase.DAY_TIME_INTERVAL   => DayTimeIntervalType
       case KindCase.YEAR_MONTH_INTERVAL => YearMonthIntervalType
 
+      case KindCase.CHAR     => CharType(proto.getChar.getLength)
+      case KindCase.VAR_CHAR => VarcharType(proto.getVarChar.getLength)
+      case KindCase.TIME     => TimeType(proto.getTime.getPrecision)
+
       case KindCase.DECIMAL =>
         val d = proto.getDecimal
         DecimalType(
@@ -100,6 +104,19 @@ object DataTypeProtoConverter:
       case YearMonthIntervalType =>
         ProtoDataType.newBuilder().setYearMonthInterval(
           ProtoDataType.YearMonthInterval.getDefaultInstance
+        ).build()
+
+      case CharType(length) =>
+        ProtoDataType.newBuilder().setChar(
+          ProtoDataType.Char.newBuilder().setLength(length).build()
+        ).build()
+      case VarcharType(length) =>
+        ProtoDataType.newBuilder().setVarChar(
+          ProtoDataType.VarChar.newBuilder().setLength(length).build()
+        ).build()
+      case TimeType(precision) =>
+        ProtoDataType.newBuilder().setTime(
+          ProtoDataType.Time.newBuilder().setPrecision(precision).build()
         ).build()
 
       case DecimalType(p, s) =>

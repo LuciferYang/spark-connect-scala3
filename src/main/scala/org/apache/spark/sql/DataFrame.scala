@@ -611,6 +611,10 @@ final class DataFrame private[sql] (
       df
     }
 
+  /** Randomly split into multiple DataFrames, returned as a Java List. */
+  def randomSplitAsList(weights: Array[Double], seed: Long): java.util.List[DataFrame] =
+    java.util.Arrays.asList(randomSplit(weights, seed)*)
+
   // ---------------------------------------------------------------------------
   // Output Format
   // ---------------------------------------------------------------------------
@@ -841,6 +845,11 @@ final class DataFrame private[sql] (
 
   def createOrReplaceGlobalTempView(viewName: String): Unit =
     createViewCommand(viewName, isGlobal = true, replace = true)
+
+  /** @deprecated Use `createOrReplaceTempView` instead. */
+  @deprecated("Use createOrReplaceTempView instead", "2.0.0")
+  def registerTempTable(tableName: String): Unit =
+    createOrReplaceTempView(tableName)
 
   private def createViewCommand(viewName: String, isGlobal: Boolean, replace: Boolean): Unit =
     val cmd = Command.newBuilder()

@@ -487,6 +487,11 @@ class Column private[sql] (
         .build()
     ).build())
 
+  /** Print the expression tree for this Column (debug utility). */
+  def explain(extended: Boolean): Unit =
+    if extended then println(expr.toString)
+    else println(toString)
+
   override def toString: String = expr.toString
 
 object Column:
