@@ -1026,7 +1026,11 @@ final class DataFrame private[sql] (
         case _              => None
     else None
 
-  /** Convert raw Array[Byte] values to Geometry/Geography objects where the schema requires it. */
+  /** Convert Arrow struct values to Geometry/Geography objects where the schema requires it.
+    *
+    * The server serializes spatial types as Arrow structs with fields: srid (int) + wkb (binary).
+    * This method reconstructs proper Geometry/Geography instances from those structs.
+    */
   private def applySpatialConversions(rows: Array[Row], schema: StructType): Array[Row] =
     val spatialIndices = schema.fields.zipWithIndex.collect {
       case (f, i) if f.dataType.isInstanceOf[GeometryType]  => (i, true)
@@ -1037,14 +1041,21 @@ final class DataFrame private[sql] (
       val values = row.toSeq.toArray
       spatialIndices.foreach { case (idx, isGeometry) =>
         if values(idx) != null then
-          val bytes = values(idx).asInstanceOf[Array[Byte]]
-          val srid = schema.fields(idx).dataType match
-            case g: GeometryType  => g.srid
-            case g: GeographyType => g.srid
-            case _                => 0
+          // Server sends spatial as struct{srid: Int, wkb: Binary}
+          val (wkb, srid) = values(idx) match
+            case r: Row =>
+              val s = r.getInt(0)
+              val b = r.get(1).asInstanceOf[Array[Byte]]
+              (b, s)
+            case bytes: Array[Byte @unchecked] =>
+              val defaultSrid = schema.fields(idx).dataType match
+                case g: GeometryType  => g.srid
+                case g: GeographyType => g.srid
+                case _                => 0
+              (bytes, defaultSrid)
           values(idx) =
-            if isGeometry then types.Geometry.fromWKB(bytes, srid)
-            else types.Geography.fromWKB(bytes, srid)
+            if isGeometry then types.Geometry.fromWKB(wkb, srid)
+            else types.Geography.fromWKB(wkb, srid)
       }
       Row.fromSeqWithSchema(values.toIndexedSeq, schema)
     }
