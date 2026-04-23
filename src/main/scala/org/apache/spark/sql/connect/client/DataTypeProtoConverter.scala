@@ -64,6 +64,13 @@ object DataTypeProtoConverter:
           StructField(f.getName, fromProto(f.getDataType), f.getNullable)
         }.toSeq)
 
+      case KindCase.UDT =>
+        val u = proto.getUdt
+        if u.hasJvmClass then
+          val udtClass = Class.forName(u.getJvmClass)
+          udtClass.getConstructor().newInstance().asInstanceOf[UserDefinedType[?]]
+        else throw UnsupportedOperationException("Python UDTs not supported in SC3")
+
       case other =>
         throw UnsupportedOperationException(s"Unsupported proto DataType kind: $other")
 
@@ -165,6 +172,15 @@ object DataTypeProtoConverter:
           )
         }
         ProtoDataType.newBuilder().setStruct(structBuilder.build()).build()
+
+      case udt: UserDefinedType[?] =>
+        ProtoDataType.newBuilder().setUdt(
+          ProtoDataType.UDT.newBuilder()
+            .setType("udt")
+            .setJvmClass(udt.getClass.getName)
+            .setSqlType(toProto(udt.sqlType))
+            .build()
+        ).build()
 
       case null =>
         throw IllegalArgumentException("Cannot convert null DataType to proto")

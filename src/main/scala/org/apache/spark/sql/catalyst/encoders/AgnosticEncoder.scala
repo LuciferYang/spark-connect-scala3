@@ -246,6 +246,21 @@ object AgnosticEncoders:
     private def writeReplace(): AnyRef =
       SpatialEncoderProxy("GeographyEncoder", dt.srid)
 
+  /** Encoder for user-defined types backed by a [[UserDefinedType]]. */
+  case class UDTEncoder[E >: Null](
+      udt: UserDefinedType[E],
+      udtClass: Class[_ <: UserDefinedType[?]]
+  ) extends AgnosticEncoder[E]:
+    override def isPrimitive: Boolean = false
+    override def dataType: DataType = udt
+    override def clsTag: ClassTag[E] = ClassTag(udt.userClass)
+    @throws[ObjectStreamException]
+    private def writeReplace(): AnyRef = UDTEncoderProxy(udtClass.getName)
+
+  object UDTEncoder:
+    def apply[E >: Null](udt: UserDefinedType[E]): UDTEncoder[E] =
+      new UDTEncoder(udt, udt.getClass.asInstanceOf[Class[_ <: UserDefinedType[?]]])
+
   // Convenience constants
   val STRICT_DATE_ENCODER: DateEncoder = DateEncoder(false)
   val STRICT_LOCAL_DATE_ENCODER: LocalDateEncoder = LocalDateEncoder(false)
@@ -718,3 +733,30 @@ final class SpatialEncoderProxy(
         throw ClassNotFoundException(s"No matching constructor for $encoderName")
       )
     ctor.newInstance(dt)
+
+/** Serialization proxy for [[AgnosticEncoders.UDTEncoder]] instances.
+  *
+  * Stores the UDT class name. On the server side, `readResolve` instantiates the UDT via its no-arg
+  * constructor and reconstructs the server's `UDTEncoder`.
+  */
+@SerialVersionUID(1L)
+final class UDTEncoderProxy(
+    val udtClassName: String
+) extends Serializable:
+
+  @throws[ObjectStreamException]
+  private def readResolve(): AnyRef =
+    val cl = getClass.getClassLoader match
+      case null => ClassLoader.getSystemClassLoader
+      case c    => Option(c.getParent).getOrElse(c)
+    val udtClass = Class.forName(udtClassName, true, cl)
+    val udt = udtClass.getConstructor().newInstance()
+    val encClassName =
+      "org.apache.spark.sql.catalyst.encoders.AgnosticEncoders$UDTEncoder"
+    val encClass = Class.forName(encClassName, true, cl)
+    val ctor = encClass.getConstructors
+      .find(_.getParameterCount == 2)
+      .getOrElse(
+        throw ClassNotFoundException(s"No UDTEncoder constructor found")
+      )
+    ctor.newInstance(udt, udtClass)

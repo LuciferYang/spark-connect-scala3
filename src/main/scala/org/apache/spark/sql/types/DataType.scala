@@ -1,7 +1,7 @@
 package org.apache.spark.sql.types
 
 /** The base type of all Spark SQL data types. */
-sealed trait DataType:
+trait DataType:
   def typeName: String
   def simpleString: String = typeName
 

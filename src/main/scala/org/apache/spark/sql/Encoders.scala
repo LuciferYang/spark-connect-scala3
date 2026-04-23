@@ -8,6 +8,7 @@ import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.*
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.types.StructField
+import org.apache.spark.sql.types.UserDefinedType
 
 /** Factory methods for creating [[Encoder]] instances.
   *
@@ -117,6 +118,11 @@ object Encoders:
     wrap(AgnosticEncoders.GeometryEncoder(org.apache.spark.sql.types.GeometryType()))
   def GEOGRAPHY: Encoder[org.apache.spark.sql.types.Geography] =
     wrap(AgnosticEncoders.GeographyEncoder(org.apache.spark.sql.types.GeographyType()))
+
+  // -- User-defined type encoder -----------------------------------------------
+
+  def udt[T >: Null](tpe: UserDefinedType[T]): Encoder[T] =
+    wrap(AgnosticEncoders.UDTEncoder(tpe))
 
   // -- Row encoder ------------------------------------------------------------
 
