@@ -2,6 +2,8 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
 
+import scala.reflect.ClassTag
+
 /** Returned by `DataFrame.groupBy`, `rollup`, or `cube`. Use `.agg(...)` to specify aggregate
   * expressions.
   */
@@ -57,6 +59,17 @@ final class GroupedDataFrame private[sql] (
   def agg(exprs: java.util.Map[String, String]): DataFrame =
     import scala.jdk.CollectionConverters.*
     agg(exprs.asScala.toMap)
+
+  /** Convert this column-based grouped DataFrame into a typed `KeyValueGroupedDataset[K, V]`.
+    *
+    * K represents the grouping key type (must match the groupBy column types). V represents the
+    * full row type.
+    */
+  def as[K: Encoder: ClassTag, V: Encoder: ClassTag]: KeyValueGroupedDataset[K, V] =
+    KeyValueGroupedDataset.fromColumns[K, V](
+      Dataset(df, summon[Encoder[V]]),
+      groupingExprs
+    )
 
   // Convenience methods
   def count(): DataFrame = agg(functions.count(functions.lit(1)).as("count"))

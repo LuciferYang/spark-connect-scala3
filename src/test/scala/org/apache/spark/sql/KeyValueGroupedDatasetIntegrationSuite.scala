@@ -186,3 +186,80 @@ class KeyValueGroupedDatasetIntegrationSuite extends IntegrationTestBase:
       assert(keys.toSet == Set("A", "B"))
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // groupBy.as[K, V] — column-based KeyValueGroupedDataset
+  // ---------------------------------------------------------------------------
+
+  private def recordDf: DataFrame =
+    spark.createDataFrame(
+      Seq(
+        Row("A", 10),
+        Row("A", 20),
+        Row("A", 30),
+        Row("B", 40),
+        Row("B", 50)
+      ),
+      StructType(Seq(
+        StructField("group", StringType),
+        StructField("value", IntegerType)
+      ))
+    )
+
+  test("groupBy.as[K, V].keys returns distinct grouping keys") {
+    assert(classFilesUploaded)
+    import Encoder.given
+    withLambdaCompat {
+      val keys = recordDf
+        .groupBy("group")
+        .as[String, (String, Int)]
+        .keys
+        .collect()
+      assert(keys.toSet == Set("A", "B"))
+    }
+  }
+
+  test("groupBy.as[K, V].count returns per-group counts") {
+    assert(classFilesUploaded)
+    import Encoder.given
+    withLambdaCompat {
+      val result = recordDf
+        .groupBy("group")
+        .as[String, (String, Int)]
+        .count()
+        .collect()
+      assert(result.toSet == Set(("A", 3L), ("B", 2L)))
+    }
+  }
+
+  test("groupBy.as[K, V].mapGroups aggregates per group") {
+    assert(classFilesUploaded)
+    import Encoder.given
+    withLambdaCompat {
+      val result = recordDf
+        .groupBy("group")
+        .as[String, (String, Int)]
+        .mapGroups { (key, iter) =>
+          (key, iter.map(_._2).sum)
+        }
+        .collect()
+      assert(result.toSet == Set(("A", 60), ("B", 90)))
+    }
+  }
+
+  test("groupBy.as[K, V].flatMapGroups expands per group") {
+    assert(classFilesUploaded)
+    import Encoder.given
+    withLambdaCompat {
+      val result = recordDf
+        .groupBy("group")
+        .as[String, (String, Int)]
+        .flatMapGroups { (key, iter) =>
+          iter.map(r => s"$key:${r._2}")
+        }
+        .collect()
+      assert(result.length == 5)
+      assert(result.toSet.contains("A:10"))
+      assert(result.toSet.contains("B:50"))
+    }
+  }

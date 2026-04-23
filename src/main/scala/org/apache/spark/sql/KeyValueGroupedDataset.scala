@@ -64,7 +64,10 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     // The mapValues transform function. When set, flatMapGroups/mapGroups compose this
     // with the user function so the server receives an (OriginalV => K) grouping UDF
     // and the map function internally applies the value transform.
-    private[sql] val mapValuesFunc: Option[Any => V] = None
+    private[sql] val mapValuesFunc: Option[Any => V] = None,
+    // Column expressions from groupBy(...).as[K, V]. When set, these are appended
+    // after the dummy grouping UDF in all proto builders (matching upstream behavior).
+    private[sql] val groupingColumnExprs: Option[Seq[Column]] = None
 ):
 
   private val keyEncoder: Encoder[K] = summon[Encoder[K]]
@@ -72,8 +75,11 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
 
   /** Cast the key type of this grouped dataset to a new type. */
   def keyAs[L: Encoder: ClassTag]: KeyValueGroupedDataset[L, V] =
-    KeyValueGroupedDataset(ds, groupingFunc.asInstanceOf[V => L])(
-      using
+    new KeyValueGroupedDataset(
+      ds,
+      groupingFunc.asInstanceOf[V => L],
+      groupingColumnExprs = groupingColumnExprs
+    )(using
       summon[Encoder[L]],
       summon[ClassTag[L]],
       ds.encoder,
@@ -105,16 +111,21 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       // The composed function maps from the original value type to the final mapped type.
       Some(mapValuesFunc match
         case Some(prev) => ((x: Any) => func(prev(x).asInstanceOf[V])).asInstanceOf[Any => W]
-        case None       => ((x: Any) => func(x.asInstanceOf[V])).asInstanceOf[Any => W])
+        case None       => ((x: Any) => func(x.asInstanceOf[V])).asInstanceOf[Any => W]),
+      groupingColumnExprs
     )(using keyEncoder, summon[ClassTag[K]], summon[Encoder[W]], summon[ClassTag[W]])
     newKvgd
 
   /** Return a Dataset of the unique keys. */
   def keys: Dataset[K] =
-    ds.map(groupingFunc)
-      .toDF()
-      .distinct()
-      .as[K](using keyEncoder, summon[ClassTag[K]])
+    groupingColumnExprs match
+      case Some(exprs) =>
+        ds.toDF().select(exprs*).distinct().as[K](using keyEncoder, summon[ClassTag[K]])
+      case None =>
+        ds.map(groupingFunc)
+          .toDF()
+          .distinct()
+          .as[K](using keyEncoder, summon[ClassTag[K]])
 
   /** Apply a function to each group and return a new Dataset.
     *
@@ -150,24 +161,23 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
         )
       case None => func.asInstanceOf[AnyRef]
     val mapUdf = buildGroupMapUdf(effectiveFunc, keyAg, inputValueAg, outAg)
+    val groupMapBuilder = GroupMap
+      .newBuilder()
+      .setInput(inputRelation)
+      .addGroupingExpressions(
+        Expression
+          .newBuilder()
+          .setCommonInlineUserDefinedFunction(groupingUdf)
+          .build()
+      )
+      .setFunc(mapUdf)
+    groupingColumnExprs.foreach(_.foreach(c => groupMapBuilder.addGroupingExpressions(c.expr)))
     val relation = Relation
       .newBuilder()
       .setCommon(
         RelationCommon.newBuilder().setPlanId(ds.sparkSession.nextPlanId()).build()
       )
-      .setGroupMap(
-        GroupMap
-          .newBuilder()
-          .setInput(inputRelation)
-          .addGroupingExpressions(
-            Expression
-              .newBuilder()
-              .setCommonInlineUserDefinedFunction(groupingUdf)
-              .build()
-          )
-          .setFunc(mapUdf)
-          .build()
-      )
+      .setGroupMap(groupMapBuilder.build())
       .build()
     val newDf = DataFrame(ds.sparkSession, relation)
     Dataset(newDf, outEnc)
@@ -223,6 +233,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
           .build()
       )
       .setFunc(mapUdf)
+    groupingColumnExprs.foreach(_.foreach(c => groupMapBuilder.addGroupingExpressions(c.expr)))
     sortExprs.foreach(c => groupMapBuilder.addSortingExpressions(c.expr))
     val relation = Relation
       .newBuilder()
@@ -267,6 +278,8 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
         Expression.newBuilder().setCommonInlineUserDefinedFunction(otherGroupingUdf).build()
       )
       .setFunc(cogroupUdf)
+    groupingColumnExprs.foreach(_.foreach(c => builder.addInputGroupingExpressions(c.expr)))
+    other.groupingColumnExprs.foreach(_.foreach(c => builder.addOtherGroupingExpressions(c.expr)))
     val relation = Relation
       .newBuilder()
       .setCommon(RelationCommon.newBuilder().setPlanId(ds.sparkSession.nextPlanId()).build())
@@ -314,6 +327,8 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
         Expression.newBuilder().setCommonInlineUserDefinedFunction(otherGroupingUdf).build()
       )
       .setFunc(cogroupUdf)
+    groupingColumnExprs.foreach(_.foreach(c => builder.addInputGroupingExpressions(c.expr)))
+    other.groupingColumnExprs.foreach(_.foreach(c => builder.addOtherGroupingExpressions(c.expr)))
     thisSortExprs.foreach(c => builder.addInputSortingExpressions(c.expr))
     otherSortExprs.foreach(c => builder.addOtherSortingExpressions(c.expr))
     val relation = Relation
@@ -524,6 +539,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
           .setCommonInlineUserDefinedFunction(groupingUdf)
           .build()
       )
+    groupingColumnExprs.foreach(_.foreach(c => aggBuilder.addGroupingExpressions(c.expr)))
     columns.foreach(c => aggBuilder.addAggregateExpressions(c.expr))
     val relation = Relation
       .newBuilder()
@@ -678,6 +694,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       .setOutputMode(outputMode.toString)
       .setTimeoutConf(timeoutConf.toString)
       .setStateSchema(DataTypeProtoConverter.toProto(stateAg.dataType))
+    groupingColumnExprs.foreach(_.foreach(c => groupMapBuilder.addGroupingExpressions(c.expr)))
     initialState.foreach { is =>
       val isKeyAg = is.keyEncoder.agnosticEncoder
       val isValueAg = is.valueEncoder.agnosticEncoder
@@ -756,6 +773,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       .setFunc(funcUdf)
       .setOutputMode(outputMode.toString)
       .setTransformWithStateInfo(twsInfoBuilder.build())
+    groupingColumnExprs.foreach(_.foreach(c => groupMapBuilder.addGroupingExpressions(c.expr)))
     initialState.foreach { is =>
       val isKeyAg = is.keyEncoder.agnosticEncoder
       val isValueAg = is.valueEncoder.agnosticEncoder
@@ -941,3 +959,11 @@ object KeyValueGroupedDataset:
       func: V => K
   ): KeyValueGroupedDataset[K, V] =
     new KeyValueGroupedDataset(ds, func)
+
+  /** Factory for column-based grouping via `GroupedDataFrame.as[K, V]`. */
+  private[sql] def fromColumns[K: Encoder: ClassTag, V: Encoder: ClassTag](
+      ds: Dataset[V],
+      groupingExprs: Seq[Column]
+  ): KeyValueGroupedDataset[K, V] =
+    val dummyFunc: V => K = _ => null.asInstanceOf[K]
+    new KeyValueGroupedDataset(ds, dummyFunc, groupingColumnExprs = Some(groupingExprs))
