@@ -89,9 +89,27 @@ jobs:
       - name: Download Spark ${{ env.SPARK_VERSION }}
         run: |
           if [ ! -d "spark-${SPARK_VERSION}-bin-hadoop3" ]; then
-            wget -q "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz"
-            tar xf "spark-${SPARK_VERSION}-bin-hadoop3.tgz"
-            rm -f "spark-${SPARK_VERSION}-bin-hadoop3.tgz"
+            SPARK_TGZ="spark-${SPARK_VERSION}-bin-hadoop3.tgz"
+            URLS=(
+              "https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/${SPARK_TGZ}"
+              "https://downloads.apache.org/spark/spark-${SPARK_VERSION}/${SPARK_TGZ}"
+              "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_TGZ}"
+            )
+            DOWNLOADED=false
+            for url in "${URLS[@]}"; do
+              echo "Trying: $url"
+              if wget --timeout=60 --tries=3 -q "$url"; then
+                DOWNLOADED=true
+                break
+              fi
+              echo "Failed, trying next mirror..."
+            done
+            if [ "$DOWNLOADED" = false ]; then
+              echo "ERROR: All download mirrors failed" >&2
+              exit 1
+            fi
+            tar xf "$SPARK_TGZ"
+            rm -f "$SPARK_TGZ"
           fi
           echo "SPARK_HOME=$(pwd)/spark-${SPARK_VERSION}-bin-hadoop3" >> "$GITHUB_ENV"
 
@@ -99,7 +117,7 @@ jobs:
         run: |
           CATALYST_TEST_JAR="spark-catalyst_2.13-${SPARK_VERSION}-tests.jar"
           if [ ! -f "$CATALYST_TEST_JAR" ]; then
-            wget -q "https://repo1.maven.org/maven2/org/apache/spark/spark-catalyst_2.13/${SPARK_VERSION}/${CATALYST_TEST_JAR}"
+            wget --timeout=60 --tries=3 -q "https://repo1.maven.org/maven2/org/apache/spark/spark-catalyst_2.13/${SPARK_VERSION}/${CATALYST_TEST_JAR}"
           fi
           echo "CATALYST_TEST_JAR=$(pwd)/${CATALYST_TEST_JAR}" >> "$GITHUB_ENV"
 
@@ -108,7 +126,7 @@ jobs:
           H2_VERSION="2.2.224"
           H2_JAR="h2-${H2_VERSION}.jar"
           if [ ! -f "$H2_JAR" ]; then
-            wget -q "https://repo1.maven.org/maven2/com/h2database/h2/${H2_VERSION}/${H2_JAR}"
+            wget --timeout=60 --tries=3 -q "https://repo1.maven.org/maven2/com/h2database/h2/${H2_VERSION}/${H2_JAR}"
           fi
           echo "H2_JAR=$(pwd)/${H2_JAR}" >> "$GITHUB_ENV"
 
