@@ -1464,12 +1464,18 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     try
       val df = spark.sql("SELECT parse_json('{\"a\": 1, \"b\": \"hello\"}') AS v")
       val schema = df.schema
-      assert(schema.fields.head.dataType == VariantType, s"Expected VariantType but got ${schema.fields.head.dataType}")
+      assert(
+        schema.fields.head.dataType == VariantType,
+        s"Expected VariantType but got ${schema.fields.head.dataType}"
+      )
 
       val rows = df.collect()
       assert(rows.length == 1)
       val value = rows.head.get(0)
-      assert(value.isInstanceOf[VariantVal], s"Expected VariantVal but got ${value.getClass}: $value")
+      assert(
+        value.isInstanceOf[VariantVal],
+        s"Expected VariantVal but got ${value.getClass}: $value"
+      )
 
       val variant = value.asInstanceOf[VariantVal]
       assert(variant.getValue.nonEmpty, "Variant value bytes should not be empty")

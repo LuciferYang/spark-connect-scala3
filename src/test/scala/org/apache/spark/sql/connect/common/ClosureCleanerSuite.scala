@@ -28,9 +28,8 @@ class ClosureCleanerSuite extends AnyFunSuite with Matchers:
   }
 
   test("classForName throws ClassNotFoundException for invalid class") {
-    an[ClassNotFoundException] should be thrownBy {
+    an[ClassNotFoundException] should be thrownBy
       SparkClassUtilsShim.classForName[AnyRef]("com.nonexistent.FakeClass")
-    }
   }
 
   test("getAllInterfaces returns all interfaces") {
@@ -124,9 +123,8 @@ class ClosureCleanerSuite extends AnyFunSuite with Matchers:
 
   test("clean with null throws NullPointerException") {
     val accessedFields = mutable.Map.empty[Class[?], mutable.Set[String]]
-    a[NullPointerException] should be thrownBy {
+    a[NullPointerException] should be thrownBy
       ClosureCleaner.clean(null.asInstanceOf[AnyRef], cleanTransitively = true, accessedFields)
-    }
   }
 
   test("clean with simple lambda returns Some") {

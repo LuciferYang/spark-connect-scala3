@@ -201,9 +201,21 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
     val allocator = RootAllocator(Long.MaxValue)
     val metadataMap = new java.util.HashMap[String, String]()
     metadataMap.put("variant", "true")
-    val valueField = Field("value", FieldType.nullable(ArrowType.Binary.INSTANCE), java.util.Collections.emptyList())
-    val metadataField = Field("metadata", new FieldType(true, ArrowType.Binary.INSTANCE, null, metadataMap), java.util.Collections.emptyList())
-    val structField = Field("v", FieldType.nullable(ArrowType.Struct.INSTANCE), java.util.Arrays.asList(valueField, metadataField))
+    val valueField = Field(
+      "value",
+      FieldType.nullable(ArrowType.Binary.INSTANCE),
+      java.util.Collections.emptyList()
+    )
+    val metadataField = Field(
+      "metadata",
+      new FieldType(true, ArrowType.Binary.INSTANCE, null, metadataMap),
+      java.util.Collections.emptyList()
+    )
+    val structField = Field(
+      "v",
+      FieldType.nullable(ArrowType.Struct.INSTANCE),
+      java.util.Arrays.asList(valueField, metadataField)
+    )
     val schema = ArrowSchema(java.util.Collections.singletonList(structField))
     val root = VectorSchemaRoot.create(schema, allocator)
     try
@@ -252,9 +264,21 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
     val allocator = RootAllocator(Long.MaxValue)
     val metadataMap = new java.util.HashMap[String, String]()
     metadataMap.put("variant", "true")
-    val valueField = Field("value", FieldType.nullable(ArrowType.Binary.INSTANCE), java.util.Collections.emptyList())
-    val metadataField = Field("metadata", new FieldType(true, ArrowType.Binary.INSTANCE, null, metadataMap), java.util.Collections.emptyList())
-    val structField = Field("v", FieldType.nullable(ArrowType.Struct.INSTANCE), java.util.Arrays.asList(valueField, metadataField))
+    val valueField = Field(
+      "value",
+      FieldType.nullable(ArrowType.Binary.INSTANCE),
+      java.util.Collections.emptyList()
+    )
+    val metadataField = Field(
+      "metadata",
+      new FieldType(true, ArrowType.Binary.INSTANCE, null, metadataMap),
+      java.util.Collections.emptyList()
+    )
+    val structField = Field(
+      "v",
+      FieldType.nullable(ArrowType.Struct.INSTANCE),
+      java.util.Arrays.asList(valueField, metadataField)
+    )
     val schema = ArrowSchema(java.util.Collections.singletonList(structField))
     val root = VectorSchemaRoot.create(schema, allocator)
     try
@@ -278,10 +302,22 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
   }
 
   test("Regular struct (no variant metadata) still produces Row") {
-    val valueField = Field("value", FieldType.nullable(ArrowType.Binary.INSTANCE), java.util.Collections.emptyList())
+    val valueField = Field(
+      "value",
+      FieldType.nullable(ArrowType.Binary.INSTANCE),
+      java.util.Collections.emptyList()
+    )
     // No variant metadata on this field
-    val metadataField = Field("metadata", FieldType.nullable(ArrowType.Binary.INSTANCE), java.util.Collections.emptyList())
-    val structField = Field("s", FieldType.nullable(ArrowType.Struct.INSTANCE), java.util.Arrays.asList(valueField, metadataField))
+    val metadataField = Field(
+      "metadata",
+      FieldType.nullable(ArrowType.Binary.INSTANCE),
+      java.util.Collections.emptyList()
+    )
+    val structField = Field(
+      "s",
+      FieldType.nullable(ArrowType.Struct.INSTANCE),
+      java.util.Arrays.asList(valueField, metadataField)
+    )
 
     val allocator = RootAllocator(Long.MaxValue)
     val schema = ArrowSchema(java.util.Collections.singletonList(structField))

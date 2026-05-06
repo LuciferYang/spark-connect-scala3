@@ -7,7 +7,9 @@ import org.apache.spark.sql.connect.client.{
   SparkConnectClient
 }
 import org.apache.spark.sql.connect.common.LiteralValueProtoConverter
-import org.apache.spark.sql.types.{GeographyType, GeometryType, StructField, StructType, VariantType, VariantVal}
+import org.apache.spark.sql.types.{
+  GeographyType, GeometryType, StructField, StructType, VariantType, VariantVal
+}
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -1062,9 +1064,10 @@ final class DataFrame private[sql] (
 
   /** Convert Arrow struct/binary values to VariantVal where the schema indicates VariantType.
     *
-    * The server serializes variant as an Arrow struct with two binary children: "value" + "metadata".
-    * If the ArrowDeserializer already detected the pattern (producing VariantVal), this is a no-op
-    * for those cells. Otherwise, this converts Row(value: byte[], metadata: byte[]) → VariantVal.
+    * The server serializes variant as an Arrow struct with two binary children: "value" +
+    * "metadata". If the ArrowDeserializer already detected the pattern (producing VariantVal), this
+    * is a no-op for those cells. Otherwise, this converts Row(value: byte[], metadata: byte[]) →
+    * VariantVal.
     */
   private def applyVariantConversions(rows: Array[Row], schema: StructType): Array[Row] =
     val variantIndices = schema.fields.zipWithIndex.collect {
@@ -1076,7 +1079,7 @@ final class DataFrame private[sql] (
       variantIndices.foreach { idx =>
         if values(idx) != null then
           values(idx) = values(idx) match
-            case v: VariantVal => v // Already converted by ArrowDeserializer
+            case v: VariantVal           => v // Already converted by ArrowDeserializer
             case r: Row if r.length == 2 =>
               // Struct decoded as Row(value: byte[], metadata: byte[])
               val v = r.get(0).asInstanceOf[Array[Byte]]

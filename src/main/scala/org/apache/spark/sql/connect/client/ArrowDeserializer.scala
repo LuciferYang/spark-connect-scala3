@@ -183,9 +183,8 @@ object ArrowDeserializer:
       case _: ArrowType.LargeBinary => BinaryType
       case _                        => StringType
 
-  /** Check if Arrow struct field children match the Variant pattern:
-    * two children named "value" and "metadata", both binary, with "metadata" having
-    * Arrow field metadata key "variant" = "true".
+  /** Check if Arrow struct field children match the Variant pattern: two children named "value" and
+    * "metadata", both binary, with "metadata" having Arrow field metadata key "variant" = "true".
     */
   private def isVariantStructSchema(children: mutable.Buffer[ArrowField]): Boolean =
     if children.size != 2 then return false

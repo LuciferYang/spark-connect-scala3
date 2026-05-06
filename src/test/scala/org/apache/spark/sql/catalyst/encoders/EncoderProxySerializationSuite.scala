@@ -27,7 +27,8 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
       catch
         case _: NoSuchMethodException =>
           val parent = cls.getSuperclass
-          if parent == null then throw NoSuchMethodException(s"writeReplace not found on ${obj.getClass}")
+          if parent == null then
+            throw NoSuchMethodException(s"writeReplace not found on ${obj.getClass}")
           else findMethod(parent)
     findMethod(obj.getClass).invoke(obj)
 
@@ -217,7 +218,10 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
 
   test("JavaDecimalEncoder lenient writeReplace carries true in extraArgs") {
     val proxy =
-      invokeWriteReplace(JavaDecimalEncoder(DecimalType(38, 18), true)).asInstanceOf[DecimalEncoderProxy]
+      invokeWriteReplace(JavaDecimalEncoder(
+        DecimalType(38, 18),
+        true
+      )).asInstanceOf[DecimalEncoderProxy]
     proxy.extraArgs(0) shouldBe java.lang.Boolean.TRUE
     proxy.precision shouldBe 38
     proxy.scale shouldBe 18
@@ -244,7 +248,8 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
   }
 
   test("OptionEncoder with StringEncoder element") {
-    val proxy = invokeWriteReplace(OptionEncoder(StringEncoder)).asInstanceOf[CollectionEncoderProxy]
+    val proxy =
+      invokeWriteReplace(OptionEncoder(StringEncoder)).asInstanceOf[CollectionEncoderProxy]
     proxy.element shouldBe StringEncoder
     proxy.encoderName shouldBe "OptionEncoder"
   }
@@ -261,7 +266,10 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
 
   test("ArrayEncoder containsNull=false in proxy") {
     val proxy =
-      invokeWriteReplace(ArrayEncoder(PrimitiveIntEncoder, false)).asInstanceOf[CollectionEncoderProxy]
+      invokeWriteReplace(ArrayEncoder(
+        PrimitiveIntEncoder,
+        false
+      )).asInstanceOf[CollectionEncoderProxy]
     proxy.containsNull shouldBe Some(false)
   }
 
@@ -361,7 +369,14 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
     val enc = ProductEncoder[Any](
       ClassTag(classOf[Any]),
       fields = Seq(
-        EncoderField("x", PrimitiveLongEncoder, nullable = false, Metadata.empty, Some("getX"), Some("setX"))
+        EncoderField(
+          "x",
+          PrimitiveLongEncoder,
+          nullable = false,
+          Metadata.empty,
+          Some("getX"),
+          Some("setX")
+        )
       )
     )
     val proxy = invokeWriteReplace(enc).asInstanceOf[ProductEncoderProxy]
@@ -510,7 +525,13 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
   }
 
   test("DecimalEncoderProxy survives Java serialization round-trip") {
-    val original = DecimalEncoderProxy("JavaDecimalEncoder", 10, 2, Array(java.lang.Boolean.FALSE), Array(classOf[Boolean]))
+    val original = DecimalEncoderProxy(
+      "JavaDecimalEncoder",
+      10,
+      2,
+      Array(java.lang.Boolean.FALSE),
+      Array(classOf[Boolean])
+    )
     val bytes = serialize(original)
     bytes.length should be > 0
   }
@@ -522,7 +543,8 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
   }
 
   test("MapEncoderProxy survives Java serialization round-trip") {
-    val original = MapEncoderProxy("scala.collection.immutable.Map", StringEncoder, PrimitiveIntEncoder, true)
+    val original =
+      MapEncoderProxy("scala.collection.immutable.Map", StringEncoder, PrimitiveIntEncoder, true)
     val bytes = serialize(original)
     bytes.length should be > 0
   }
@@ -562,13 +584,14 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
       catch
         case _: NoSuchMethodException =>
           val parent = cls.getSuperclass
-          if parent == null then throw NoSuchMethodException(s"readResolve not found on ${obj.getClass}")
+          if parent == null then
+            throw NoSuchMethodException(s"readResolve not found on ${obj.getClass}")
           else findMethod(parent)
     try
       Right(findMethod(obj.getClass).invoke(obj))
     catch
       case e: java.lang.reflect.InvocationTargetException => Left(e.getCause)
-      case e: Exception => Left(e)
+      case e: Exception                                   => Left(e)
 
   test("EncoderSerializationProxy.readResolve exercises classloader lookup") {
     val proxy = EncoderSerializationProxy("PrimitiveIntEncoder")

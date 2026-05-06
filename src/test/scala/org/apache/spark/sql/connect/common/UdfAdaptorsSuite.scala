@@ -104,9 +104,8 @@ class UdfAdaptorsSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("CoGroupAdaptor delegates to function") {
-    val adaptor = CoGroupAdaptor[String, Int, Int, Int](
-      (_, left, right) => Iterator(left.sum + right.sum)
-    )
+    val adaptor =
+      CoGroupAdaptor[String, Int, Int, Int]((_, left, right) => Iterator(left.sum + right.sum))
     val result = adaptor("k", Iterator(1, 2), Iterator(3, 4)).iterator.toList
     result shouldBe List(10)
   }
@@ -125,7 +124,10 @@ class UdfAdaptorsSuite extends AnyFunSuite with Matchers:
       MapGroupsAdaptor[String, Int, Int]((_, iter) => iter.sum),
       CountGroupsAdaptor[String](),
       ReduceGroupsAdaptor[String, Int](_ + _),
-      MapValuesFlatMapAdaptor[String, Int]((v: Any) => v, (_, iter) => iter.map(_.asInstanceOf[Int])),
+      MapValuesFlatMapAdaptor[String, Int](
+        (v: Any) => v,
+        (_, iter) => iter.map(_.asInstanceOf[Int])
+      ),
       CoGroupAdaptor[String, Int, Int, Int]((_, l, r) => Iterator.empty)
     )
 
