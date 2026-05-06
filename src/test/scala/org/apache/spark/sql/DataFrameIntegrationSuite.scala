@@ -1455,3 +1455,74 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     assert(splits.length == 2)
     assert(splits(0).count() + splits(1).count() == 100)
   }
+
+  // ---------------------------------------------------------------------------
+  // Variant type Arrow deserialization
+  // ---------------------------------------------------------------------------
+
+  test("collect() on variant column returns VariantVal") {
+    try
+      val df = spark.sql("SELECT parse_json('{\"a\": 1, \"b\": \"hello\"}') AS v")
+      val schema = df.schema
+      assert(schema.fields.head.dataType == VariantType, s"Expected VariantType but got ${schema.fields.head.dataType}")
+
+      val rows = df.collect()
+      assert(rows.length == 1)
+      val value = rows.head.get(0)
+      assert(value.isInstanceOf[VariantVal], s"Expected VariantVal but got ${value.getClass}: $value")
+
+      val variant = value.asInstanceOf[VariantVal]
+      assert(variant.getValue.nonEmpty, "Variant value bytes should not be empty")
+      assert(variant.getMetadata.nonEmpty, "Variant metadata bytes should not be empty")
+    catch
+      case e: Exception
+          if e.getMessage != null &&
+            (e.getMessage.contains("VARIANT") ||
+              e.getMessage.contains("variant") ||
+              e.getMessage.contains("parse_json") ||
+              e.getMessage.contains("UNRESOLVED_ROUTINE")) =>
+        cancel("Server does not support variant type")
+  }
+
+  test("collect() on variant array elements returns VariantVal") {
+    try
+      val df = spark.sql(
+        """SELECT v.value FROM (
+          |  SELECT parse_json('[1, "two", true]') AS j
+          |), LATERAL variant_explode(j) AS v""".stripMargin
+      )
+      val rows = df.collect()
+      assert(rows.length == 3)
+      rows.foreach { row =>
+        val value = row.get(0)
+        assert(
+          value == null || value.isInstanceOf[VariantVal],
+          s"Expected null or VariantVal but got ${value.getClass}: $value"
+        )
+      }
+    catch
+      case e: Exception
+          if e.getMessage != null &&
+            (e.getMessage.contains("VARIANT") ||
+              e.getMessage.contains("variant") ||
+              e.getMessage.contains("parse_json") ||
+              e.getMessage.contains("UNRESOLVED_ROUTINE") ||
+              e.getMessage.contains("variant_explode")) =>
+        cancel("Server does not support variant type or variant_explode")
+  }
+
+  test("variant null value in collect() returns null") {
+    try
+      val df = spark.sql("SELECT CAST(NULL AS VARIANT) AS v")
+      val rows = df.collect()
+      assert(rows.length == 1)
+      assert(rows.head.get(0) == null)
+    catch
+      case e: Exception
+          if e.getMessage != null &&
+            (e.getMessage.contains("VARIANT") ||
+              e.getMessage.contains("variant") ||
+              e.getMessage.contains("UNRESOLVED_ROUTINE") ||
+              e.getMessage.contains("not supported")) =>
+        cancel("Server does not support variant type")
+  }

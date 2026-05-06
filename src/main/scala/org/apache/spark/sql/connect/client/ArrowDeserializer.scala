@@ -4,7 +4,7 @@ import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.*
 import org.apache.arrow.vector.complex.*
 import org.apache.arrow.vector.ipc.ArrowStreamReader
-import org.apache.arrow.vector.types.pojo.Schema as ArrowSchema
+import org.apache.arrow.vector.types.pojo.{ArrowType, Field as ArrowField, Schema as ArrowSchema}
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types.*
 
@@ -97,8 +97,16 @@ object ArrowDeserializer:
         (start until end).map(i => extractValue(inner, i)).toSeq
 
       case v: StructVector =>
-        val fields = v.getChildrenFromFields.asScala.toSeq
-        Row.fromSeq(fields.map(f => extractValue(f, index)))
+        if isVariantStruct(v) then
+          val valueVec = v.getChild("value").asInstanceOf[FieldVector]
+          val metadataVec = v.getChild("metadata").asInstanceOf[FieldVector]
+          VariantVal(
+            extractValue(valueVec, index).asInstanceOf[Array[Byte]],
+            extractValue(metadataVec, index).asInstanceOf[Array[Byte]]
+          )
+        else
+          val fields = v.getChildrenFromFields.asScala.toSeq
+          Row.fromSeq(fields.map(f => extractValue(f, index)))
 
       case v: DurationVector =>
         v.getObject(index)
@@ -125,8 +133,7 @@ object ArrowDeserializer:
       StructField(field.getName, arrowTypeToSparkType(field), field.isNullable)
     }.toSeq)
 
-  private def arrowTypeToSparkType(field: org.apache.arrow.vector.types.pojo.Field): DataType =
-    import org.apache.arrow.vector.types.pojo.ArrowType
+  private def arrowTypeToSparkType(field: ArrowField): DataType =
     field.getType match
       case _: ArrowType.Bool                       => BooleanType
       case i: ArrowType.Int if i.getBitWidth == 8  => ByteType
@@ -152,9 +159,14 @@ object ArrowDeserializer:
           ArrayType(arrowTypeToSparkType(children.head), containsNull = true)
         else ArrayType(NullType, containsNull = true)
       case _: ArrowType.Struct =>
-        StructType(field.getChildren.asScala.map { child =>
-          StructField(child.getName, arrowTypeToSparkType(child), child.isNullable)
-        }.toSeq)
+        // Detect Variant struct pattern: children "value" (binary) + "metadata" (binary with
+        // Arrow field metadata "variant"="true")
+        val children = field.getChildren.asScala
+        if isVariantStructSchema(children) then VariantType
+        else
+          StructType(children.map { child =>
+            StructField(child.getName, arrowTypeToSparkType(child), child.isNullable)
+          }.toSeq)
       case _: ArrowType.Map =>
         val entriesField = field.getChildren.asScala.head
         val children = entriesField.getChildren.asScala
@@ -170,3 +182,33 @@ object ArrowDeserializer:
       case _: ArrowType.LargeUtf8   => StringType
       case _: ArrowType.LargeBinary => BinaryType
       case _                        => StringType
+
+  /** Check if Arrow struct field children match the Variant pattern:
+    * two children named "value" and "metadata", both binary, with "metadata" having
+    * Arrow field metadata key "variant" = "true".
+    */
+  private def isVariantStructSchema(children: mutable.Buffer[ArrowField]): Boolean =
+    if children.size != 2 then return false
+    val hasValue = children.exists(c =>
+      c.getName == "value" && c.getType.isInstanceOf[ArrowType.Binary]
+    )
+    val hasMetadataWithFlag = children.exists { c =>
+      c.getName == "metadata" &&
+      c.getType.isInstanceOf[ArrowType.Binary] &&
+      c.getMetadata != null &&
+      c.getMetadata.containsKey("variant") &&
+      c.getMetadata.get("variant") == "true"
+    }
+    hasValue && hasMetadataWithFlag
+
+  /** Check if a StructVector at runtime matches the Variant encoding pattern. */
+  private def isVariantStruct(v: StructVector): Boolean =
+    val children = v.getChildrenFromFields.asScala
+    if children.size != 2 then return false
+    val valueChild = children.find(_.getName == "value")
+    val metadataChild = children.find(_.getName == "metadata")
+    (valueChild, metadataChild) match
+      case (Some(_: VarBinaryVector), Some(mc: VarBinaryVector)) =>
+        val meta = mc.getField.getMetadata
+        meta != null && meta.containsKey("variant") && meta.get("variant") == "true"
+      case _ => false

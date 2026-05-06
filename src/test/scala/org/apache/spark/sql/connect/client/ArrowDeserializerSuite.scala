@@ -191,3 +191,125 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
     val result = ArrowDeserializer.fromArrowBatch(Array.emptyByteArray)
     result shouldBe empty
   }
+
+  // ---------------------------------------------------------------------------
+  // Variant struct pattern detection
+  // ---------------------------------------------------------------------------
+
+  /** Create an Arrow batch with a Variant struct (value + metadata with variant=true flag). */
+  private def encodeVariantBatch(value: Array[Byte], metadata: Array[Byte]): Array[Byte] =
+    val allocator = RootAllocator(Long.MaxValue)
+    val metadataMap = new java.util.HashMap[String, String]()
+    metadataMap.put("variant", "true")
+    val valueField = Field("value", FieldType.nullable(ArrowType.Binary.INSTANCE), java.util.Collections.emptyList())
+    val metadataField = Field("metadata", new FieldType(true, ArrowType.Binary.INSTANCE, null, metadataMap), java.util.Collections.emptyList())
+    val structField = Field("v", FieldType.nullable(ArrowType.Struct.INSTANCE), java.util.Arrays.asList(valueField, metadataField))
+    val schema = ArrowSchema(java.util.Collections.singletonList(structField))
+    val root = VectorSchemaRoot.create(schema, allocator)
+    try
+      val struct = root.getFieldVectors.get(0).asInstanceOf[StructVector]
+      val valueVec = struct.getChild("value").asInstanceOf[VarBinaryVector]
+      val metadataVec = struct.getChild("metadata").asInstanceOf[VarBinaryVector]
+      valueVec.setSafe(0, value)
+      metadataVec.setSafe(0, metadata)
+      struct.setIndexDefined(0)
+      valueVec.setValueCount(1)
+      metadataVec.setValueCount(1)
+      struct.setValueCount(1)
+      root.setRowCount(1)
+      val baos = ByteArrayOutputStream()
+      val writer = ArrowStreamWriter(root, null, baos)
+      writer.start()
+      writer.writeBatch()
+      writer.end()
+      writer.close()
+      baos.toByteArray
+    finally
+      root.close()
+      allocator.close()
+
+  test("Variant struct is detected and deserialized as VariantVal") {
+    val value = Array[Byte](1, 2, 3, 4)
+    val metadata = Array[Byte](10, 20)
+    val bytes = encodeVariantBatch(value, metadata)
+
+    val (rows, schema) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    rows should have size 1
+    schema.get.fields.head.dataType shouldBe VariantType
+
+    val variant = rows.head.get(0).asInstanceOf[VariantVal]
+    variant.getValue shouldBe value
+    variant.getMetadata shouldBe metadata
+  }
+
+  test("Variant struct schema inferred as VariantType") {
+    val bytes = encodeVariantBatch(Array[Byte](1), Array[Byte](2))
+    val (_, schema) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    schema.get.fields.head.dataType shouldBe VariantType
+  }
+
+  test("Variant struct with null value produces null") {
+    val allocator = RootAllocator(Long.MaxValue)
+    val metadataMap = new java.util.HashMap[String, String]()
+    metadataMap.put("variant", "true")
+    val valueField = Field("value", FieldType.nullable(ArrowType.Binary.INSTANCE), java.util.Collections.emptyList())
+    val metadataField = Field("metadata", new FieldType(true, ArrowType.Binary.INSTANCE, null, metadataMap), java.util.Collections.emptyList())
+    val structField = Field("v", FieldType.nullable(ArrowType.Struct.INSTANCE), java.util.Arrays.asList(valueField, metadataField))
+    val schema = ArrowSchema(java.util.Collections.singletonList(structField))
+    val root = VectorSchemaRoot.create(schema, allocator)
+    try
+      val struct = root.getFieldVectors.get(0).asInstanceOf[StructVector]
+      // Leave the struct null (don't call setIndexDefined)
+      struct.setValueCount(1)
+      root.setRowCount(1)
+      val baos = ByteArrayOutputStream()
+      val writer = ArrowStreamWriter(root, null, baos)
+      writer.start()
+      writer.writeBatch()
+      writer.end()
+      writer.close()
+
+      val (rows, _) = ArrowDeserializer.fromArrowBatchWithSchema(baos.toByteArray)
+      rows should have size 1
+      rows.head.get(0) shouldBe (null: Any)
+    finally
+      root.close()
+      allocator.close()
+  }
+
+  test("Regular struct (no variant metadata) still produces Row") {
+    val valueField = Field("value", FieldType.nullable(ArrowType.Binary.INSTANCE), java.util.Collections.emptyList())
+    // No variant metadata on this field
+    val metadataField = Field("metadata", FieldType.nullable(ArrowType.Binary.INSTANCE), java.util.Collections.emptyList())
+    val structField = Field("s", FieldType.nullable(ArrowType.Struct.INSTANCE), java.util.Arrays.asList(valueField, metadataField))
+
+    val allocator = RootAllocator(Long.MaxValue)
+    val schema = ArrowSchema(java.util.Collections.singletonList(structField))
+    val root = VectorSchemaRoot.create(schema, allocator)
+    try
+      val struct = root.getFieldVectors.get(0).asInstanceOf[StructVector]
+      val valueVec = struct.getChild("value").asInstanceOf[VarBinaryVector]
+      val metadataVec = struct.getChild("metadata").asInstanceOf[VarBinaryVector]
+      valueVec.setSafe(0, Array[Byte](1, 2))
+      metadataVec.setSafe(0, Array[Byte](3, 4))
+      struct.setIndexDefined(0)
+      valueVec.setValueCount(1)
+      metadataVec.setValueCount(1)
+      struct.setValueCount(1)
+      root.setRowCount(1)
+      val baos = ByteArrayOutputStream()
+      val writer = ArrowStreamWriter(root, null, baos)
+      writer.start()
+      writer.writeBatch()
+      writer.end()
+      writer.close()
+
+      val (rows, inferredSchema) = ArrowDeserializer.fromArrowBatchWithSchema(baos.toByteArray)
+      rows should have size 1
+      // Should be a regular Row, not a VariantVal
+      rows.head.get(0) shouldBe a[org.apache.spark.sql.Row]
+      inferredSchema.get.fields.head.dataType shouldBe a[StructType]
+    finally
+      root.close()
+      allocator.close()
+  }

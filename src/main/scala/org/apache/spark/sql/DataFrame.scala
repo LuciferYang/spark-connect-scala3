@@ -7,7 +7,7 @@ import org.apache.spark.sql.connect.client.{
   SparkConnectClient
 }
 import org.apache.spark.sql.connect.common.LiteralValueProtoConverter
-import org.apache.spark.sql.types.{GeographyType, GeometryType, StructField, StructType}
+import org.apache.spark.sql.types.{GeographyType, GeometryType, StructField, StructType, VariantType, VariantVal}
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -630,7 +630,7 @@ final class DataFrame private[sql] (
   def collect(): Array[Row] =
     val (rows, observed) = executeAndCollect(relation)
     if observed.nonEmpty then session.processObservedMetrics(observed)
-    applySpatialConversions(rows, schema)
+    applyVariantConversions(applySpatialConversions(rows, schema), schema)
 
   def collectAsList(): java.util.List[Row] = java.util.Arrays.asList(collect()*)
 
@@ -1056,6 +1056,36 @@ final class DataFrame private[sql] (
           values(idx) =
             if isGeometry then types.Geometry.fromWKB(wkb, srid)
             else types.Geography.fromWKB(wkb, srid)
+      }
+      Row.fromSeqWithSchema(values.toIndexedSeq, schema)
+    }
+
+  /** Convert Arrow struct/binary values to VariantVal where the schema indicates VariantType.
+    *
+    * The server serializes variant as an Arrow struct with two binary children: "value" + "metadata".
+    * If the ArrowDeserializer already detected the pattern (producing VariantVal), this is a no-op
+    * for those cells. Otherwise, this converts Row(value: byte[], metadata: byte[]) → VariantVal.
+    */
+  private def applyVariantConversions(rows: Array[Row], schema: StructType): Array[Row] =
+    val variantIndices = schema.fields.zipWithIndex.collect {
+      case (f, i) if f.dataType == VariantType => i
+    }
+    if variantIndices.isEmpty then return rows
+    rows.map { row =>
+      val values = row.toSeq.toArray
+      variantIndices.foreach { idx =>
+        if values(idx) != null then
+          values(idx) = values(idx) match
+            case v: VariantVal => v // Already converted by ArrowDeserializer
+            case r: Row if r.length == 2 =>
+              // Struct decoded as Row(value: byte[], metadata: byte[])
+              val v = r.get(0).asInstanceOf[Array[Byte]]
+              val m = r.get(1).asInstanceOf[Array[Byte]]
+              VariantVal(v, m)
+            case bytes: Array[Byte @unchecked] =>
+              // Single binary — treat as value-only (empty metadata)
+              VariantVal(bytes, Array.empty[Byte])
+            case other => other // Unknown format, leave as-is
       }
       Row.fromSeqWithSchema(values.toIndexedSeq, schema)
     }
