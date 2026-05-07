@@ -1,0 +1,96 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      jmh_args:
+        description: 'JMH arguments (e.g. "-f1 -wi2 -i3 .*deserializeInts.*")'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          sparse-checkout: |
+            build.sbt
+            project/
+            src/
+            spark-upstream/sql/connect/common/src/main/protobuf
+            spark-upstream/common/sketch/src/main/java
+            spark-upstream/common/tags/src/main/java
+            spark-upstream/sql/api/src/main/java/org/apache/spark/sql/types
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache sbt
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.sbt
+            ~/.cache/coursier
+          key: ${{ runner.os }}-sbt-jmh-${{ hashFiles('build.sbt', 'project/plugins.sbt') }}
+          restore-keys: |
+            ${{ runner.os }}-sbt-jmh-
+            ${{ runner.os }}-sbt-
+
+      - name: Compile benchmark code
+        run: sbt 'Jmh/compile'
+
+      - name: Run benchmarks
+        id: run_bench
+        run: |
+          JMH_ARGS="${{ github.event.inputs.jmh_args }}"
+          if [ -z "$JMH_ARGS" ]; then
+            JMH_ARGS="-rf json -rff benchmark-results.json"
+          else
+            JMH_ARGS="$JMH_ARGS -rf json -rff benchmark-results.json"
+          fi
+          sbt "Jmh/run $JMH_ARGS"
+
+      - name: Generate summary
+        if: always() && steps.run_bench.outcome == 'success'
+        run: |
+          echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          if [ -f benchmark-results.json ]; then
+            python3 -c "
+          import json, sys
+          with open('benchmark-results.json') as f:
+              data = json.load(f)
+          print(f'{'Benchmark':<55} {'Score':>12} {'Error':>12} {'Units':>8}')
+          print('-' * 90)
+          for r in data:
+              name = r['benchmark'].split('.')[-1]
+              params = ', '.join(f'{k}={v}' for k,v in r.get('params',{}).items())
+              label = f'{name}({params})' if params else name
+              score = f\"{r['primaryMetric']['score']:.3f}\"
+              error = f\"± {r['primaryMetric']['scoreError']:.3f}\"
+              unit = r['primaryMetric']['scoreUnit']
+              print(f'{label:<55} {score:>12} {error:>12} {unit:>8}')
+          "
+          else
+            echo "No JSON results file found"
+          fi
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload results
+        if: always() && steps.run_bench.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: benchmark-results.json
+          retention-days: 90

@@ -36,6 +36,7 @@ ThisBuild / resolvers += "gcs-maven-central-mirror" at
   "https://maven-central.storage-download.googleapis.com/maven2/"
 
 lazy val root = (project in file("."))
+  .enablePlugins(JmhPlugin)
   .settings(
     name := "spark-connect-scala3",
 
@@ -153,5 +154,17 @@ lazy val root = (project in file("."))
     Compile / packageSrc / mappings ++= Seq(
       baseDirectory.value / "LICENSE" -> "META-INF/LICENSE",
       baseDirectory.value / "NOTICE" -> "META-INF/NOTICE"
-    )
+    ),
+
+    // -------------------------------------------------------------------------
+    // JMH Benchmark settings
+    // -------------------------------------------------------------------------
+    Jmh / sourceDirectory := (ThisBuild / baseDirectory).value / "src" / "jmh",
+    // Relax strict compilation for benchmark code (no -Werror, no -Wunused)
+    Jmh / scalacOptions --= Seq("-Wunused:all", "-Werror"),
+    Jmh / javaOptions ++= Seq(
+      "--add-opens=java.base/java.nio=ALL-UNNAMED",
+      "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+    ),
+    Jmh / fork := true
   )

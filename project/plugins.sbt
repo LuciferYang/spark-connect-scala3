@@ -6,3 +6,6 @@ addSbtPlugin("org.scoverage" % "sbt-scoverage" % "2.3.1")
 
 // Publishing to Maven Central
 addSbtPlugin("com.github.sbt" % "sbt-ci-release" % "1.9.2")
+
+// JMH microbenchmarks
+addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.8")
