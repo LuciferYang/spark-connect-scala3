@@ -9,11 +9,15 @@ import org.apache.spark.sql.Row
 import org.apache.spark.sql.types.*
 
 import java.io.ByteArrayInputStream
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
 /** Deserializes Arrow IPC batches into Row sequences. */
 object ArrowDeserializer:
+
+  /** Shared RootAllocator — thread-safe (uses AtomicLong internally). */
+  private val rootAllocator = RootAllocator(Long.MaxValue)
 
   def fromArrowBatch(data: Array[Byte]): Seq[Row] =
     fromArrowBatchWithSchema(data)._1
@@ -21,25 +25,31 @@ object ArrowDeserializer:
   /** Deserialize Arrow IPC bytes, returning rows and the inferred StructType schema. */
   def fromArrowBatchWithSchema(data: Array[Byte]): (Seq[Row], Option[StructType]) =
     if data.isEmpty then return (Seq.empty, None)
-    val allocator = RootAllocator(Long.MaxValue)
+    val childAllocator = rootAllocator.newChildAllocator("deser", 0, Long.MaxValue)
     try
-      val reader = ArrowStreamReader(ByteArrayInputStream(data), allocator)
+      val reader = ArrowStreamReader(ByteArrayInputStream(data), childAllocator)
       try
         val rows = mutable.ArrayBuffer.empty[Row]
         val root = reader.getVectorSchemaRoot
         val schema = arrowSchemaToStructType(root.getSchema)
+        val vectors = root.getFieldVectors.asScala.toArray
+        val numCols = vectors.length
         while reader.loadNextBatch() do
           val numRows = root.getRowCount
-          val vectors = root.getFieldVectors.asScala.toSeq
           var i = 0
           while i < numRows do
-            rows += Row.fromSeq(vectors.map(v => extractValue(v, i)))
+            val values = new Array[Any](numCols)
+            var col = 0
+            while col < numCols do
+              values(col) = extractValue(vectors(col), i)
+              col += 1
+            rows += Row.fromSeqDirectWithSchema(ArraySeq.unsafeWrapArray(values), schema)
             i += 1
         (rows.toSeq, Some(schema))
       finally
         reader.close()
     finally
-      allocator.close()
+      childAllocator.close()
 
   private def extractValue(vector: FieldVector, index: Int): Any =
     if vector.isNull(index) then return null

@@ -236,7 +236,7 @@ class StreamingReadWriteIntegrationSuite extends IntegrationTestBase:
                   msg.contains("Failed to load class correctly") ||
                   msg.contains("cannot be cast to class org.apache.spark.sql.DataFrame") ||
                   msg.contains("can not implement org.apache.spark.sql.streaming.OutputMode") =>
-              cancel("Scala 3 foreachBatch incompatible with Scala 2.13 server")
+              cancel("Scala 3 foreachBatch incompatible with Scala 2.13 server: " + msg)
             case Some(msg) => fail(s"Query terminated with unexpected error: $msg")
             case None      => fail("Query terminated without exception and isActive is false")
       finally query.stop()
@@ -250,7 +250,7 @@ class StreamingReadWriteIntegrationSuite extends IntegrationTestBase:
               e.getMessage.contains(
                 "can not implement org.apache.spark.sql.streaming.OutputMode"
               )) =>
-        cancel("Scala 3 foreachBatch incompatible with Scala 2.13 server")
+        cancel("Scala 3 foreachBatch incompatible with Scala 2.13 server: " + e.getMessage)
   }
 
   // ---------------------------------------------------------------------------

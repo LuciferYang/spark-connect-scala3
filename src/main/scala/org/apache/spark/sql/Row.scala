@@ -157,6 +157,12 @@ object Row:
 
   def fromTuple(t: Product): Row = fromSeq(t.productIterator.toSeq)
 
+  /** Fast-path constructor that avoids the `toIndexedSeq` copy when the caller already provides an
+    * `IndexedSeq`. Package-private to keep the public API unchanged.
+    */
+  private[sql] def fromSeqDirectWithSchema(values: IndexedSeq[Any], schema: StructType): Row =
+    new Row(values, Some(schema))
+
   val empty: Row = new Row(IndexedSeq.empty)
 
   /** Pattern-matching extractor for Row values.
