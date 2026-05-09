@@ -85,15 +85,22 @@ final class SparkConnectClient private (
     _planCompressionOptions match
       case Some(opts) => opts
       case None       =>
-        val opts =
-          try
-            Some(PlanCompressionOptions(
-              thresholdBytes = getConfig("spark.connect.session.planCompression.threshold").toInt,
-              algorithm = getConfig("spark.connect.session.planCompression.defaultAlgorithm")
-            ))
-          catch case NonFatal(_) => None // server doesn't support → disable
-        _planCompressionOptions = Some(opts)
-        opts
+        synchronized {
+          _planCompressionOptions match
+            case Some(opts) => opts // double-check
+            case None       =>
+              val opts =
+                try
+                  Some(PlanCompressionOptions(
+                    thresholdBytes =
+                      getConfig("spark.connect.session.planCompression.threshold").toInt,
+                    algorithm =
+                      getConfig("spark.connect.session.planCompression.defaultAlgorithm")
+                  ))
+                catch case NonFatal(_) => None
+              _planCompressionOptions = Some(opts)
+              opts
+        }
 
   /** For testing: override the compression options. */
   private[client] def setPlanCompressionOptions(

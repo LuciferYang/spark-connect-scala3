@@ -73,6 +73,4 @@ final class DataFrameWriterV2 private[sql] (table: String, df: DataFrame):
     val command = Command.newBuilder()
       .setWriteOperationV2(builder.setMode(mode).build())
       .build()
-    val plan = Plan.newBuilder().setCommand(command).build()
-    val responses = df.session.client.execute(plan)
-    responses.foreach(_ => ()) // drain iterator
+    df.session.client.executeCommand(command)

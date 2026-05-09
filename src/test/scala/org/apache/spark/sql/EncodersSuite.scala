@@ -280,3 +280,84 @@ class EncodersSuite extends AnyFunSuite with Matchers:
     enc.schema shouldBe StructType(Seq(StructField("value", GeographyType())))
     enc.agnosticEncoder shouldBe a[GeographyEncoder]
   }
+
+  // ---------------------------------------------------------------------------
+  // R8-3: TupleEncoder3/4/5 fromRow and toRow
+  // ---------------------------------------------------------------------------
+
+  test("tuple3 encoder fromRow decodes struct columns") {
+    import Encoder.given
+    val enc = Encoders.tuple(summon[Encoder[Int]], summon[Encoder[String]], summon[Encoder[Double]])
+    // Simulate the server returning a row with nested struct columns
+    val innerRow = Row(Row(1), Row("hello"), Row(3.14))
+    val result = enc.fromRow(innerRow)
+    result shouldBe (1, "hello", 3.14)
+  }
+
+  test("tuple3 encoder toRow produces correct Row") {
+    import Encoder.given
+    val enc = Encoders.tuple(summon[Encoder[Int]], summon[Encoder[String]], summon[Encoder[Double]])
+    val row = enc.toRow((10, "world", 2.72))
+    row.get(0) shouldBe Row(10)
+    row.get(1) shouldBe Row("world")
+    row.get(2) shouldBe Row(2.72)
+  }
+
+  test("tuple4 encoder fromRow decodes struct columns") {
+    import Encoder.given
+    val enc = Encoders.tuple(
+      summon[Encoder[Int]],
+      summon[Encoder[String]],
+      summon[Encoder[Double]],
+      summon[Encoder[Long]]
+    )
+    val innerRow = Row(Row(1), Row("a"), Row(2.0), Row(99L))
+    val result = enc.fromRow(innerRow)
+    result shouldBe (1, "a", 2.0, 99L)
+  }
+
+  test("tuple4 encoder toRow produces correct Row") {
+    import Encoder.given
+    val enc = Encoders.tuple(
+      summon[Encoder[Int]],
+      summon[Encoder[String]],
+      summon[Encoder[Double]],
+      summon[Encoder[Long]]
+    )
+    val row = enc.toRow((5, "b", 1.5, 100L))
+    row.get(0) shouldBe Row(5)
+    row.get(1) shouldBe Row("b")
+    row.get(2) shouldBe Row(1.5)
+    row.get(3) shouldBe Row(100L)
+  }
+
+  test("tuple5 encoder fromRow decodes struct columns") {
+    import Encoder.given
+    val enc = Encoders.tuple(
+      summon[Encoder[Int]],
+      summon[Encoder[String]],
+      summon[Encoder[Double]],
+      summon[Encoder[Long]],
+      summon[Encoder[Boolean]]
+    )
+    val innerRow = Row(Row(1), Row("x"), Row(0.5), Row(7L), Row(true))
+    val result = enc.fromRow(innerRow)
+    result shouldBe (1, "x", 0.5, 7L, true)
+  }
+
+  test("tuple5 encoder toRow produces correct Row") {
+    import Encoder.given
+    val enc = Encoders.tuple(
+      summon[Encoder[Int]],
+      summon[Encoder[String]],
+      summon[Encoder[Double]],
+      summon[Encoder[Long]],
+      summon[Encoder[Boolean]]
+    )
+    val row = enc.toRow((2, "y", 9.9, 42L, false))
+    row.get(0) shouldBe Row(2)
+    row.get(1) shouldBe Row("y")
+    row.get(2) shouldBe Row(9.9)
+    row.get(3) shouldBe Row(42L)
+    row.get(4) shouldBe Row(false)
+  }

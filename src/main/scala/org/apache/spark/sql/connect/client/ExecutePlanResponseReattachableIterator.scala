@@ -55,13 +55,16 @@ class ExecutePlanResponseReattachableIterator private[client] (
   private val asyncStub = SparkConnectServiceGrpc.newStub(channel)
 
   // Stream state.
+  private val stateLock = new AnyRef
   @volatile private var iter: java.util.Iterator[ExecutePlanResponse] = _
   @volatile private var lastReturnedResponseId: Option[String] = None
   @volatile private var resultComplete: Boolean = false
   @volatile private var closed: Boolean = false
 
-  // Start the initial execution.
-  iter = rawExecutePlan(request)
+  // Start the initial execution under lock to ensure visibility.
+  stateLock.synchronized {
+    iter = rawExecutePlan(request)
+  }
 
   // ---------------------------------------------------------------------------
   // Iterator interface

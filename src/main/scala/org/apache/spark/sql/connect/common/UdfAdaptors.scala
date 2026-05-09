@@ -64,7 +64,10 @@ final class CountGroupsAdaptor[K]
 final class ReduceGroupsAdaptor[K, V](val func: (V, V) => V)
     extends ((K, Iterator[V]) => (K, V))
     with Serializable:
-  def apply(k: K, iter: Iterator[V]): (K, V) = (k, iter.reduce(func))
+  def apply(k: K, iter: Iterator[V]): (K, V) =
+    if !iter.hasNext then
+      throw new NoSuchElementException(s"Cannot reduce empty group for key: $k")
+    (k, iter.reduce(func))
 
 /** Adaptor for `KVGD.flatMapGroups` after `mapValues` — composes the value transform with the
   * user's flatMap function.

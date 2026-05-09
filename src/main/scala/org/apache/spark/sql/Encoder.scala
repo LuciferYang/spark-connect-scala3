@@ -102,13 +102,19 @@ object Encoder:
 
   given Encoder[java.time.LocalDate] with
     def schema = StructType(Seq(StructField("value", DateType)))
-    def fromRow(row: Row) = row.get(0).asInstanceOf[java.time.LocalDate]
+    def fromRow(row: Row) = row.get(0) match
+      case d: java.sql.Date        => d.toLocalDate
+      case ld: java.time.LocalDate => ld
+      case other                   => other.asInstanceOf[java.time.LocalDate]
     def toRow(value: java.time.LocalDate) = Row(value)
     override def agnosticEncoder = AgnosticEncoders.STRICT_LOCAL_DATE_ENCODER
 
   given Encoder[java.time.Instant] with
     def schema = StructType(Seq(StructField("value", TimestampType)))
-    def fromRow(row: Row) = row.get(0).asInstanceOf[java.time.Instant]
+    def fromRow(row: Row) = row.get(0) match
+      case ts: java.sql.Timestamp  => ts.toInstant
+      case inst: java.time.Instant => inst
+      case other                   => other.asInstanceOf[java.time.Instant]
     def toRow(value: java.time.Instant) = Row(value)
     override def agnosticEncoder = AgnosticEncoders.STRICT_INSTANT_ENCODER
 
@@ -239,11 +245,14 @@ object Encoder:
     def schema: StructType = _schema
 
     def fromRow(row: Row): T =
-      val values = (0 until _schema.fields.size).map { i =>
+      val n = _schema.fields.size
+      val values = new Array[Any](n)
+      var i = 0
+      while i < n do
         val isOpt = _schema.fields(i).nullable && _schema.fields(i).dataType != NullType
-        extractField(row, i, isOpt)
-      }
-      val tuple = Tuple.fromArray(values.toArray)
+        values(i) = extractField(row, i, isOpt)
+        i += 1
+      val tuple = Tuple.fromArray(values)
       mirror.fromTuple(tuple.asInstanceOf[mirror.MirroredElemTypes])
 
     def toRow(value: T): Row =

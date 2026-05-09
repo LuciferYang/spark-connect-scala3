@@ -86,6 +86,20 @@ class UdfAdaptorsSuite extends AnyFunSuite with Matchers:
     result shouldBe ("key", 6)
   }
 
+  test("ReduceGroupsAdaptor throws NoSuchElementException on empty iterator") {
+    val adaptor = ReduceGroupsAdaptor[String, Int](_ + _)
+    val ex = intercept[NoSuchElementException] {
+      adaptor("emptyKey", Iterator.empty)
+    }
+    ex.getMessage should include("emptyKey")
+  }
+
+  test("ReduceGroupsAdaptor with single element") {
+    val adaptor = ReduceGroupsAdaptor[String, Int](_ + _)
+    val result = adaptor("k", Iterator(42))
+    result shouldBe ("k", 42)
+  }
+
   // ---------------------------------------------------------------------------
   // MapValuesFlatMapAdaptor
   // ---------------------------------------------------------------------------

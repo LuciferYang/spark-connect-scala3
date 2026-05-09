@@ -146,6 +146,26 @@ class KeyValueGroupedDatasetIntegrationSuite extends IntegrationTestBase:
     }
   }
 
+  test("mapValues + flatMapSortedGroups applies value transform correctly") {
+    assert(classFilesUploaded)
+    import Encoder.given
+    withLambdaCompat {
+      // R3-1/R3-2: after mapValues, flatMapSortedGroups should use the original relation
+      // and apply the mapValues transform via MapValuesFlatMapAdaptor
+      val result = recordDs
+        .groupByKey(_.group)
+        .mapValues(_.value)
+        .flatMapSortedGroups(col("value").asc) { (key, iter) =>
+          val values = iter.toList
+          Seq(s"$key:${values.mkString(",")}")
+        }
+        .collect()
+      // Values should be sorted ascending after mapValues extracted .value
+      assert(result.toSet.contains("A:10,20,30"), s"Expected ascending sort, got: ${result.toSet}")
+      assert(result.toSet.contains("B:40,50"), s"Expected ascending sort, got: ${result.toSet}")
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // cogroup
   // ---------------------------------------------------------------------------

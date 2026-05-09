@@ -109,17 +109,25 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
     var queryId = ""
     var runId = ""
     var queryName: Option[String] = None
-    responses.foreach { resp =>
-      if resp.hasWriteStreamOperationStartResult then
-        val result = resp.getWriteStreamOperationStartResult
-        queryId = result.getQueryId.getId
-        runId = result.getQueryId.getRunId
-        if result.getName.nonEmpty then queryName = Some(result.getName)
-        // Dispatch QueryStartedEvent synchronously before returning
-        if result.hasQueryStartedEventJson then
-          val event = QueryStartedEvent.fromJson(result.getQueryStartedEventJson)
-          df.session.streams.streamingQueryListenerBus.postToAll(event)
-    }
+    try
+      responses.foreach { resp =>
+        if resp.hasWriteStreamOperationStartResult then
+          val result = resp.getWriteStreamOperationStartResult
+          queryId = result.getQueryId.getId
+          runId = result.getQueryId.getRunId
+          if result.getName.nonEmpty then queryName = Some(result.getName)
+          if result.hasQueryStartedEventJson then
+            val event = QueryStartedEvent.fromJson(result.getQueryStartedEventJson)
+            df.session.streams.streamingQueryListenerBus.postToAll(event)
+      }
+    finally
+      (responses: Any) match
+        case c: AutoCloseable => c.close()
+        case _                => ()
+    if queryId.isEmpty || runId.isEmpty then
+      throw new RuntimeException(
+        "Server response did not contain WriteStreamOperationStartResult with query IDs"
+      )
     StreamingQuery(df.session, queryId, runId, queryName)
 
   private[sql] def buildWriteStreamOp(): WriteStreamOperationStart.Builder =

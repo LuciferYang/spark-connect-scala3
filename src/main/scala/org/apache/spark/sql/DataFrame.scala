@@ -11,6 +11,7 @@ import org.apache.spark.sql.types.{
   GeographyType, GeometryType, StructField, StructType, VariantType, VariantVal
 }
 
+import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
@@ -327,7 +328,7 @@ final class DataFrame private[sql] (
       .build()
     val (rows, observed) = executeAndCollect(tailRel)
     if observed.nonEmpty then session.processObservedMetrics(observed)
-    rows
+    applyPostConversions(rows, schema)
 
   /** Pipeline-style transformation. */
   def transform(f: DataFrame => DataFrame): DataFrame = f(this)
@@ -632,7 +633,7 @@ final class DataFrame private[sql] (
   def collect(): Array[Row] =
     val (rows, observed) = executeAndCollect(relation)
     if observed.nonEmpty then session.processObservedMetrics(observed)
-    applyVariantConversions(applySpatialConversions(rows, schema), schema)
+    applyPostConversions(rows, schema)
 
   def collectAsList(): java.util.List[Row] = java.util.Arrays.asList(collect()*)
 
@@ -738,12 +739,18 @@ final class DataFrame private[sql] (
   def toLocalIterator(): java.util.Iterator[Row] with AutoCloseable =
     val plan = Plan.newBuilder().setRoot(relation).build()
     val responses = client.execute(plan)
-    val rowIter = responses.flatMap { resp =>
+    val rawIter = responses.flatMap { resp =>
       if resp.hasArrowBatch then
         ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
       else
         Iterator.empty
     }
+    // Apply spatial/variant post-conversions lazily per row (consistent with collect/tail)
+    val sch = schema
+    val rowIter = needsPostConversions(sch) match
+      case None                           => rawIter
+      case Some((spatialIdx, variantIdx)) =>
+        rawIter.map(row => convertRowPost(row, sch, spatialIdx, variantIdx))
     new java.util.Iterator[Row] with AutoCloseable:
       private var closed = false
       def hasNext: Boolean =
@@ -1024,70 +1031,68 @@ final class DataFrame private[sql] (
         case _              => None
     else None
 
-  /** Convert Arrow struct values to Geometry/Geography objects where the schema requires it.
+  /** Fused post-processing: spatial + variant conversions in a single pass over the rows.
     *
-    * The server serializes spatial types as Arrow structs with fields: srid (int) + wkb (binary).
-    * This method reconstructs proper Geometry/Geography instances from those structs.
+    * Avoids creating intermediate arrays when both conversion types are needed.
     */
-  private def applySpatialConversions(rows: Array[Row], schema: StructType): Array[Row] =
+  private def applyPostConversions(rows: Array[Row], schema: StructType): Array[Row] =
+    needsPostConversions(schema) match
+      case None                           => rows
+      case Some((spatialIdx, variantIdx)) =>
+        rows.map(row => convertRowPost(row, schema, spatialIdx, variantIdx))
+
+  /** Returns None if no post-conversions are needed, or Some((spatialIndices, variantIndices)). */
+  private def needsPostConversions(
+      schema: StructType
+  ): Option[(Seq[(Int, Boolean)], Seq[Int])] =
     val spatialIndices = schema.fields.zipWithIndex.collect {
       case (f, i) if f.dataType.isInstanceOf[GeometryType]  => (i, true)
       case (f, i) if f.dataType.isInstanceOf[GeographyType] => (i, false)
     }
-    if spatialIndices.isEmpty then return rows
-    rows.map { row =>
-      val values = row.toSeq.toArray
-      spatialIndices.foreach { case (idx, isGeometry) =>
-        if values(idx) != null then
-          // Server sends spatial as struct{srid: Int, wkb: Binary}
-          val (wkb, srid) = values(idx) match
-            case r: Row =>
-              val s = r.getInt(0)
-              val b = r.get(1).asInstanceOf[Array[Byte]]
-              (b, s)
-            case bytes: Array[Byte @unchecked] =>
-              val defaultSrid = schema.fields(idx).dataType match
-                case g: GeometryType  => g.srid
-                case g: GeographyType => g.srid
-                case _                => 0
-              (bytes, defaultSrid)
-          values(idx) =
-            if isGeometry then types.Geometry.fromWKB(wkb, srid)
-            else types.Geography.fromWKB(wkb, srid)
-      }
-      Row.fromSeqWithSchema(values.toIndexedSeq, schema)
-    }
-
-  /** Convert Arrow struct/binary values to VariantVal where the schema indicates VariantType.
-    *
-    * The server serializes variant as an Arrow struct with two binary children: "value" +
-    * "metadata". If the ArrowDeserializer already detected the pattern (producing VariantVal), this
-    * is a no-op for those cells. Otherwise, this converts Row(value: byte[], metadata: byte[]) →
-    * VariantVal.
-    */
-  private def applyVariantConversions(rows: Array[Row], schema: StructType): Array[Row] =
     val variantIndices = schema.fields.zipWithIndex.collect {
       case (f, i) if f.dataType == VariantType => i
     }
-    if variantIndices.isEmpty then return rows
-    rows.map { row =>
-      val values = row.toSeq.toArray
-      variantIndices.foreach { idx =>
-        if values(idx) != null then
-          values(idx) = values(idx) match
-            case v: VariantVal           => v // Already converted by ArrowDeserializer
-            case r: Row if r.length == 2 =>
-              // Struct decoded as Row(value: byte[], metadata: byte[])
-              val v = r.get(0).asInstanceOf[Array[Byte]]
-              val m = r.get(1).asInstanceOf[Array[Byte]]
-              VariantVal(v, m)
-            case bytes: Array[Byte @unchecked] =>
-              // Single binary — treat as value-only (empty metadata)
-              VariantVal(bytes, Array.empty[Byte])
-            case other => other // Unknown format, leave as-is
-      }
-      Row.fromSeqWithSchema(values.toIndexedSeq, schema)
+    if spatialIndices.isEmpty && variantIndices.isEmpty then None
+    else Some((spatialIndices, variantIndices))
+
+  /** Convert a single row's spatial and variant columns in place. */
+  private def convertRowPost(
+      row: Row,
+      schema: StructType,
+      spatialIndices: Seq[(Int, Boolean)],
+      variantIndices: Seq[Int]
+  ): Row =
+    val values = row.toSeq.toArray
+    spatialIndices.foreach { case (idx, isGeometry) =>
+      if values(idx) != null then
+        values(idx) = values(idx) match
+          case r: Row =>
+            val s = r.getInt(0)
+            val b = r.get(1).asInstanceOf[Array[Byte]]
+            if isGeometry then types.Geometry.fromWKB(b, s)
+            else types.Geography.fromWKB(b, s)
+          case bytes: Array[Byte @unchecked] =>
+            val defaultSrid = schema.fields(idx).dataType match
+              case g: GeometryType  => g.srid
+              case g: GeographyType => g.srid
+              case _                => 0
+            if isGeometry then types.Geometry.fromWKB(bytes, defaultSrid)
+            else types.Geography.fromWKB(bytes, defaultSrid)
+          case already => already // already converted or unexpected type
     }
+    variantIndices.foreach { idx =>
+      if values(idx) != null then
+        values(idx) = values(idx) match
+          case v: VariantVal           => v
+          case r: Row if r.length == 2 =>
+            val v = r.get(0).asInstanceOf[Array[Byte]]
+            val m = r.get(1).asInstanceOf[Array[Byte]]
+            VariantVal(v, m)
+          case bytes: Array[Byte @unchecked] =>
+            VariantVal(bytes, Array.empty[Byte])
+          case other => other
+    }
+    Row.fromSeqDirectWithSchema(ArraySeq.unsafeWrapArray(values), schema)
 
   private[sql] def withRelation(f: Relation.Builder => Relation.Builder): DataFrame =
     val builder = Relation.newBuilder()

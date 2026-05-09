@@ -148,10 +148,13 @@ final class Row private (
   override def hashCode(): Int = values.hashCode()
 
 object Row:
-  def fromSeq(values: Seq[Any]): Row = new Row(values.toIndexedSeq)
+  def fromSeq(values: Seq[Any]): Row = values match
+    case idx: IndexedSeq[Any @unchecked] => new Row(idx)
+    case _                               => new Row(values.toIndexedSeq)
 
-  def fromSeqWithSchema(values: Seq[Any], schema: StructType): Row =
-    new Row(values.toIndexedSeq, Some(schema))
+  def fromSeqWithSchema(values: Seq[Any], schema: StructType): Row = values match
+    case idx: IndexedSeq[Any @unchecked] => new Row(idx, Some(schema))
+    case _                               => new Row(values.toIndexedSeq, Some(schema))
 
   def apply(values: Any*): Row = fromSeq(values)
 

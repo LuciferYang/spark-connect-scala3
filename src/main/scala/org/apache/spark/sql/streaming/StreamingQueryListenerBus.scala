@@ -52,9 +52,7 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
       cmdBuilder.getStreamingQueryListenerBusCommandBuilder
         .setRemoveListenerBusListener(true)
       try
-        val plan = Plan.newBuilder().setCommand(cmdBuilder.build()).build()
-        val responses = session.client.execute(plan)
-        responses.foreach(_ => ()) // drain
+        session.client.executeCommand(cmdBuilder.build())
       catch case NonFatal(_) => () // best-effort
 
       executionThread.foreach(_.interrupt())
@@ -73,12 +71,19 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
 
     val plan = Plan.newBuilder().setCommand(cmdBuilder.build()).build()
     val iterator = session.client.execute(plan)
-    while iterator.hasNext do
-      val response = iterator.next()
-      val result = response.getStreamingQueryListenerEventsResult
-      if result.hasListenerBusListenerAdded && result.getListenerBusListenerAdded then
-        return iterator
-    iterator
+    try
+      while iterator.hasNext do
+        val response = iterator.next()
+        val result = response.getStreamingQueryListenerEventsResult
+        if result.hasListenerBusListenerAdded && result.getListenerBusListenerAdded then
+          return iterator
+      iterator
+    catch
+      case e: Exception =>
+        (iterator: Any) match
+          case c: AutoCloseable => c.close()
+          case _                => ()
+        throw e
 
   private def queryEventHandler(iter: Iterator[ExecutePlanResponse]): Unit =
     try
@@ -105,6 +110,12 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
           val snapshot = listeners.asScala.toList
           snapshot.foreach(l => listeners.remove(l))
         }
+    finally
+      (iter: Any) match
+        case c: AutoCloseable => try c.close()
+          catch
+            case NonFatal(_) => ()
+            case _           => ()
 
   private[sql] def postToAll(event: Event): Unit = lock.synchronized {
     listeners.forEach { listener =>

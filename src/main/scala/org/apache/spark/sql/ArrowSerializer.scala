@@ -29,10 +29,13 @@ import scala.jdk.CollectionConverters.*
 /** Encodes Row sequences into Arrow IPC byte arrays. */
 private[sql] object ArrowSerializer:
 
+  /** Shared RootAllocator — thread-safe (uses AtomicLong internally). */
+  private val rootAllocator = RootAllocator(Long.MaxValue)
+
   def encodeRows(rows: Seq[Row], schema: types.StructType): Array[Byte] =
     if rows.isEmpty then return Array.emptyByteArray
 
-    val allocator = RootAllocator(Long.MaxValue)
+    val allocator = rootAllocator.newChildAllocator("ser", 0, Long.MaxValue)
     val baos = ByteArrayOutputStream()
     try
       val arrowFields =
@@ -44,12 +47,19 @@ private[sql] object ArrowSerializer:
         try
           writer.start()
           root.setRowCount(rows.size)
-          val vectors = root.getFieldVectors.asScala.toSeq
+          val vectors = root.getFieldVectors.asScala.toArray
+          val numCols = vectors.length
           rows.indices.foreach { rowIdx =>
             val row = rows(rowIdx)
-            vectors.zipWithIndex.foreach { (vec, colIdx) =>
-              setArrowValue(vec, rowIdx, row.get(colIdx), schema.fields(colIdx).dataType)
-            }
+            var colIdx = 0
+            while colIdx < numCols do
+              setArrowValue(
+                vectors(colIdx),
+                rowIdx,
+                row.get(colIdx),
+                schema.fields(colIdx).dataType
+              )
+              colIdx += 1
           }
           vectors.foreach(_.setValueCount(rows.size))
           writer.writeBatch()

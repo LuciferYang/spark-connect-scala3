@@ -143,9 +143,7 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
     builder
 
   private def executeCommand(command: Command): Unit =
-    val plan = Plan.newBuilder().setCommand(command).build()
-    val responses = df.session.client.execute(plan)
-    responses.foreach(_ => ()) // drain iterator
+    df.session.client.executeCommand(command)
 
   private def toProtoMode(mode: String): WriteOperation.SaveMode =
     mode.toLowerCase match

@@ -217,15 +217,28 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   )(func: (K, Iterator[V]) => IterableOnce[U]): Dataset[U] =
     val outEnc = summon[Encoder[U]]
     val keyAg = keyEncoder.agnosticEncoder
-    val valueAg = valueEncoder.agnosticEncoder
     val outAg = outEnc.agnosticEncoder
-    if keyAg == null || valueAg == null || outAg == null then
+    // For mapValues-derived KVGDs, use the original relation and value encoder
+    val inputRelation = originalRelation.getOrElse(ds.df.relation)
+    val inputValueAg =
+      originalValueEncoder.map(_.agnosticEncoder).getOrElse(valueEncoder.agnosticEncoder)
+    val currentValueAg = valueEncoder.agnosticEncoder
+    if keyAg == null || inputValueAg == null || currentValueAg == null || outAg == null then
       return flatMapGroupsLocal(func, outEnc)
-    val groupingUdf = buildGroupingUdf(keyAg, valueAg)
-    val mapUdf = buildGroupMapUdf(func, keyAg, valueAg, outAg)
+    // Build server-side GroupMap
+    val groupingUdf = buildGroupingUdf(keyAg, inputValueAg)
+    // When mapValuesFunc is set, compose it with the user function
+    val effectiveFunc: AnyRef = mapValuesFunc match
+      case Some(mvf) =>
+        new MapValuesFlatMapAdaptor[K, U](
+          mvf.asInstanceOf[Any => Any],
+          func.asInstanceOf[(K, Iterator[Any]) => IterableOnce[U]]
+        )
+      case None => func.asInstanceOf[AnyRef]
+    val mapUdf = buildGroupMapUdf(effectiveFunc, keyAg, inputValueAg, outAg)
     val groupMapBuilder = GroupMap
       .newBuilder()
-      .setInput(ds.df.relation)
+      .setInput(inputRelation)
       .addGroupingExpressions(
         Expression
           .newBuilder()

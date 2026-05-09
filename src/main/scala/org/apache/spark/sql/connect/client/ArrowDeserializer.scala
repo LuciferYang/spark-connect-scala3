@@ -92,13 +92,11 @@ object ArrowDeserializer:
 
       case v: MapVector =>
         val dataVec = v.getDataVector.asInstanceOf[StructVector]
+        val keyVec = dataVec.getChildByOrdinal(0).asInstanceOf[FieldVector]
+        val valVec = dataVec.getChildByOrdinal(1).asInstanceOf[FieldVector]
         val start = v.getElementStartIndex(index)
         val end = v.getElementEndIndex(index)
-        (start until end).map { i =>
-          val keyVec = dataVec.getChildByOrdinal(0).asInstanceOf[FieldVector]
-          val valVec = dataVec.getChildByOrdinal(1).asInstanceOf[FieldVector]
-          extractValue(keyVec, i) -> extractValue(valVec, i)
-        }.toMap
+        (start until end).map(i => extractValue(keyVec, i) -> extractValue(valVec, i)).toMap
 
       case v: ListVector =>
         val inner = v.getDataVector

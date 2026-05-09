@@ -67,7 +67,81 @@ object Encoders:
       Row(e1.toRow(value._1), e2.toRow(value._2))
     override def agnosticEncoder: AgnosticEncoder[?] = ae
 
-  // -- Scala primitive types ------------------------------------------------
+  private class TupleEncoder3[T1, T2, T3](
+      e1: Encoder[T1],
+      e2: Encoder[T2],
+      e3: Encoder[T3],
+      ae: AgnosticEncoder[(T1, T2, T3)]
+  ) extends Encoder[(T1, T2, T3)]:
+    def schema: StructType = StructType(
+      Seq(StructField("_1", e1.schema), StructField("_2", e2.schema), StructField("_3", e3.schema))
+    )
+    def fromRow(row: Row): (T1, T2, T3) =
+      val r = if row.schema.isDefined && row.size == 1 then row.getStruct(0) else row
+      val v1 = r.get(0) match { case r: Row => e1.fromRow(r); case o => o.asInstanceOf[T1] }
+      val v2 = r.get(1) match { case r: Row => e2.fromRow(r); case o => o.asInstanceOf[T2] }
+      val v3 = r.get(2) match { case r: Row => e3.fromRow(r); case o => o.asInstanceOf[T3] }
+      (v1, v2, v3)
+    def toRow(value: (T1, T2, T3)): Row =
+      Row(e1.toRow(value._1), e2.toRow(value._2), e3.toRow(value._3))
+    override def agnosticEncoder: AgnosticEncoder[?] = ae
+
+  private class TupleEncoder4[T1, T2, T3, T4](
+      e1: Encoder[T1],
+      e2: Encoder[T2],
+      e3: Encoder[T3],
+      e4: Encoder[T4],
+      ae: AgnosticEncoder[(T1, T2, T3, T4)]
+  ) extends Encoder[(T1, T2, T3, T4)]:
+    def schema: StructType = StructType(Seq(
+      StructField("_1", e1.schema),
+      StructField("_2", e2.schema),
+      StructField("_3", e3.schema),
+      StructField("_4", e4.schema)
+    ))
+    def fromRow(row: Row): (T1, T2, T3, T4) =
+      val r = if row.schema.isDefined && row.size == 1 then row.getStruct(0) else row
+      val v1 = r.get(0) match { case r: Row => e1.fromRow(r); case o => o.asInstanceOf[T1] }
+      val v2 = r.get(1) match { case r: Row => e2.fromRow(r); case o => o.asInstanceOf[T2] }
+      val v3 = r.get(2) match { case r: Row => e3.fromRow(r); case o => o.asInstanceOf[T3] }
+      val v4 = r.get(3) match { case r: Row => e4.fromRow(r); case o => o.asInstanceOf[T4] }
+      (v1, v2, v3, v4)
+    def toRow(value: (T1, T2, T3, T4)): Row =
+      Row(e1.toRow(value._1), e2.toRow(value._2), e3.toRow(value._3), e4.toRow(value._4))
+    override def agnosticEncoder: AgnosticEncoder[?] = ae
+
+  private class TupleEncoder5[T1, T2, T3, T4, T5](
+      e1: Encoder[T1],
+      e2: Encoder[T2],
+      e3: Encoder[T3],
+      e4: Encoder[T4],
+      e5: Encoder[T5],
+      ae: AgnosticEncoder[(T1, T2, T3, T4, T5)]
+  ) extends Encoder[(T1, T2, T3, T4, T5)]:
+    def schema: StructType = StructType(Seq(
+      StructField("_1", e1.schema),
+      StructField("_2", e2.schema),
+      StructField("_3", e3.schema),
+      StructField("_4", e4.schema),
+      StructField("_5", e5.schema)
+    ))
+    def fromRow(row: Row): (T1, T2, T3, T4, T5) =
+      val r = if row.schema.isDefined && row.size == 1 then row.getStruct(0) else row
+      val v1 = r.get(0) match { case r: Row => e1.fromRow(r); case o => o.asInstanceOf[T1] }
+      val v2 = r.get(1) match { case r: Row => e2.fromRow(r); case o => o.asInstanceOf[T2] }
+      val v3 = r.get(2) match { case r: Row => e3.fromRow(r); case o => o.asInstanceOf[T3] }
+      val v4 = r.get(3) match { case r: Row => e4.fromRow(r); case o => o.asInstanceOf[T4] }
+      val v5 = r.get(4) match { case r: Row => e5.fromRow(r); case o => o.asInstanceOf[T5] }
+      (v1, v2, v3, v4, v5)
+    def toRow(value: (T1, T2, T3, T4, T5)): Row =
+      Row(
+        e1.toRow(value._1),
+        e2.toRow(value._2),
+        e3.toRow(value._3),
+        e4.toRow(value._4),
+        e5.toRow(value._5)
+      )
+    override def agnosticEncoder: AgnosticEncoder[?] = ae
 
   def scalaBoolean: Encoder[Boolean] = wrap(PrimitiveBooleanEncoder)
   def scalaByte: Encoder[Byte] = wrap(PrimitiveByteEncoder)
@@ -145,7 +219,8 @@ object Encoders:
       e2: Encoder[T2],
       e3: Encoder[T3]
   ): Encoder[(T1, T2, T3)] =
-    wrap(tupleProductEncoder[(T1, T2, T3)](asAgnostic(e1), asAgnostic(e2), asAgnostic(e3)))
+    val ae = tupleProductEncoder[(T1, T2, T3)](asAgnostic(e1), asAgnostic(e2), asAgnostic(e3))
+    new TupleEncoder3(e1, e2, e3, ae)
 
   def tuple[T1, T2, T3, T4](
       e1: Encoder[T1],
@@ -153,14 +228,13 @@ object Encoders:
       e3: Encoder[T3],
       e4: Encoder[T4]
   ): Encoder[(T1, T2, T3, T4)] =
-    wrap(
-      tupleProductEncoder[(T1, T2, T3, T4)](
-        asAgnostic(e1),
-        asAgnostic(e2),
-        asAgnostic(e3),
-        asAgnostic(e4)
-      )
+    val ae = tupleProductEncoder[(T1, T2, T3, T4)](
+      asAgnostic(e1),
+      asAgnostic(e2),
+      asAgnostic(e3),
+      asAgnostic(e4)
     )
+    new TupleEncoder4(e1, e2, e3, e4, ae)
 
   def tuple[T1, T2, T3, T4, T5](
       e1: Encoder[T1],
@@ -169,15 +243,14 @@ object Encoders:
       e4: Encoder[T4],
       e5: Encoder[T5]
   ): Encoder[(T1, T2, T3, T4, T5)] =
-    wrap(
-      tupleProductEncoder[(T1, T2, T3, T4, T5)](
-        asAgnostic(e1),
-        asAgnostic(e2),
-        asAgnostic(e3),
-        asAgnostic(e4),
-        asAgnostic(e5)
-      )
+    val ae = tupleProductEncoder[(T1, T2, T3, T4, T5)](
+      asAgnostic(e1),
+      asAgnostic(e2),
+      asAgnostic(e3),
+      asAgnostic(e4),
+      asAgnostic(e5)
     )
+    new TupleEncoder5(e1, e2, e3, e4, e5, ae)
 
   // -- Case class encoder ---------------------------------------------------
 

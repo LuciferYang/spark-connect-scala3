@@ -95,10 +95,15 @@ final class StreamingQuery private[sql] (
     val plan = Plan.newBuilder().setCommand(command).build()
     val responses = session.client.execute(plan)
     var result: StreamingQueryCommandResult = null
-    responses.foreach { resp =>
-      if resp.hasStreamingQueryCommandResult then
-        result = resp.getStreamingQueryCommandResult
-    }
+    try
+      responses.foreach { resp =>
+        if resp.hasStreamingQueryCommandResult then
+          result = resp.getStreamingQueryCommandResult
+      }
+    finally
+      (responses: Any) match
+        case c: AutoCloseable => c.close()
+        case _                => ()
     if result == null then
       throw new RuntimeException("No StreamingQueryCommandResult in response")
     result

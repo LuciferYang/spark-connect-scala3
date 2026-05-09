@@ -94,9 +94,9 @@ private[common] object SparkClassUtilsShim:
     finally
       if closeStreams then
         try in.close()
-        catch case _: Throwable => ()
+        catch case _: Exception => ()
         try out.close()
-        catch case _: Throwable => ()
+        catch case _: Exception => ()
     count
 
 /** A cleaner that renders closures serializable if they can be done so safely.
@@ -570,7 +570,7 @@ private[sql] object ClosureCleaner extends Logging {
         modifiersFieldOption.foreach(_.setAccessible(true))
         modifiersFieldOption
       } catch {
-        case _: Throwable => None
+        case _: Exception => None
       }
     } else None
 
@@ -614,7 +614,7 @@ private[sql] object ClosureCleaner extends Logging {
           factory.invokeWithArguments(outerThis +: argsBuffer.tail.toArray: _*).asInstanceOf[F]
         Some(clonedLambda)
       } catch {
-        case _: Throwable => None
+        case _: Exception => None
       }
     } else {
       None

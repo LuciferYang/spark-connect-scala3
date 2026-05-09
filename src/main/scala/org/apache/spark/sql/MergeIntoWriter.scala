@@ -43,9 +43,7 @@ final class MergeIntoWriter private[sql] (table: String, df: DataFrame, on: Colu
     val command = Command.newBuilder()
       .setMergeIntoTableCommand(builder.build())
       .build()
-    val plan = Plan.newBuilder().setCommand(command).build()
-    val responses = df.session.client.execute(plan)
-    responses.foreach(_ => ()) // drain iterator
+    df.session.client.executeCommand(command)
 
   // ---- Internal callbacks used by WhenXxx helpers ----
 

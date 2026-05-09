@@ -364,3 +364,41 @@ class EncoderSuite extends AnyFunSuite with Matchers:
     val enc = summon[Encoder[WithBinary]]
     enc.schema.fields(0).dataType shouldBe BinaryType
   }
+
+  // ---------------------------------------------------------------------------
+  // R6-1: LocalDate encoder handles java.sql.Date without ClassCastException
+  // ---------------------------------------------------------------------------
+
+  test("LocalDate encoder fromRow handles java.sql.Date input") {
+    val enc = summon[Encoder[java.time.LocalDate]]
+    val sqlDate = java.sql.Date.valueOf("2026-03-15")
+    val row = Row(sqlDate)
+    val result = enc.fromRow(row)
+    result shouldBe java.time.LocalDate.of(2026, 3, 15)
+  }
+
+  test("LocalDate encoder fromRow handles native LocalDate input") {
+    val enc = summon[Encoder[java.time.LocalDate]]
+    val ld = java.time.LocalDate.of(2026, 6, 20)
+    val row = Row(ld)
+    enc.fromRow(row) shouldBe ld
+  }
+
+  // ---------------------------------------------------------------------------
+  // R6-1: Instant encoder handles java.sql.Timestamp without ClassCastException
+  // ---------------------------------------------------------------------------
+
+  test("Instant encoder fromRow handles java.sql.Timestamp input") {
+    val enc = summon[Encoder[java.time.Instant]]
+    val ts = java.sql.Timestamp.valueOf("2026-03-15 10:30:00")
+    val row = Row(ts)
+    val result = enc.fromRow(row)
+    result shouldBe ts.toInstant
+  }
+
+  test("Instant encoder fromRow handles native Instant input") {
+    val enc = summon[Encoder[java.time.Instant]]
+    val inst = java.time.Instant.parse("2026-03-15T10:30:00Z")
+    val row = Row(inst)
+    enc.fromRow(row) shouldBe inst
+  }
