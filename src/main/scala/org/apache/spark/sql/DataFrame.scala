@@ -298,6 +298,16 @@ final class DataFrame private[sql] (
 
   /** Hint the optimizer (e.g., broadcast). */
   def hint(name: String, parameters: Any*): DataFrame =
+    parameters.foreach {
+      case _: Int | _: Long | _: Float | _: Double | _: String | _: Boolean |
+          _: Array[String] | _: Array[Byte] | null =>
+      // supported types
+      case other =>
+        throw IllegalArgumentException(
+          s"Unsupported hint parameter type: ${other.getClass.getName}. " +
+            "Supported types: Int, Long, Float, Double, String, Boolean, Array[String], Array[Byte]."
+        )
+    }
     val hintBuilder = Hint.newBuilder().setInput(relation).setName(name)
     parameters.foreach(p => hintBuilder.addParameters(Column.lit(p).expr))
     withRelation(_.setHint(hintBuilder.build()))

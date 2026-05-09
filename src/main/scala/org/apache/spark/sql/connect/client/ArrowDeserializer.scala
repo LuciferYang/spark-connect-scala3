@@ -16,8 +16,16 @@ import scala.jdk.CollectionConverters.*
 /** Deserializes Arrow IPC batches into Row sequences. */
 object ArrowDeserializer:
 
+  /** Cached metadata for a StructVector: whether it's a Variant struct, and its child field
+    * vectors.
+    */
+  private case class StructVectorMeta(isVariant: Boolean, children: Seq[FieldVector])
+
+  /** Maximum bytes the Arrow allocator may reserve (256 GB). */
+  private val MaxAllocatorBytes: Long = 256L * 1024 * 1024 * 1024
+
   /** Shared RootAllocator — thread-safe (uses AtomicLong internally). */
-  private val rootAllocator = RootAllocator(Long.MaxValue)
+  private val rootAllocator = RootAllocator(MaxAllocatorBytes)
 
   def fromArrowBatch(data: Array[Byte]): Seq[Row] =
     fromArrowBatchWithSchema(data)._1
@@ -25,7 +33,7 @@ object ArrowDeserializer:
   /** Deserialize Arrow IPC bytes, returning rows and the inferred StructType schema. */
   def fromArrowBatchWithSchema(data: Array[Byte]): (Seq[Row], Option[StructType]) =
     if data.isEmpty then return (Seq.empty, None)
-    val childAllocator = rootAllocator.newChildAllocator("deser", 0, Long.MaxValue)
+    val childAllocator = rootAllocator.newChildAllocator("deser", 0, MaxAllocatorBytes)
     try
       val reader = ArrowStreamReader(ByteArrayInputStream(data), childAllocator)
       try
@@ -34,6 +42,7 @@ object ArrowDeserializer:
         val schema = arrowSchemaToStructType(root.getSchema)
         val vectors = root.getFieldVectors.asScala.toArray
         val numCols = vectors.length
+        val structMetaCache = mutable.HashMap.empty[StructVector, StructVectorMeta]
         while reader.loadNextBatch() do
           val numRows = root.getRowCount
           var i = 0
@@ -41,7 +50,7 @@ object ArrowDeserializer:
             val values = new Array[Any](numCols)
             var col = 0
             while col < numCols do
-              values(col) = extractValue(vectors(col), i)
+              values(col) = extractValue(vectors(col), i, structMetaCache)
               col += 1
             rows += Row.fromSeqDirectWithSchema(ArraySeq.unsafeWrapArray(values), schema)
             i += 1
@@ -51,7 +60,11 @@ object ArrowDeserializer:
     finally
       childAllocator.close()
 
-  private def extractValue(vector: FieldVector, index: Int): Any =
+  private def extractValue(
+      vector: FieldVector,
+      index: Int,
+      structMetaCache: mutable.HashMap[StructVector, StructVectorMeta]
+  ): Any =
     if vector.isNull(index) then return null
     vector match
       case v: TinyIntVector    => v.get(index)
@@ -96,25 +109,32 @@ object ArrowDeserializer:
         val valVec = dataVec.getChildByOrdinal(1).asInstanceOf[FieldVector]
         val start = v.getElementStartIndex(index)
         val end = v.getElementEndIndex(index)
-        (start until end).map(i => extractValue(keyVec, i) -> extractValue(valVec, i)).toMap
+        (start until end).map(i =>
+          extractValue(keyVec, i, structMetaCache) -> extractValue(valVec, i, structMetaCache)
+        ).toMap
 
       case v: ListVector =>
         val inner = v.getDataVector
         val start = v.getElementStartIndex(index)
         val end = v.getElementEndIndex(index)
-        (start until end).map(i => extractValue(inner, i)).toSeq
+        (start until end).map(i => extractValue(inner, i, structMetaCache)).toSeq
 
       case v: StructVector =>
-        if isVariantStruct(v) then
+        val meta = structMetaCache.getOrElseUpdate(
+          v, {
+            val children = v.getChildrenFromFields.asScala.toSeq
+            StructVectorMeta(isVariantStruct(v), children)
+          }
+        )
+        if meta.isVariant then
           val valueVec = v.getChild("value").asInstanceOf[FieldVector]
           val metadataVec = v.getChild("metadata").asInstanceOf[FieldVector]
           VariantVal(
-            extractValue(valueVec, index).asInstanceOf[Array[Byte]],
-            extractValue(metadataVec, index).asInstanceOf[Array[Byte]]
+            extractValue(valueVec, index, structMetaCache).asInstanceOf[Array[Byte]],
+            extractValue(metadataVec, index, structMetaCache).asInstanceOf[Array[Byte]]
           )
         else
-          val fields = v.getChildrenFromFields.asScala.toSeq
-          Row.fromSeq(fields.map(f => extractValue(f, index)))
+          Row.fromSeq(meta.children.map(f => extractValue(f, index, structMetaCache)))
 
       case v: DurationVector =>
         v.getObject(index)

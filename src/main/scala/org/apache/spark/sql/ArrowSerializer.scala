@@ -29,13 +29,16 @@ import scala.jdk.CollectionConverters.*
 /** Encodes Row sequences into Arrow IPC byte arrays. */
 private[sql] object ArrowSerializer:
 
+  /** Maximum bytes the Arrow allocator may reserve (256 GB). */
+  private val MaxAllocatorBytes: Long = 256L * 1024 * 1024 * 1024
+
   /** Shared RootAllocator — thread-safe (uses AtomicLong internally). */
-  private val rootAllocator = RootAllocator(Long.MaxValue)
+  private val rootAllocator = RootAllocator(MaxAllocatorBytes)
 
   def encodeRows(rows: Seq[Row], schema: types.StructType): Array[Byte] =
     if rows.isEmpty then return Array.emptyByteArray
 
-    val allocator = rootAllocator.newChildAllocator("ser", 0, Long.MaxValue)
+    val allocator = rootAllocator.newChildAllocator("ser", 0, MaxAllocatorBytes)
     val baos = ByteArrayOutputStream()
     try
       val arrowFields =
@@ -192,33 +195,35 @@ private[sql] object ArrowSerializer:
           val bytes = value.asInstanceOf[Array[Byte]]
           v.setSafe(idx, bytes, 0, bytes.length)
         case v: MapVector =>
-          val entries = value match
-            case m: Map[?, ?]           => m.toSeq
-            case m: java.util.Map[?, ?] =>
-              import scala.jdk.CollectionConverters.*
-              m.asScala.toSeq
-            case _ =>
-              throw IllegalArgumentException(s"Cannot convert ${value.getClass} to Map")
           val mt = dt.asInstanceOf[types.MapType]
           val dataVec = v.getDataVector.asInstanceOf[StructVector]
           val keyVec = dataVec.getChildByOrdinal(0).asInstanceOf[FieldVector]
           val valVec = dataVec.getChildByOrdinal(1).asInstanceOf[FieldVector]
           val offset = v.startNewValue(idx)
-          for ((kv, i) <- entries.zipWithIndex) do
-            val (key, valu) = kv
-            setArrowValue(keyVec, offset + i, key, mt.keyType)
-            setArrowValue(valVec, offset + i, valu, mt.valueType)
-          v.endValue(idx, entries.size)
+          value match
+            case m: Map[?, ?] =>
+              var i = 0
+              m.foreach { (key, valu) =>
+                setArrowValue(keyVec, offset + i, key, mt.keyType)
+                setArrowValue(valVec, offset + i, valu, mt.valueType)
+                i += 1
+              }
+              v.endValue(idx, i)
+            case m: java.util.Map[?, ?] =>
+              var i = 0
+              m.forEach { (key, valu) =>
+                setArrowValue(keyVec, offset + i, key, mt.keyType)
+                setArrowValue(valVec, offset + i, valu, mt.valueType)
+                i += 1
+              }
+              v.endValue(idx, i)
+            case _ =>
+              throw IllegalArgumentException(s"Cannot convert ${value.getClass} to Map")
         case v: ListVector =>
           val listWriter = v.getWriter
-          val items = value match
-            case a: Array[?]          => a.toSeq
-            case s: Iterable[?]       => s.toSeq
-            case j: java.util.List[?] => j.asScala.toSeq
-            case _                    => Seq(value)
           listWriter.setPosition(idx)
           listWriter.startList()
-          for item <- items do
+          val writeItem = (item: Any) =>
             if item == null then listWriter.writeNull()
             else
               item match
@@ -237,6 +242,11 @@ private[sql] object ArrowSerializer:
                     listWriter.varChar().writeVarChar(0, bytes.length, buf)
                   finally buf.close()
                 case _ => listWriter.writeNull()
+          value match
+            case a: Array[?]          => a.foreach(writeItem)
+            case s: Iterable[?]       => s.foreach(writeItem)
+            case j: java.util.List[?] => j.forEach(item => writeItem(item))
+            case _                    => writeItem(value)
           listWriter.endList()
         case v: StructVector =>
           val row = value.asInstanceOf[Row]

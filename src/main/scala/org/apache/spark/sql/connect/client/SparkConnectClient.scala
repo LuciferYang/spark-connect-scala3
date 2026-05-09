@@ -91,7 +91,12 @@ final class SparkConnectClient private (
   /** Cached compression options. None = not yet fetched; Some(None) = disabled. */
   @volatile private var _planCompressionOptions: Option[Option[PlanCompressionOptions]] = None
 
-  /** Lazily fetch compression options from server config (cached after first call). */
+  /** Lazily fetch compression options from server config (cached after first call).
+    *
+    * Only permanently disables compression on ClassNotFoundException or
+    * UnsupportedOperationException (indicating the feature is truly unavailable). Transient errors
+    * (e.g., network issues) are rethrown so callers can retry.
+    */
   private def getPlanCompressionOptions: Option[PlanCompressionOptions] =
     _planCompressionOptions match
       case Some(opts) => opts
@@ -100,17 +105,22 @@ final class SparkConnectClient private (
           _planCompressionOptions match
             case Some(opts) => opts // double-check
             case None       =>
-              val opts =
-                try
-                  Some(PlanCompressionOptions(
-                    thresholdBytes =
-                      getConfig("spark.connect.session.planCompression.threshold").toInt,
-                    algorithm =
-                      getConfig("spark.connect.session.planCompression.defaultAlgorithm")
-                  ))
-                catch case NonFatal(_) => None
-              _planCompressionOptions = Some(opts)
-              opts
+              try
+                val opts = Some(PlanCompressionOptions(
+                  thresholdBytes =
+                    getConfig("spark.connect.session.planCompression.threshold").toInt,
+                  algorithm =
+                    getConfig("spark.connect.session.planCompression.defaultAlgorithm")
+                ))
+                _planCompressionOptions = Some(opts)
+                opts
+              catch
+                case _: ClassNotFoundException | _: UnsupportedOperationException =>
+                  _planCompressionOptions = Some(None)
+                  None
+                case e if NonFatal(e) =>
+                  // Transient error — do NOT cache None; let caller retry later
+                  None
         }
 
   /** For testing: override the compression options. */
@@ -145,6 +155,9 @@ final class SparkConnectClient private (
               .build()
           ).build()
         catch
+          // Intentional fallback: if the zstd-jni library is not on the classpath,
+          // permanently disable compression for this session. This is expected in
+          // environments where the optional zstd dependency is not provided.
           case _: NoClassDefFoundError | _: ClassNotFoundException =>
             _planCompressionOptions = Some(None); plan
           case NonFatal(_) =>
@@ -386,7 +399,11 @@ final class SparkConnectClient private (
         GrpcExceptionConverter.convert(retryHandler.retry(bstub.interrupt(rb.build())))
       )
       resp.getInterruptedIdsList.asScala.toSeq
-    catch case NonFatal(_) => Seq.empty
+    catch
+      // Known limitation: interrupt failures are swallowed to maintain API compatibility.
+      // The caller receives an empty Seq and cannot distinguish "nothing interrupted" from
+      // "interrupt RPC itself failed". This matches the official Spark Connect client behavior.
+      case NonFatal(_) => Seq.empty
 
   def close(): Unit =
     sharedChannel.release()
@@ -453,12 +470,22 @@ final class SparkConnectClient private (
 
 object SparkConnectClient:
 
+  /** Maximum inbound gRPC message size (128 MB). */
+  private val MaxInboundMessageSize: Int = 128 * 1024 * 1024
+
+  /** User-Agent string sent with all gRPC requests. */
+  private val UserAgentString: String = "spark-connect-scala3/0.3.0"
+
   /** Parse a `sc://host:port` URL into (host, port, params). Params preserve insertion order. */
   private def parseUrl(url: String): (String, Int, Seq[(String, String)]) =
     // sc://host:port;key=value;key=value
     val stripped = url.stripPrefix("sc://")
     val parts = stripped.split(";").toSeq
     val hostPort = parts.head.split(":")
+    if hostPort.isEmpty || hostPort(0).isBlank then
+      throw new IllegalArgumentException(
+        s"Invalid Spark Connect URL '$url': host must not be empty. Expected format: sc://host[:port][;key=value...]"
+      )
     val host = hostPort(0)
     val port = if hostPort.length > 1 then hostPort(1).toInt else 15002
     val params = parts.tail.flatMap { p =>
@@ -487,8 +514,8 @@ object SparkConnectClient:
 
     val channelBuilder = ManagedChannelBuilder
       .forAddress(host, port)
-      .maxInboundMessageSize(128 * 1024 * 1024) // 128 MB
-      .userAgent("spark-connect-scala3/0.1.0")
+      .maxInboundMessageSize(MaxInboundMessageSize)
+      .userAgent(UserAgentString)
 
     if !useSsl then channelBuilder.usePlaintext()
 

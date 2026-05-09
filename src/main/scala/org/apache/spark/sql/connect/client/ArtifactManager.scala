@@ -60,6 +60,9 @@ final class ArtifactManager private[client] (
   // 32 KiB chunk size (gRPC recommendation)
   private val CHUNK_SIZE = 32 * 1024
 
+  /** Maximum time to wait for artifact upload to complete (30 minutes). */
+  private val ArtifactUploadTimeout: Duration = Duration(30, "minutes")
+
   private val classFinders = CopyOnWriteArrayList[ClassFinder]()
 
   /** Register a `ClassFinder` whose classes are uploaded before every plan execution. */
@@ -152,7 +155,7 @@ final class ArtifactManager private[client] (
         stream.onError(e)
         throw e
 
-    Await.result(promise.future, Duration.Inf)
+    Await.result(promise.future, ArtifactUploadTimeout)
 
   /** Send small artifacts in a single batched request. */
   private def addBatchedArtifacts(

@@ -89,9 +89,9 @@ final class Row private (
             if isNullAt(i) then "null"
             else
               get(i) match
-                case s: String => s"\"$s\""
+                case s: String => s"\"${Row.escapeJson(s)}\""
                 case other     => other.toString
-          s"\"${f.name}\":$v"
+          s"\"${Row.escapeJson(f.name)}\":$v"
         }
         s"{${fields.mkString(",")}}"
       case None =>
@@ -108,9 +108,9 @@ final class Row private (
             if isNullAt(i) then "null"
             else
               get(i) match
-                case s: String => s"\"$s\""
+                case s: String => s"\"${Row.escapeJson(s)}\""
                 case other     => other.toString
-          s"  \"${f.name}\" : $v"
+          s"  \"${Row.escapeJson(f.name)}\" : $v"
         }
         s"{\n${fields.mkString(",\n")}\n}"
       case None =>
@@ -148,6 +148,27 @@ final class Row private (
   override def hashCode(): Int = values.hashCode()
 
 object Row:
+  /** Escape a string for safe inclusion in JSON output. */
+  private def escapeJson(s: String): String =
+    val sb = new StringBuilder(s.length)
+    var i = 0
+    while i < s.length do
+      val ch = s.charAt(i)
+      ch match
+        case '"'          => sb.append("\\\"")
+        case '\\'         => sb.append("\\\\")
+        case '\b'         => sb.append("\\b")
+        case '\f'         => sb.append("\\f")
+        case '\n'         => sb.append("\\n")
+        case '\r'         => sb.append("\\r")
+        case '\t'         => sb.append("\\t")
+        case c if c < ' ' =>
+          sb.append("\\u")
+          sb.append(f"${c.toInt}%04x")
+        case c => sb.append(c)
+      i += 1
+    sb.toString
+
   def fromSeq(values: Seq[Any]): Row = values match
     case idx: IndexedSeq[Any @unchecked] => new Row(idx)
     case _                               => new Row(values.toIndexedSeq)

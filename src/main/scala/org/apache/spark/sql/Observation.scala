@@ -1,6 +1,7 @@
 package org.apache.spark.sql
 
 import java.util.UUID
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{Await, Future, Promise}
 import scala.concurrent.duration.Duration
@@ -25,6 +26,9 @@ final class Observation(val name: String):
 
   def this() = this(UUID.randomUUID().toString)
 
+  /** Maximum time to wait for observation metrics (10 minutes). */
+  private val ObservationTimeout: Duration = Duration(10, "minutes")
+
   private val registered = AtomicBoolean(false)
   private val promise = Promise[Row]()
 
@@ -37,7 +41,13 @@ final class Observation(val name: String):
     */
   @throws[InterruptedException]
   def get: Map[String, Any] =
-    val row = Await.result(future, Duration.Inf)
+    val row =
+      try Await.result(future, ObservationTimeout)
+      catch
+        case _: TimeoutException =>
+          throw TimeoutException(
+            s"Observation '$name' timed out after $ObservationTimeout waiting for metrics"
+          )
     if row == null then Map.empty
     else
       row.schema match

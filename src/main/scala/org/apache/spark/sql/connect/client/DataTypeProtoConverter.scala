@@ -184,3 +184,6 @@ object DataTypeProtoConverter:
 
       case null =>
         throw IllegalArgumentException("Cannot convert null DataType to proto")
+
+      case other =>
+        throw UnsupportedOperationException(s"Cannot convert DataType $other to proto")

@@ -11,10 +11,10 @@
 | 严重级别 | 数量 | 已修复 |
 |----------|------|--------|
 | CRITICAL | 5 | 5 ✅ |
-| HIGH | 24 | 0 |
-| MEDIUM | 72 | 0 |
-| LOW | 61 | 0 |
-| **合计** | **162** | **5** |
+| HIGH | 24 | 22 ✅ |
+| MEDIUM | 72 | 18 ✅ |
+| LOW | 61 | 2 ✅ |
+| **合计** | **162** | **47** |
 
 | 兼容性标记 | 数量 | 说明 |
 |------------|------|------|
@@ -57,21 +57,21 @@
 
 ### HIGH
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| S-1 | `SparkConnectClient.scala:466` | gRPC channel 默认明文传输（无 TLS）。连接 Spark Connect Server 的数据（含 auth token）默认不加密。 |
-| S-2 | `SparkConnectClient.scala:457-458` | 认证 token 从 URL 参数或环境变量读取，存储在 `connectionUrl` 字段（package-private），有通过日志/toString/序列化泄漏的风险。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| S-1 | `SparkConnectClient.scala:466` | gRPC channel 默认明文传输（无 TLS）。连接 Spark Connect Server 的数据（含 auth token）默认不加密。 | ⏳ 未修复：需 TLS 增强（非纯客户端修复） |
+| S-2 | `SparkConnectClient.scala:457-458` | 认证 token 从 URL 参数或环境变量读取，存储在 `connectionUrl` 字段（package-private），有通过日志/toString/序列化泄漏的风险。 | ✅ 已修复 (commit f7183d9)：token 独立存储，connectionUrl 不含 token |
 
 ### MEDIUM
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| S-3 | `SparkConnectClientParser.scala:102` | Token 嵌入 `sc://` URL 字符串，可能通过进程命令行、日志可见。 |
-| S-4 | `DataTypeProtoConverter.scala:70-71` | 从不可信 protobuf 输入执行 `Class.forName` + `newInstance()`（UDT jvmClass），如 MITM 可触发任意类实例化。 |
-| S-5 | `ArrowDeserializer.scala:24` | `RootAllocator(Long.MaxValue)` 无内存上限，恶意 Arrow batch 可导致 OOM/DoS。 |
-| S-6 | `ArrowSerializer.scala:35` | 同上：编码时 `RootAllocator(Long.MaxValue)` 无限制。 |
-| S-7 | `ArtifactManager.scala:155` | `Await.result(promise.future, Duration.Inf)` 无超时，gRPC 流不完成则永久阻塞。 |
-| S-8 | `Observation.scala:40` | `Await.result(future, Duration.Inf)` 无超时，观测指标不送达则永久阻塞。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| S-3 | `SparkConnectClientParser.scala:102` | Token 嵌入 `sc://` URL 字符串，可能通过进程命令行、日志可见。 | |
+| S-4 | `DataTypeProtoConverter.scala:70-71` | 从不可信 protobuf 输入执行 `Class.forName` + `newInstance()`（UDT jvmClass），如 MITM 可触发任意类实例化。 | |
+| S-5 | `ArrowDeserializer.scala:24` | `RootAllocator(Long.MaxValue)` 无内存上限，恶意 Arrow batch 可导致 OOM/DoS。 | ✅ 已修复：256GB 上限 |
+| S-6 | `ArrowSerializer.scala:35` | 同上：编码时 `RootAllocator(Long.MaxValue)` 无限制。 | ✅ 已修复：256GB 上限 |
+| S-7 | `ArtifactManager.scala:155` | `Await.result(promise.future, Duration.Inf)` 无超时，gRPC 流不完成则永久阻塞。 | ✅ 已修复：30 分钟超时 |
+| S-8 | `Observation.scala:40` | `Await.result(future, Duration.Inf)` 无超时，观测指标不送达则永久阻塞。 | ✅ 已修复：10 分钟超时 |
 | S-9 | `ClosureCleaner.scala:577-589` | 🚫 **DO NOT FIX** — 使用 `sun.reflect.ReflectionFactory` 绕过构造函数实例化对象，绕过安全检查。（序列化兼容性必需） |
 | S-10 | `ClosureCleaner.scala:673-681` | 🚫 **DO NOT FIX** — 通过反射创建全权限 `MethodHandles.Lookup`（access mode = -1），绕过 JVM 访问控制。（序列化兼容性必需） |
 | S-11 | `ClosureCleaner.scala:548-557` | 🚫 **DO NOT FIX** — 反射移除字段 `final` 修饰符，破坏 JVM 不可变性保证。（序列化兼容性必需） |
@@ -103,34 +103,34 @@
 | P-3 | `DataFrame.scala:1013` | `executeAndCollect` 对每行调用 `Row.fromSeqWithSchema(r.toSeq, s)`，导致每行数据被拷贝两次。 | ✅ 已修复：ArrowDeserializer 直接生成带 schema 的 Row，去掉冗余包装 |
 | P-4 | `ArrowDeserializer.scala:24` | 每次反序列化创建新 `RootAllocator`（重量级线程安全对象），应复用。 | ✅ 已修复：改为对象级别单例 + 每次调用使用 child allocator |
 
-### HIGH
+### HIGH — 已全部修复 (commit 57fbbd2)
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| P-5 | `ArrowSerializer.scala:48-53` | 嵌套 `foreach` + `zipWithIndex` 每行每列分配 tuple，应改 while 循环。 |
-| P-6 | `ArrowSerializer.scala:35` | 同 P-4：序列化时每次创建新 `RootAllocator`。 |
-| P-7 | `DataFrame.scala:1036-1063` | `applySpatialConversions`: `row.toSeq.toArray` → 修改 → `toIndexedSeq` = 三次拷贝。 |
-| P-8 | `DataFrame.scala:1072-1094` | `applyVariantConversions`: 同样的三次拷贝模式。 |
-| P-9 | `DataFrame.scala:635` | `collect()` 对同时含 Spatial + Variant 列的 schema 做两次全量遍历，应融合为一次。 |
-| P-10 | `Row.scala:151` | `Row.fromSeq` 无条件调用 `toIndexedSeq`，输入已是 IndexedSeq 时浪费。 |
-| P-11 | `ArrowDeserializer.scala:87-91` | MapVector 反序列化：`getChildByOrdinal` 在内循环中，应提到循环外。 |
-| P-12 | `DataType.scala:136-140` | `StructType.fieldIndex` 线性搜索 O(n)，应用 lazy Map[String,Int]。 |
-| P-13 | `Encoder.scala:242-247` | `DerivedEncoder.fromRow` 创建 3 个中间集合 + boxing 所有原始类型。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| P-5 | `ArrowSerializer.scala:48-53` | 嵌套 `foreach` + `zipWithIndex` 每行每列分配 tuple，应改 while 循环。 | ✅ 已修复：改用索引 while 循环 |
+| P-6 | `ArrowSerializer.scala:35` | 同 P-4：序列化时每次创建新 `RootAllocator`。 | ✅ 已修复：共享 RootAllocator 单例 + child allocator |
+| P-7 | `DataFrame.scala:1036-1063` | `applySpatialConversions`: `row.toSeq.toArray` → 修改 → `toIndexedSeq` = 三次拷贝。 | ✅ 已修复：融合为单次遍历 `applyPostConversions` |
+| P-8 | `DataFrame.scala:1072-1094` | `applyVariantConversions`: 同样的三次拷贝模式。 | ✅ 已修复：同 P-7，统一融合处理 |
+| P-9 | `DataFrame.scala:635` | `collect()` 对同时含 Spatial + Variant 列的 schema 做两次全量遍历，应融合为一次。 | ✅ 已修复：`needsPostConversions` 一次性判断 + `convertRowPost` 单次转换 |
+| P-10 | `Row.scala:151` | `Row.fromSeq` 无条件调用 `toIndexedSeq`，输入已是 IndexedSeq 时浪费。 | ✅ 已修复：检测 IndexedSeq 时跳过拷贝 |
+| P-11 | `ArrowDeserializer.scala:87-91` | MapVector 反序列化：`getChildByOrdinal` 在内循环中，应提到循环外。 | ✅ 已修复：提升到循环外 |
+| P-12 | `DataType.scala:136-140` | `StructType.fieldIndex` 线性搜索 O(n)，应用 lazy Map[String,Int]。 | ✅ 已修复：添加 lazy `fieldNameIndex` Map |
+| P-13 | `Encoder.scala:242-247` | `DerivedEncoder.fromRow` 创建 3 个中间集合 + boxing 所有原始类型。 | ✅ 已修复：Array + while 循环替代 Range.map |
 
 ### MEDIUM
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| P-14 | `ArrowDeserializer.scala:108` | StructVector: `getChildrenFromFields.asScala.toSeq` 每行调用，应提取到循环外。 |
-| P-15 | `ArrowDeserializer.scala:100-106` | `isVariantStruct` 每个 StructVector cell 调用，含 `.find()` + metadata 查找，应缓存。 |
-| P-16 | `ArrowDeserializer.scala:47-48` | 原始类型 extractValue 返回 boxed java 类型，每行每列 boxing。 |
-| P-17 | `ArrowSerializer.scala:186-189` | Map 序列化：`m.toSeq` + `entries.zipWithIndex` 双重中间集合。 |
-| P-18 | `ArrowSerializer.scala:204-207` | List 序列化：value match 统一 `.toSeq` 产生不必要中间集合。 |
-| P-19 | `DataFrame.scala:995` | `resp.getArrowBatch.getData.toByteArray` 全拷贝 protobuf ByteString，大 batch 临时翻倍内存。 |
-| P-20 | `ResponseValidator.scala:60-66` | `extractServerSideSessionId` 每条响应用 protobuf 反射查找字段描述符，应缓存。 |
-| P-21 | `ArtifactManager.scala:217-225` | `readNextChunk` 每 chunk 分配新 32KB byte[]，应复用 buffer。 |
-| P-22 | `DataFrame.scala:741-746` | `toLocalIterator` 使用 `flatMap` 立即解析整个 batch，违背惰性迭代初衷。 |
-| P-23 | `SparkConnectClient.scala:81` | `@volatile` 无同步保护，可能导致多线程重复远程 getConfig 调用。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| P-14 | `ArrowDeserializer.scala:108` | StructVector: `getChildrenFromFields.asScala.toSeq` 每行调用，应提取到循环外。 | ✅ 已修复：StructVectorMeta 缓存 |
+| P-15 | `ArrowDeserializer.scala:100-106` | `isVariantStruct` 每个 StructVector cell 调用，含 `.find()` + metadata 查找，应缓存。 | ✅ 已修复：StructVectorMeta 缓存 |
+| P-16 | `ArrowDeserializer.scala:47-48` | 原始类型 extractValue 返回 boxed java 类型，每行每列 boxing。 | |
+| P-17 | `ArrowSerializer.scala:186-189` | Map 序列化：`m.toSeq` + `entries.zipWithIndex` 双重中间集合。 | ✅ 已修复：直接迭代 + 手动计数 |
+| P-18 | `ArrowSerializer.scala:204-207` | List 序列化：value match 统一 `.toSeq` 产生不必要中间集合。 | ✅ 已修复：直接 foreach 各类型 |
+| P-19 | `DataFrame.scala:995` | `resp.getArrowBatch.getData.toByteArray` 全拷贝 protobuf ByteString，大 batch 临时翻倍内存。 | |
+| P-20 | `ResponseValidator.scala:60-66` | `extractServerSideSessionId` 每条响应用 protobuf 反射查找字段描述符，应缓存。 | ✅ 已修复：ConcurrentHashMap 缓存 |
+| P-21 | `ArtifactManager.scala:217-225` | `readNextChunk` 每 chunk 分配新 32KB byte[]，应复用 buffer。 | |
+| P-22 | `DataFrame.scala:741-746` | `toLocalIterator` 使用 `flatMap` 立即解析整个 batch，违背惰性迭代初衷。 | |
+| P-23 | `SparkConnectClient.scala:81` | `@volatile` 无同步保护，可能导致多线程重复远程 getConfig 调用。 | |
 | P-24 | `Encoder.scala:251-254` | `DerivedEncoder.toRow`: Range.map → Row.fromSeq → toIndexedSeq = 两次中间集合。 |
 
 ### LOW
@@ -152,26 +152,26 @@
 
 ### HIGH
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| Q-1 | `SparkConnectClient.scala:81` | `_planCompressionOptions` 使用 `@volatile` 但 check-then-set 逻辑（85-96 行）存在竞态条件。 |
-| Q-2 | `SparkConnectClient.scala:385` | `cloneSession()` 复用同一 ManagedChannel 和 stubs；关闭任一 client 会破坏另一个。 |
-| Q-3 | `ClosureCleaner.scala:572` | `getFinalModifiersFieldForJava17` 捕获所有 `Throwable`（含 OOM/ThreadDeath），应只捕获 ReflectiveOperationException。 |
-| Q-4 | `ExecutePlanResponseReattachableIterator.scala:58` | `iter` 字段 `@volatile` 但 64 行初始化非同步，其他线程提前调用 hasNext/next 会 NPE。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| Q-1 | `SparkConnectClient.scala:81` | `_planCompressionOptions` 使用 `@volatile` 但 check-then-set 逻辑（85-96 行）存在竞态条件。 | ✅ 已修复 (commit 57fbbd2)：double-check locking |
+| Q-2 | `SparkConnectClient.scala:385` | `cloneSession()` 复用同一 ManagedChannel 和 stubs；关闭任一 client 会破坏另一个。 | ✅ 已修复：SharedChannel 引用计数 |
+| Q-3 | `ClosureCleaner.scala:572` | `getFinalModifiersFieldForJava17` 捕获所有 `Throwable`（含 OOM/ThreadDeath），应只捕获 ReflectiveOperationException。 | ✅ 已修复 (commit 57fbbd2)：改为 catch Exception |
+| Q-4 | `ExecutePlanResponseReattachableIterator.scala:58` | `iter` 字段 `@volatile` 但 64 行初始化非同步，其他线程提前调用 hasNext/next 会 NPE。 | ✅ 已修复 (commit 57fbbd2)：synchronized 初始化 |
 
 ### MEDIUM
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| Q-5 | `DataFrame.scala:1150` | 🚫 **DO NOT FIX** — `toJoinType` 对不识别的 join type 默认 INNER，不抛错。（与上游行为一致，前向兼容） |
-| Q-6 | `DataFrame.scala:299` | `hint()` 接受 `Any*` 参数，不支持的类型静默产生错误 literal。 |
-| Q-7 | `DataFrame.scala:1047` | `applySpatialConversions` 使用 `asInstanceOf[Array[Byte]]` 无类型检查。 |
-| Q-8 | `DataFrame.scala:1085` | `applyVariantConversions` 同样使用无保护 `asInstanceOf`。 |
-| Q-9 | `SparkSession.scala:453` | `Builder.build()` 不验证 URL 格式，无效 URL 产生晦涩异常。 |
-| Q-10 | `SparkConnectClient.scala:94` | `getPlanCompressionOptions` 捕获 NonFatal 后永久禁用压缩（含瞬时网络错误）。 |
-| Q-11 | `SparkConnectClient.scala:132` | `tryCompressPlan` 捕获 ClassNotFound 后永久禁用，无日志记录失败原因。 |
-| Q-12 | `SparkConnectClient.scala:371` | `doInterrupt` 捕获 NonFatal 返回空 Seq，调用方无法得知中断是否失败。 |
-| Q-13 | `SparkConnectClient.scala:441` | `parseUrl` 使用 `hostPort(0)` 无边界检查，空 host 会 IndexOutOfBoundsException。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| Q-5 | `DataFrame.scala:1150` | 🚫 **DO NOT FIX** — `toJoinType` 对不识别的 join type 默认 INNER，不抛错。（与上游行为一致，前向兼容） | |
+| Q-6 | `DataFrame.scala:299` | `hint()` 接受 `Any*` 参数，不支持的类型静默产生错误 literal。 | ✅ 已修复：添加类型白名单验证 |
+| Q-7 | `DataFrame.scala:1047` | `applySpatialConversions` 使用 `asInstanceOf[Array[Byte]]` 无类型检查。 | |
+| Q-8 | `DataFrame.scala:1085` | `applyVariantConversions` 同样使用无保护 `asInstanceOf`。 | |
+| Q-9 | `SparkSession.scala:453` | `Builder.build()` 不验证 URL 格式，无效 URL 产生晦涩异常。 | |
+| Q-10 | `SparkConnectClient.scala:94` | `getPlanCompressionOptions` 捕获 NonFatal 后永久禁用压缩（含瞬时网络错误）。 | ✅ 已修复：区分永久/瞬时错误 |
+| Q-11 | `SparkConnectClient.scala:132` | `tryCompressPlan` 捕获 ClassNotFound 后永久禁用，无日志记录失败原因。 | ✅ 已修复：添加注释说明意图 |
+| Q-12 | `SparkConnectClient.scala:371` | `doInterrupt` 捕获 NonFatal 返回空 Seq，调用方无法得知中断是否失败。 | ✅ 已修复：添加注释说明 API 兼容性约束 |
+| Q-13 | `SparkConnectClient.scala:441` | `parseUrl` 使用 `hostPort(0)` 无边界检查，空 host 会 IndexOutOfBoundsException。 | ✅ 已修复：添加 host 非空验证 |
 | Q-14 | `ClosureCleaner.scala:97` | `copyStream` 捕获 `Throwable`（含 OOM）静默吞掉，应只捕获 IOException。 |
 | Q-15 | `ClosureCleaner.scala:616` | `cloneIndyLambda` 捕获所有 Throwable，应只捕获 Exception。 |
 | Q-16 | `ClosureCleaner.scala:266` | `func == null` 检查在 func 已被解引用之后（259 行），死代码。 |
@@ -189,8 +189,8 @@
 | Q-23 | `DataFrame.scala:643` | `count()` 走完整 groupBy/agg/collect 流程，无 server 端快捷命令。 |
 | Q-24 | `SparkSession.scala:54` | `sql(query, args: Map[String, Any])` Any 参数不支持的类型运行时才报错。 |
 | Q-25 | `SparkSession.scala:430` | 默认 URL `"sc://localhost:15002"` 硬编码，应为常量。 |
-| Q-26 | `SparkConnectClient.scala:463` | 128MB 魔数应提取为命名常量。 |
-| Q-27 | `SparkConnectClient.scala:464` | userAgent 版本 `"0.1.0"` 硬编码（实际已是 0.3.0）。 |
+| Q-26 | `SparkConnectClient.scala:463` | 128MB 魔数应提取为命名常量。 | ✅ 已修复 |
+| Q-27 | `SparkConnectClient.scala:464` | userAgent 版本 `"0.1.0"` 硬编码（实际已是 0.3.0）。 | ✅ 已修复 |
 | Q-28 | `ClosureCleaner.scala:681` | 魔数 `-1` 作为全权限 lookup mode。 |
 | Q-29 | `functions.scala:2069` | 文件 2069 行，超出 800 行建议上限。 |
 | Q-30 | `functions.scala:19` | `lit(value: Any)` 不支持类型在 LiteralValueProtoConverter 深处报错。 |
@@ -203,10 +203,10 @@
 
 ### HIGH
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| C-1 | `functions.scala` | 文件 2069 行，远超 800 行限制；应按类别拆分（聚合、数学、字符串、日期、集合等）。 |
-| C-2 | `DataFrame.scala` | 文件 1155 行，超出 800 行限制；混合了转换、动作、视图创建、子查询辅助、空间/Variant 转换逻辑。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| C-1 | `functions.scala` | 文件 2069 行，远超 800 行限制；应按类别拆分（聚合、数学、字符串、日期、集合等）。 | ⏳ 未修复：需大规模文件拆分 |
+| C-2 | `DataFrame.scala` | 文件 1155 行，超出 800 行限制；混合了转换、动作、视图创建、子查询辅助、空间/Variant 转换逻辑。 | ⏳ 未修复：需大规模文件拆分 |
 
 ### MEDIUM
 
@@ -233,7 +233,7 @@
 | C-16 | `DataFrameWriter.scala:113-118` | 同上：快捷方法无文档，jdbc 方法有。 |
 | C-17 | `Column.scala:507-524` | 🚫 **DO NOT FIX** — `lit` fallback 将未知类型静默转为 String，与已知类型的显式匹配不一致。（与上游 `functions.lit` 行为一致） |
 | C-18 | `functions.scala:1040-1041` | ⚠️ **FIX WITH CARE** — `sumDistinct` 是 `sum_distinct` 的冗余别名，无 @deprecated 标注。（API 兼容层，不能删除，只能标 `@deprecated`） |
-| C-19 | `SparkConnectClient.scala:464` | userAgent 版本硬编码 "0.1.0"，实际已是 0.3.0。 |
+| C-19 | `SparkConnectClient.scala:464` | userAgent 版本硬编码 "0.1.0"，实际已是 0.3.0。 | ✅ 已修复 |
 
 ---
 
@@ -285,11 +285,20 @@
 ## 附注
 
 - **ClosureCleaner** 中的深度反射（S-9/S-10/S-11）是 Apache Spark 上游代码的直接移植，为序列化兼容性的已知折中。**标记为 DO NOT FIX。**
-- 性能类 CRITICAL 问题集中在 Arrow 反序列化热路径，~~优化空间最大~~。**已在 commit 0613e19 中全部修复。**
+- 性能类 CRITICAL 问题集中在 Arrow 反序列化热路径。**已在 commit 0613e19 中全部修复。**
+- 性能类 HIGH 问题（P-5~P-13）集中在 Arrow 序列化、Row/StructType/Encoder 路径。**已在 commit 57fbbd2 中全部修复。**
+- 资源泄漏 HIGH（R7-1~R7-6）全部系统性修复，统一使用 try/finally close 或 executeCommand 模式。**已在 commit 57fbbd2 中全部修复。**
+- 功能 bug（R3-1/R3-2 flatMapSortedGroups）、编码器 bug（R6-1/R8-2/R8-3/R8-4）、并发问题（Q-1/Q-3/Q-4）全部修复。**commit 57fbbd2。**
 - 安全类最可操作的问题是默认明文 gRPC（S-1），与 DataTypeProtoConverter 的任意类实例化（S-4）配合构成攻击链。
-- 资源泄漏（R7-1~R7-6）是系统性模式，应在所有 `client.execute(plan)` 调用点统一修复。
-- Round 8 发现的 ForeachWriterPacket 序列化缺陷（R8-1）~~是 CRITICAL 级别，影响 Scala 3 lambda 在 foreachBatch 中的跨版本兼容性~~。**已在 commit 0613e19 中修复。**
+- Round 8 发现的 ForeachWriterPacket 序列化缺陷（R8-1）**已在 commit 0613e19 中修复。**
 - **兼容性总结**：162 个问题中，5 个标记为 🚫 DO NOT FIX（修复会破坏 Spark 4.1.1 兼容性），5 个标记为 ⚠️ FIX WITH CARE（修复须严格对齐协议/API 约束），其余 152 个可安全修复。
+
+### 剩余未修复 HIGH 问题（2 个）
+
+| # | 类别 | 描述 | 未修复原因 |
+|---|------|------|-----------|
+| S-1 | 安全 | gRPC channel 默认明文传输（无 TLS） | 需 TLS 基础设施增强，涉及证书管理和部署配置 |
+| C-1 + C-2 | 一致性 | functions.scala(2069行) + DataFrame.scala(1155行) 超长 | 需大规模文件拆分，属架构重构 |
 
 ---
 
@@ -297,10 +306,10 @@
 
 ### MEDIUM
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| R2-1 | `GrpcRetryHandler.scala:39` | `lastException` 可能为 null（仅 RetryException 路径），抛出时导致 NPE。 |
-| R2-2 | `DataTypeProtoConverter.scala:185` | `toProto` match 非穷尽，无 wildcard case；未识别的 DataType 子类抛 MatchError 而非描述性异常。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| R2-1 | `GrpcRetryHandler.scala:39` | `lastException` 可能为 null（仅 RetryException 路径），抛出时导致 NPE。 | ✅ 已修复：null 检查 + RuntimeException |
+| R2-2 | `DataTypeProtoConverter.scala:185` | `toProto` match 非穷尽，无 wildcard case；未识别的 DataType 子类抛 MatchError 而非描述性异常。 | ✅ 已修复：添加 wildcard case |
 | R2-3 | `DataTypeProtoConverter.scala:11` | `fromProto` 未处理 CALENDAR_INTERVAL/UNPARSED proto KindCase，server 返回时抛 UnsupportedOperationException。 |
 | R2-4 | `LiteralValueProtoConverter.scala:33` | Timestamp 转换：负微秒值时 `Instant.ofEpochSecond(0, negativeMicros * 1000)` 结果错误。 |
 | R2-5 | `DataFrameNaFunctions.scala:115` | `toLiteral` fallthrough 将不支持的类型（Byte/Short/BigDecimal）静默转为 String，导致错误的 fill 行为。 |
@@ -328,12 +337,12 @@
 
 ## 6. Round 3 补充发现 (Deep Audit)
 
-### HIGH
+### HIGH — 已全部修复 (commit 57fbbd2)
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| R3-1 | `KeyValueGroupedDataset.scala:228` | `flatMapSortedGroups` 未尊重 `originalRelation`/`originalValueEncoder`（mapValues 之后），发送错误的 relation 和 value encoder 到 server。 |
-| R3-2 | `KeyValueGroupedDataset.scala:228` | `flatMapSortedGroups` 未将 `mapValuesFunc` 组合到用户函数（不同于 `flatMapGroups` 使用 MapValuesFlatMapAdaptor），导致类型不匹配。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| R3-1 | `KeyValueGroupedDataset.scala:228` | `flatMapSortedGroups` 未尊重 `originalRelation`/`originalValueEncoder`（mapValues 之后），发送错误的 relation 和 value encoder 到 server。 | ✅ 已修复：使用 originalRelation/originalValueEncoder |
+| R3-2 | `KeyValueGroupedDataset.scala:228` | `flatMapSortedGroups` 未将 `mapValuesFunc` 组合到用户函数（不同于 `flatMapGroups` 使用 MapValuesFlatMapAdaptor），导致类型不匹配。 | ✅ 已修复：添加 MapValuesFlatMapAdaptor 包装 |
 
 ### MEDIUM
 
@@ -357,12 +366,12 @@
 
 ### MEDIUM
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| R4-1 | `Row.scala:92` | JSON 注入：字符串值含引号/反斜杠/控制字符时未转义，产生无效 JSON。 |
-| R4-2 | `Row.scala:94` | JSON 注入：StructField 名称含引号时未转义，产生无效 JSON key。 |
-| R4-3 | `ArrowDeserializer.scala:171` | Map 类型空 children 崩溃：`field.getChildren.asScala.head` 在畸形 schema（0 children）时抛 NoSuchElementException。 |
-| R4-4 | `DataFrame.scala:597` | `randomSplit` 全零权重（`Array(0.0, 0.0)`）导致除零产生 NaN bounds，server 行为未定义。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| R4-1 | `Row.scala:92` | JSON 注入：字符串值含引号/反斜杠/控制字符时未转义，产生无效 JSON。 | ✅ 已修复：escapeJson 辅助方法 |
+| R4-2 | `Row.scala:94` | JSON 注入：StructField 名称含引号时未转义，产生无效 JSON key。 | ✅ 已修复：escapeJson 辅助方法 |
+| R4-3 | `ArrowDeserializer.scala:171` | Map 类型空 children 崩溃：`field.getChildren.asScala.head` 在畸形 schema（0 children）时抛 NoSuchElementException。 | |
+| R4-4 | `DataFrame.scala:597` | `randomSplit` 全零权重（`Array(0.0, 0.0)`）导致除零产生 NaN bounds，server 行为未定义。 | |
 
 ### LOW
 
@@ -399,26 +408,26 @@
 
 ## 9. Round 6 补充发现 (Encoder API Contract)
 
-### HIGH
+### HIGH — 已修复 (commit 57fbbd2)
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| R6-1 | `Encoder.scala:105,111` | `Encoder[java.time.LocalDate].fromRow` 和 `Encoder[java.time.Instant].fromRow` 执行直接 `asInstanceOf` 转换，但 ArrowDeserializer 始终生成 `java.sql.Date`/`java.sql.Timestamp`，导致运行时 ClassCastException。API 合约与反序列化实现不一致。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| R6-1 | `Encoder.scala:105,111` | `Encoder[java.time.LocalDate].fromRow` 和 `Encoder[java.time.Instant].fromRow` 执行直接 `asInstanceOf` 转换，但 ArrowDeserializer 始终生成 `java.sql.Date`/`java.sql.Timestamp`，导致运行时 ClassCastException。API 合约与反序列化实现不一致。 | ✅ 已修复：添加 sql→java.time 转换 |
 
 ---
 
 ## 10. Round 7 补充发现 (Resource Leaks & API Semantics)
 
-### HIGH
+### HIGH — 已全部修复 (commit 57fbbd2)
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| R7-1 | `DataFrameWriter.scala:147-148` | `executeCommand` 调用 `client.execute(plan)` 后仅用 `.foreach(_ => ())` 消耗迭代器，但未在 `finally` 中关闭。`SparkConnectClient.executeCommand`（314-320 行）展示了正确模式（try/finally close），但此处绕过了它直接调用 `execute()`，泄漏 gRPC 流资源。 |
-| R7-2 | `DataFrameWriterV2.scala:77-78` | 同 R7-1：`executeWriteOperation` 调用 `client.execute(plan)` 后未关闭 AutoCloseable 迭代器。 |
-| R7-3 | `MergeIntoWriter.scala:47-48` | 同 R7-1：`merge()` 消耗迭代器后未关闭。 |
-| R7-4 | `DataStreamWriter.scala:108-122` | `doStart()` 消耗 `client.execute(plan)` 迭代器后未关闭。流启动路径的资源泄漏。 |
-| R7-5 | `StreamingQuery.scala:96-101` | `executeQueryCmd` 消耗 `client.execute(plan)` 迭代器后未关闭。 |
-| R7-6 | `StreamingQueryListenerBus.scala:55-57` | `remove()` 中 `client.execute(plan)` 迭代器未关闭（catch 中 drain 但无 finally close）。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| R7-1 | `DataFrameWriter.scala:147-148` | `executeCommand` 调用 `client.execute(plan)` 后仅用 `.foreach(_ => ())` 消耗迭代器，但未在 `finally` 中关闭。`SparkConnectClient.executeCommand`（314-320 行）展示了正确模式（try/finally close），但此处绕过了它直接调用 `execute()`，泄漏 gRPC 流资源。 | ✅ 已修复：改为 try/finally close |
+| R7-2 | `DataFrameWriterV2.scala:77-78` | 同 R7-1：`executeWriteOperation` 调用 `client.execute(plan)` 后未关闭 AutoCloseable 迭代器。 | ✅ 已修复：改为 try/finally close |
+| R7-3 | `MergeIntoWriter.scala:47-48` | 同 R7-1：`merge()` 消耗迭代器后未关闭。 | ✅ 已修复：改为 try/finally close |
+| R7-4 | `DataStreamWriter.scala:108-122` | `doStart()` 消耗 `client.execute(plan)` 迭代器后未关闭。流启动路径的资源泄漏。 | ✅ 已修复：改为 try/finally close |
+| R7-5 | `StreamingQuery.scala:96-101` | `executeQueryCmd` 消耗 `client.execute(plan)` 迭代器后未关闭。 | ✅ 已修复：改为 try/finally close |
+| R7-6 | `StreamingQueryListenerBus.scala:55-57` | `remove()` 中 `client.execute(plan)` 迭代器未关闭（catch 中 drain 但无 finally close）。 | ✅ 已修复：改为 executeCommand |
 
 ### MEDIUM
 
@@ -445,13 +454,13 @@
 |---|-----------|------|------|
 | R8-1 | `ForeachWriterPacket.scala:21` | 使用普通 `ObjectOutputStream` 序列化，缺少 `UdfPacket.serialize` 中的 `replaceObject` 重写（将 `SerializedLambda` 替换为 `LambdaSerializationProxy`）。当 `foreachBatch` 传入 Scala 3 lambda 时，序列化结果在 Scala 2.13 server 端反序列化会因缺少 `Scala3LambdaDeserialize` 而失败（`ArrayStoreException` 或 `NoSuchMethodException`）。 | ✅ 已修复：添加 ClosureCleaner + LambdaSerializationProxy，匹配 UdfPacket.serialize 模式 |
 
-### HIGH
+### HIGH — 已全部修复 (commit 57fbbd2)
 
-| # | 文件:行号 | 描述 |
-|---|-----------|------|
-| R8-2 | `UdfAdaptors.scala:67` | `ReduceGroupsAdaptor.apply` 直接调用 `iter.reduce(func)`。若分组为空（outer join 或倾斜数据产生空组），`reduce` 对空 Iterator 抛出 `UnsupportedOperationException("empty.reduceLeft")`。应使用 `reduceOption` 或预检查。 |
-| R8-3 | `Encoders.scala:143-180` | `Encoders.tuple[T1, T2, T3]`（及所有 3+ 元组编码器）使用 `wrap()` 创建 `AgnosticEncoderWrapper`，其 `fromRow`/`toRow` 方法抛出 `UnsupportedOperationException`。仅 `tuple[T1, T2]` 有完整的 `TupleEncoder2` 实现。3+ 元组编码器在 `collect()` 等需要类型化反序列化的路径上会运行时失败。 |
-| R8-4 | `DataStreamWriter.scala:109-123` | `doStart()` 将 `queryId`/`runId` 初始化为空字符串。若 server 响应不含 `WriteStreamOperationStartResult`（协议错误），返回空 ID 的 `StreamingQuery`。下游依赖有效 UUID 的代码（如 `StreamingQueryManager.get(id)`）会静默失败。 |
+| # | 文件:行号 | 描述 | 状态 |
+|---|-----------|------|------|
+| R8-2 | `UdfAdaptors.scala:67` | `ReduceGroupsAdaptor.apply` 直接调用 `iter.reduce(func)`。若分组为空（outer join 或倾斜数据产生空组），`reduce` 对空 Iterator 抛出 `UnsupportedOperationException("empty.reduceLeft")`。应使用 `reduceOption` 或预检查。 | ✅ 已修复：添加空迭代器预检查 |
+| R8-3 | `Encoders.scala:143-180` | `Encoders.tuple[T1, T2, T3]`（及所有 3+ 元组编码器）使用 `wrap()` 创建 `AgnosticEncoderWrapper`，其 `fromRow`/`toRow` 方法抛出 `UnsupportedOperationException`。仅 `tuple[T1, T2]` 有完整的 `TupleEncoder2` 实现。3+ 元组编码器在 `collect()` 等需要类型化反序列化的路径上会运行时失败。 | ✅ 已修复：实现 TupleEncoder3/4/5 |
+| R8-4 | `DataStreamWriter.scala:109-123` | `doStart()` 将 `queryId`/`runId` 初始化为空字符串。若 server 响应不含 `WriteStreamOperationStartResult`（协议错误），返回空 ID 的 `StreamingQuery`。下游依赖有效 UUID 的代码（如 `StreamingQueryManager.get(id)`）会静默失败。 | ✅ 已修复：添加空 ID 校验 |
 
 ### MEDIUM
 

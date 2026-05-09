@@ -36,7 +36,9 @@ class GrpcRetryHandler(
         case e: Throwable =>
           throw e
     // Should not reach here, but just in case:
-    throw lastException
+    if lastException == null then
+      throw RuntimeException("Retry loop exhausted without capturing an exception")
+    else throw lastException
 
 object GrpcRetryHandler:
   /** Always-retryable exception that triggers immediate retry without backoff. */

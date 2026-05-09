@@ -1,7 +1,9 @@
 package org.apache.spark.sql.connect.client
 
-import com.google.protobuf.GeneratedMessage
+import com.google.protobuf.{Descriptors, GeneratedMessage}
 import io.grpc.StatusRuntimeException
+
+import java.util.concurrent.ConcurrentHashMap
 
 /** Validates server-side session ID consistency across all responses.
   *
@@ -56,8 +58,16 @@ class ResponseValidator:
         )
       case _ => // matches — ok
 
+  /** Cache of field descriptors keyed by message Descriptor to avoid repeated reflection. */
+  private val fieldDescriptorCache =
+    ConcurrentHashMap[Descriptors.Descriptor, Descriptors.FieldDescriptor]()
+
   private def extractServerSideSessionId(msg: GeneratedMessage): Option[String] =
-    val fd = msg.getDescriptorForType.findFieldByName("server_side_session_id")
+    val descriptor = msg.getDescriptorForType
+    val fd = fieldDescriptorCache.computeIfAbsent(
+      descriptor,
+      d => d.findFieldByName("server_side_session_id")
+    )
     if fd != null then
       val value = msg.getField(fd)
       value match
