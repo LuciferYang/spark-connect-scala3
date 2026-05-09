@@ -1,11 +1,10 @@
 package org.apache.spark.sql.connect.client
 
-import io.grpc.{ManagedChannel, ManagedChannelBuilder, Metadata}
+import io.grpc.{ManagedChannelBuilder, Metadata}
 import io.grpc.stub.MetadataUtils
 import org.apache.spark.connect.proto.*
 
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -16,7 +15,7 @@ import scala.util.control.NonFatal
   * directly — no effect wrapper needed for the MVP.
   */
 final class SparkConnectClient private (
-    private val channel: ManagedChannel,
+    private val sharedChannel: SharedChannel,
     private val bstub: SparkConnectServiceGrpc.SparkConnectServiceBlockingStub,
     private val asyncStub: SparkConnectServiceGrpc.SparkConnectServiceStub,
     val sessionId: String,
@@ -57,7 +56,7 @@ final class SparkConnectClient private (
   def serverSideSessionId: Option[String] = responseValidator.getServerSideSessionId
 
   /** Whether the underlying gRPC channel has been shut down. */
-  def isChannelShutdown: Boolean = channel.isShutdown
+  def isChannelShutdown: Boolean = sharedChannel.isShutdown
 
   // ---------------------------------------------------------------------------
   // Common helpers
@@ -158,7 +157,7 @@ final class SparkConnectClient private (
     val currentTags = tags.get
     if currentTags.nonEmpty then currentTags.foreach(rb.addTags)
     val inner =
-      ExecutePlanResponseReattachableIterator(rb.build(), channel, retryHandler)
+      ExecutePlanResponseReattachableIterator(rb.build(), sharedChannel.underlying, retryHandler)
     val validated = responseValidator.wrapIterator(inner)
     // Wrap with GrpcExceptionConverter (with FetchErrorDetails support).
     new Iterator[ExecutePlanResponse] with AutoCloseable:
@@ -378,11 +377,7 @@ final class SparkConnectClient private (
     catch case NonFatal(_) => Seq.empty
 
   def close(): Unit =
-    try
-      channel.shutdown()
-      if !channel.awaitTermination(5, TimeUnit.SECONDS) then
-        channel.shutdownNow()
-    catch case NonFatal(_) => channel.shutdownNow()
+    sharedChannel.release()
 
   /** Create a new client connected to the same server but with a fresh session ID. */
   def newClient(): SparkConnectClient =
@@ -396,15 +391,22 @@ final class SparkConnectClient private (
     serverSideSessionId.foreach(rb.setClientObservedServerSideSessionId)
     val resp = GrpcExceptionConverter.convert(retryHandler.retry(bstub.cloneSession(rb.build())))
     val clonedSessionId = resp.getSessionId
-    SparkConnectClient(
-      channel,
-      bstub,
-      asyncStub,
-      clonedSessionId,
-      userId,
-      retryHandler,
-      connectionUrl
-    )
+    // Retain after RPC success to avoid leaking a ref count on failure
+    val retained = sharedChannel.retain()
+    try
+      SparkConnectClient(
+        retained,
+        bstub,
+        asyncStub,
+        clonedSessionId,
+        userId,
+        retryHandler,
+        connectionUrl
+      )
+    catch
+      case e: Exception =>
+        retained.release()
+        throw e
 
   /** Fetch enriched error details from the server for the given error ID. */
   private[client] def fetchErrorDetails(
@@ -488,7 +490,7 @@ object SparkConnectClient:
       case None => (baseStub, baseAsyncStub)
 
     val client = SparkConnectClient(
-      channel,
+      SharedChannel(channel),
       stub,
       aStub,
       sessionId,
