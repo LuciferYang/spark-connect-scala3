@@ -21,8 +21,20 @@ final class SparkConnectClient private (
     val sessionId: String,
     val userId: String,
     private val retryHandler: GrpcRetryHandler,
-    private[sql] val connectionUrl: String
+    private val connectionUrl: String,
+    private val token: Option[String]
 ):
+
+  /** The connection URL with any token redacted — safe for logging/display. */
+  private[sql] def redactedUrl: String = connectionUrl
+
+  /** Reconstruct the full URL (with token) for internal use only. */
+  private def fullUrl: String = token match
+    case Some(t) => s"$connectionUrl;token=$t"
+    case None    => connectionUrl
+
+  override def toString: String =
+    s"SparkConnectClient(session=$sessionId, url=$connectionUrl)"
 
   /** Manages uploading artifacts (class files, JARs) to the server. */
   val artifactManager: ArtifactManager = ArtifactManager(sessionId, userId, asyncStub)
@@ -381,7 +393,7 @@ final class SparkConnectClient private (
 
   /** Create a new client connected to the same server but with a fresh session ID. */
   def newClient(): SparkConnectClient =
-    SparkConnectClient.create(connectionUrl)
+    SparkConnectClient.create(fullUrl)
 
   /** Clone the current session on the server (preserving config, temp views, UDFs). */
   def cloneSession(): SparkConnectClient =
@@ -401,7 +413,8 @@ final class SparkConnectClient private (
         clonedSessionId,
         userId,
         retryHandler,
-        connectionUrl
+        connectionUrl,
+        token
       )
     catch
       case e: Exception =>
@@ -440,8 +453,8 @@ final class SparkConnectClient private (
 
 object SparkConnectClient:
 
-  /** Parse a `sc://host:port` URL into (host, port, params). */
-  private def parseUrl(url: String): (String, Int, Map[String, String]) =
+  /** Parse a `sc://host:port` URL into (host, port, params). Params preserve insertion order. */
+  private def parseUrl(url: String): (String, Int, Seq[(String, String)]) =
     // sc://host:port;key=value;key=value
     val stripped = url.stripPrefix("sc://")
     val parts = stripped.split(";").toSeq
@@ -452,7 +465,7 @@ object SparkConnectClient:
       p.split("=", 2) match
         case Array(k, v) => Some(k -> v)
         case _           => None
-    }.toMap
+    }
     (host, port, params)
 
   /** Create a client connected to the given `sc://` URL. */
@@ -462,10 +475,15 @@ object SparkConnectClient:
       configs: Map[String, String] = Map.empty
   ): SparkConnectClient =
     val (host, port, params) = parseUrl(url)
-    val userId = params.getOrElse("user_id", System.getProperty("user.name", "anonymous"))
+    val paramMap = params.toMap
+    val userId = paramMap.getOrElse("user_id", System.getProperty("user.name", "anonymous"))
     val token =
-      params.get("token").orElse(Option(System.getenv("SPARK_CONNECT_AUTHENTICATE_TOKEN")))
-    val useSsl = params.get("use_ssl").exists(_.equalsIgnoreCase("true"))
+      paramMap.get("token").orElse(Option(System.getenv("SPARK_CONNECT_AUTHENTICATE_TOKEN")))
+    val useSsl = paramMap.get("use_ssl").exists(_.equalsIgnoreCase("true"))
+
+    // Build a sanitized URL without the token for storage (preserving original param order)
+    val sanitizedParams = params.filterNot(_._1 == "token")
+    val sanitizedUrl = buildSanitizedUrl(host, port, sanitizedParams)
 
     val channelBuilder = ManagedChannelBuilder
       .forAddress(host, port)
@@ -496,8 +514,15 @@ object SparkConnectClient:
       sessionId,
       userId,
       GrpcRetryHandler(RetryPolicy.defaultPolicy()),
-      url
+      sanitizedUrl,
+      token
     )
 
     configs.foreach((k, v) => client.setConfig(k, v))
     client
+
+  /** Build a sanitized `sc://` URL from host, port, and ordered params (token excluded). */
+  private def buildSanitizedUrl(host: String, port: Int, params: Seq[(String, String)]): String =
+    val base = s"sc://$host:$port"
+    if params.isEmpty then base
+    else base + ";" + params.map((k, v) => s"$k=$v").mkString(";")
