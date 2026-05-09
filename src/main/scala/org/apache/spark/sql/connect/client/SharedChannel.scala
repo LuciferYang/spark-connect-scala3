@@ -8,12 +8,12 @@ import scala.util.control.NonFatal
 
 /** A reference-counted wrapper around a [[ManagedChannel]].
   *
-  * Multiple [[SparkConnectClient]] instances can share the same underlying gRPC channel (e.g.
-  * after `cloneSession`). The channel is only shut down when the last reference calls [[release]].
+  * Multiple [[SparkConnectClient]] instances can share the same underlying gRPC channel (e.g. after
+  * `cloneSession`). The channel is only shut down when the last reference calls [[release]].
   *
   * This class is thread-safe.
   */
-private[client] final class SharedChannel(private val channel: ManagedChannel):
+final private[client] class SharedChannel(private val channel: ManagedChannel):
   private val refCount = AtomicInteger(1)
 
   /** Access the underlying channel for creating stubs or iterators. */
@@ -28,7 +28,9 @@ private[client] final class SharedChannel(private val channel: ManagedChannel):
     while current > 0 do
       if refCount.compareAndSet(current, current + 1) then return this
       current = refCount.get()
-    throw IllegalStateException("Cannot retain a SharedChannel that has already been fully released")
+    throw IllegalStateException(
+      "Cannot retain a SharedChannel that has already been fully released"
+    )
 
   /** Decrement the reference count. When it reaches zero, the channel is shut down. */
   def release(): Unit =
