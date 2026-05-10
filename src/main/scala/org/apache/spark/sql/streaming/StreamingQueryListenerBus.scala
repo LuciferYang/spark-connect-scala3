@@ -116,7 +116,11 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
     catch
       case _: InterruptedException =>
         Thread.currentThread().interrupt() // restore interrupt status
-      case NonFatal(_) =>
+      case NonFatal(e) =>
+        // Log the failure before removing listeners so users can diagnose
+        System.err.println(
+          s"[WARN] [StreamingQueryListenerBus] Event handler thread failed: ${e.getMessage}"
+        )
         // Handler thread failed — remove all listeners
         lock.synchronized {
           executionThread = None

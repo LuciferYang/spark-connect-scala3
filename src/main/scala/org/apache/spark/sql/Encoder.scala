@@ -246,6 +246,10 @@ object Encoder:
 
     def fromRow(row: Row): T =
       val n = _schema.fields.size
+      if row.size < n then
+        throw IllegalArgumentException(
+          s"Row size ${row.size} is less than expected schema field count $n"
+        )
       val values = new Array[Any](n)
       var i = 0
       while i < n do

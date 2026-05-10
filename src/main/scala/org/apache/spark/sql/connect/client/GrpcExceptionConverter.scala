@@ -64,12 +64,24 @@ object GrpcExceptionConverter:
   /** Wrap `fn` so that any `StatusRuntimeException` is converted to a `SparkException`. */
   def convert[T](fn: => T): T =
     try fn
-    catch case e: StatusRuntimeException => throw toSparkException(e)
+    catch
+      case e: StatusRuntimeException  => throw toSparkException(e)
+      case e: io.grpc.StatusException =>
+        throw SparkException(
+          s"gRPC error: ${e.getStatus.getCode}: ${e.getStatus.getDescription}",
+          e
+        )
 
   /** Wrap `fn` with FetchErrorDetails support. */
   def convert[T](fn: => T, fetchDetails: String => Option[FetchErrorDetailsResponse]): T =
     try fn
-    catch case e: StatusRuntimeException => throw toSparkException(e, fetchDetails)
+    catch
+      case e: StatusRuntimeException  => throw toSparkException(e, fetchDetails)
+      case e: io.grpc.StatusException =>
+        throw SparkException(
+          s"gRPC error: ${e.getStatus.getCode}: ${e.getStatus.getDescription}",
+          e
+        )
 
   /** Convert a `StatusRuntimeException` into a `SparkException`. */
   def toSparkException(
