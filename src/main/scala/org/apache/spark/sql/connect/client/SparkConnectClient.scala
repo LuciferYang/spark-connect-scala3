@@ -243,97 +243,47 @@ final class SparkConnectClient private (
   // Config
   // ---------------------------------------------------------------------------
 
-  def getConfig(key: String): String =
+  /** Execute a config operation and return the response. */
+  private def executeConfigOp(
+      setOp: ConfigRequest.Operation.Builder => ConfigRequest.Operation.Builder
+  ): ConfigResponse =
     val rb = ConfigRequest.newBuilder()
       .setSessionId(sessionId)
       .setUserContext(userContext)
-      .setOperation(
-        ConfigRequest.Operation.newBuilder()
-          .setGet(ConfigRequest.Get.newBuilder().addKeys(key).build())
-          .build()
-      )
-    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
-    val resp = responseValidator.verifyResponse(
-      GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(rb.build())))
-    )
-    val pairs = resp.getPairsList.asScala
-    pairs.headOption.map(_.getValue).getOrElse("")
-
-  def setConfig(key: String, value: String): Unit =
-    val rb = ConfigRequest.newBuilder()
-      .setSessionId(sessionId)
-      .setUserContext(userContext)
-      .setOperation(
-        ConfigRequest.Operation.newBuilder()
-          .setSet(
-            ConfigRequest.Set.newBuilder()
-              .addPairs(KeyValue.newBuilder().setKey(key).setValue(value).build())
-              .build()
-          )
-          .build()
-      )
+      .setOperation(setOp(ConfigRequest.Operation.newBuilder()).build())
     addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
     responseValidator.verifyResponse(
       GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(rb.build())))
+    )
+
+  def getConfig(key: String): String =
+    val resp = executeConfigOp(_.setGet(ConfigRequest.Get.newBuilder().addKeys(key).build()))
+    resp.getPairsList.asScala.headOption.map(_.getValue).getOrElse("")
+
+  def setConfig(key: String, value: String): Unit =
+    executeConfigOp(
+      _.setSet(
+        ConfigRequest.Set.newBuilder()
+          .addPairs(KeyValue.newBuilder().setKey(key).setValue(value).build())
+          .build()
+      )
     )
 
   def getConfigOption(key: String): Option[String] =
-    val rb = ConfigRequest.newBuilder()
-      .setSessionId(sessionId)
-      .setUserContext(userContext)
-      .setOperation(
-        ConfigRequest.Operation.newBuilder()
-          .setGetOption(ConfigRequest.GetOption.newBuilder().addKeys(key).build())
-          .build()
-      )
-    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
-    val resp = responseValidator.verifyResponse(
-      GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(rb.build())))
-    )
-    val pairs = resp.getPairsList.asScala
-    pairs.headOption.flatMap(p => if p.hasValue then Some(p.getValue) else None)
+    val resp =
+      executeConfigOp(_.setGetOption(ConfigRequest.GetOption.newBuilder().addKeys(key).build()))
+    resp.getPairsList.asScala.headOption.flatMap(p => if p.hasValue then Some(p.getValue) else None)
 
   def getAllConfig(): Map[String, String] =
-    val rb = ConfigRequest.newBuilder()
-      .setSessionId(sessionId)
-      .setUserContext(userContext)
-      .setOperation(
-        ConfigRequest.Operation.newBuilder()
-          .setGetAll(ConfigRequest.GetAll.newBuilder().build())
-          .build()
-      )
-    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
-    val resp = responseValidator.verifyResponse(
-      GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(rb.build())))
-    )
+    val resp = executeConfigOp(_.setGetAll(ConfigRequest.GetAll.newBuilder().build()))
     resp.getPairsList.asScala.map(p => p.getKey -> p.getValue).toMap
 
   def unsetConfig(key: String): Unit =
-    val rb = ConfigRequest.newBuilder()
-      .setSessionId(sessionId)
-      .setUserContext(userContext)
-      .setOperation(
-        ConfigRequest.Operation.newBuilder()
-          .setUnset(ConfigRequest.Unset.newBuilder().addKeys(key).build())
-          .build()
-      )
-    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
-    responseValidator.verifyResponse(
-      GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(rb.build())))
-    )
+    executeConfigOp(_.setUnset(ConfigRequest.Unset.newBuilder().addKeys(key).build()))
 
   def isModifiableConfig(key: String): Boolean =
-    val rb = ConfigRequest.newBuilder()
-      .setSessionId(sessionId)
-      .setUserContext(userContext)
-      .setOperation(
-        ConfigRequest.Operation.newBuilder()
-          .setIsModifiable(ConfigRequest.IsModifiable.newBuilder().addKeys(key).build())
-          .build()
-      )
-    addClientObservedSessionId(rb.setClientObservedServerSideSessionId)
-    val resp = responseValidator.verifyResponse(
-      GrpcExceptionConverter.convert(retryHandler.retry(bstub.config(rb.build())))
+    val resp = executeConfigOp(
+      _.setIsModifiable(ConfigRequest.IsModifiable.newBuilder().addKeys(key).build())
     )
     resp.getPairsList.asScala.headOption.exists(_.getValue == "true")
 
