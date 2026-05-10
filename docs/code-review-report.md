@@ -60,7 +60,7 @@
 | # | 文件:行号 | 描述 | 状态 |
 |---|-----------|------|------|
 | S-1 | `SparkConnectClient.scala:466` | gRPC channel 默认明文传输（无 TLS）。连接 Spark Connect Server 的数据（含 auth token）默认不加密。 | ⏳ 未修复：需 TLS 增强（非纯客户端修复） |
-| S-2 | `SparkConnectClient.scala:457-458` | 认证 token 从 URL 参数或环境变量读取，存储在 `connectionUrl` 字段（package-private），有通过日志/toString/序列化泄漏的风险。 | ✅ 已修复 (commit f7183d9)：token 独立存储，connectionUrl 不含 token |
+| S-2 | `SparkConnectClient.scala:457-458` | 认证 token 从 URL 参数或环境变量读取，存储在 `connectionUrl` 字段（package-private），有通过日志/toString/序列化泄漏的风险。 | ✅ 已修复 (commit f7183d9)：token 独立存储，connectionUrl 不含 token；parseUrl 错误消息不泄漏 token (f700732) |
 
 ### MEDIUM
 
@@ -71,7 +71,7 @@
 | S-5 | `ArrowDeserializer.scala:24` | `RootAllocator(Long.MaxValue)` 无内存上限，恶意 Arrow batch 可导致 OOM/DoS。 | ✅ 已修复：256GB 上限 |
 | S-6 | `ArrowSerializer.scala:35` | 同上：编码时 `RootAllocator(Long.MaxValue)` 无限制。 | ✅ 已修复：256GB 上限 |
 | S-7 | `ArtifactManager.scala:155` | `Await.result(promise.future, Duration.Inf)` 无超时，gRPC 流不完成则永久阻塞。 | ✅ 已修复：30 分钟超时 |
-| S-8 | `Observation.scala:40` | `Await.result(future, Duration.Inf)` 无超时，观测指标不送达则永久阻塞。 | ✅ 已修复：10 分钟超时 |
+| S-8 | `Observation.scala:40` | `Await.result(future, Duration.Inf)` 无超时，观测指标不送达则永久阻塞。 | ✅ 已修复：10 分钟超时 + @throws 注解 + companion object 常量 (f700732) |
 | S-9 | `ClosureCleaner.scala:577-589` | 🚫 **DO NOT FIX** — 使用 `sun.reflect.ReflectionFactory` 绕过构造函数实例化对象，绕过安全检查。（序列化兼容性必需） |
 | S-10 | `ClosureCleaner.scala:673-681` | 🚫 **DO NOT FIX** — 通过反射创建全权限 `MethodHandles.Lookup`（access mode = -1），绕过 JVM 访问控制。（序列化兼容性必需） |
 | S-11 | `ClosureCleaner.scala:548-557` | 🚫 **DO NOT FIX** — 反射移除字段 `final` 修饰符，破坏 JVM 不可变性保证。（序列化兼容性必需） |
@@ -127,7 +127,7 @@
 | P-17 | `ArrowSerializer.scala:186-189` | Map 序列化：`m.toSeq` + `entries.zipWithIndex` 双重中间集合。 | ✅ 已修复：直接迭代 + 手动计数 |
 | P-18 | `ArrowSerializer.scala:204-207` | List 序列化：value match 统一 `.toSeq` 产生不必要中间集合。 | ✅ 已修复：直接 foreach 各类型 |
 | P-19 | `DataFrame.scala:995` | `resp.getArrowBatch.getData.toByteArray` 全拷贝 protobuf ByteString，大 batch 临时翻倍内存。 | |
-| P-20 | `ResponseValidator.scala:60-66` | `extractServerSideSessionId` 每条响应用 protobuf 反射查找字段描述符，应缓存。 | ✅ 已修复：ConcurrentHashMap 缓存 |
+| P-20 | `ResponseValidator.scala:60-66` | `extractServerSideSessionId` 每条响应用 protobuf 反射查找字段描述符，应缓存。 | ✅ 已修复：ConcurrentHashMap 缓存 + Optional null 安全 (f700732) |
 | P-21 | `ArtifactManager.scala:217-225` | `readNextChunk` 每 chunk 分配新 32KB byte[]，应复用 buffer。 | |
 | P-22 | `DataFrame.scala:741-746` | `toLocalIterator` 使用 `flatMap` 立即解析整个 batch，违背惰性迭代初衷。 | |
 | P-23 | `SparkConnectClient.scala:81` | `@volatile` 无同步保护，可能导致多线程重复远程 getConfig 调用。 | |
@@ -171,7 +171,7 @@
 | Q-10 | `SparkConnectClient.scala:94` | `getPlanCompressionOptions` 捕获 NonFatal 后永久禁用压缩（含瞬时网络错误）。 | ✅ 已修复：区分永久/瞬时错误 |
 | Q-11 | `SparkConnectClient.scala:132` | `tryCompressPlan` 捕获 ClassNotFound 后永久禁用，无日志记录失败原因。 | ✅ 已修复：添加注释说明意图 |
 | Q-12 | `SparkConnectClient.scala:371` | `doInterrupt` 捕获 NonFatal 返回空 Seq，调用方无法得知中断是否失败。 | ✅ 已修复：添加注释说明 API 兼容性约束 |
-| Q-13 | `SparkConnectClient.scala:441` | `parseUrl` 使用 `hostPort(0)` 无边界检查，空 host 会 IndexOutOfBoundsException。 | ✅ 已修复：添加 host 非空验证 |
+| Q-13 | `SparkConnectClient.scala:441` | `parseUrl` 使用 `hostPort(0)` 无边界检查，空 host 会 IndexOutOfBoundsException。 | ✅ 已修复：lastIndexOf 重写 + scheme/host/port 全面验证 (f700732) |
 | Q-14 | `ClosureCleaner.scala:97` | `copyStream` 捕获 `Throwable`（含 OOM）静默吞掉，应只捕获 IOException。 |
 | Q-15 | `ClosureCleaner.scala:616` | `cloneIndyLambda` 捕获所有 Throwable，应只捕获 Exception。 |
 | Q-16 | `ClosureCleaner.scala:266` | `func == null` 检查在 func 已被解引用之后（259 行），死代码。 |
@@ -292,6 +292,12 @@
 - 安全类最可操作的问题是默认明文 gRPC（S-1），与 DataTypeProtoConverter 的任意类实例化（S-4）配合构成攻击链。
 - Round 8 发现的 ForeachWriterPacket 序列化缺陷（R8-1）**已在 commit 0613e19 中修复。**
 - **兼容性总结**：162 个问题中，5 个标记为 🚫 DO NOT FIX（修复会破坏 Spark 4.1.1 兼容性），5 个标记为 ⚠️ FIX WITH CARE（修复须严格对齐协议/API 约束），其余 152 个可安全修复。
+- **多角色评审加固 (commit f700732)**：对已修复项执行 10 轮连续多角色代码审查（安全专家、性能工程师、高级工程师、一致性审查者、冗余检查者、事实审查者），发现并修复以下加固问题：
+  - `ResponseValidator.scala`：ConcurrentHashMap 值改为 `java.util.Optional` 包装，防止 `findFieldByName` 返回 null 时 NPE（加固 P-20）
+  - `Observation.scala`：`@throws[TimeoutException]` 注解 + `ObservationTimeout` 移至 companion object（加固 S-8）
+  - `Row.scala`：`escapeJson` 增加 U+2028/U+2029 行分隔符转义（加固 R4-1/R4-2）
+  - `SparkConnectClient.parseUrl`：使用 `lastIndexOf(':')` 重写、添加 scheme/host/port 验证、错误消息不泄漏 token（加固 Q-13/S-2）
+  - 新增 10 个 `parseUrl` 单元测试覆盖边界情况
 
 ### 剩余未修复 HIGH 问题（2 个）
 
@@ -368,8 +374,8 @@
 
 | # | 文件:行号 | 描述 | 状态 |
 |---|-----------|------|------|
-| R4-1 | `Row.scala:92` | JSON 注入：字符串值含引号/反斜杠/控制字符时未转义，产生无效 JSON。 | ✅ 已修复：escapeJson 辅助方法 |
-| R4-2 | `Row.scala:94` | JSON 注入：StructField 名称含引号时未转义，产生无效 JSON key。 | ✅ 已修复：escapeJson 辅助方法 |
+| R4-1 | `Row.scala:92` | JSON 注入：字符串值含引号/反斜杠/控制字符时未转义，产生无效 JSON。 | ✅ 已修复：escapeJson 辅助方法 + U+2028/U+2029 转义 (f700732) |
+| R4-2 | `Row.scala:94` | JSON 注入：StructField 名称含引号时未转义，产生无效 JSON key。 | ✅ 已修复：escapeJson 辅助方法 + U+2028/U+2029 转义 (f700732) |
 | R4-3 | `ArrowDeserializer.scala:171` | Map 类型空 children 崩溃：`field.getChildren.asScala.head` 在畸形 schema（0 children）时抛 NoSuchElementException。 | |
 | R4-4 | `DataFrame.scala:597` | `randomSplit` 全零权重（`Array(0.0, 0.0)`）导致除零产生 NaN bounds，server 行为未定义。 | |
 
