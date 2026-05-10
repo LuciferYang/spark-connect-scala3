@@ -60,6 +60,11 @@ object ArrowDeserializer:
     finally
       childAllocator.close()
 
+  private def microsToTimestamp(micros: Long): java.sql.Timestamp =
+    val seconds = Math.floorDiv(micros, 1_000_000L)
+    val nanos = Math.floorMod(micros, 1_000_000L) * 1000
+    java.sql.Timestamp.from(java.time.Instant.ofEpochSecond(seconds, nanos))
+
   private def extractValue(
       vector: FieldVector,
       index: Int,
@@ -83,16 +88,10 @@ object ArrowDeserializer:
         java.sql.Date(v.get(index).toLong * 86400000L)
 
       case v: TimeStampMicroVector =>
-        val micros = v.get(index)
-        val seconds = Math.floorDiv(micros, 1_000_000L)
-        val nanos = Math.floorMod(micros, 1_000_000L) * 1000
-        java.sql.Timestamp.from(java.time.Instant.ofEpochSecond(seconds, nanos))
+        microsToTimestamp(v.get(index))
 
       case v: TimeStampMicroTZVector =>
-        val micros = v.get(index)
-        val seconds = Math.floorDiv(micros, 1_000_000L)
-        val nanos = Math.floorMod(micros, 1_000_000L) * 1000
-        java.sql.Timestamp.from(java.time.Instant.ofEpochSecond(seconds, nanos))
+        microsToTimestamp(v.get(index))
 
       case v: TimeStampMilliVector =>
         java.sql.Timestamp(v.get(index))

@@ -147,6 +147,14 @@ private[sql] object ArrowSerializer:
           java.util.Collections.emptyList()
         )
 
+  private def toMicros(value: Any): Long = value match
+    case ts: java.sql.Timestamp =>
+      ts.getTime * 1000 + (ts.getNanos / 1000) % 1000
+    case inst: java.time.Instant =>
+      inst.getEpochSecond * 1_000_000 + inst.getNano / 1000
+    case n: Number => n.longValue()
+    case _         => value.toString.toLong
+
   private def setArrowValue(vec: FieldVector, idx: Int, value: Any, dt: types.DataType): Unit =
     if value == null then
       vec.setNull(idx)
@@ -168,23 +176,9 @@ private[sql] object ArrowSerializer:
             case _                       => value.toString.toInt
           v.setSafe(idx, epochDay)
         case v: TimeStampMicroTZVector =>
-          val micros = value match
-            case ts: java.sql.Timestamp =>
-              ts.getTime * 1000 + (ts.getNanos / 1000) % 1000
-            case inst: java.time.Instant =>
-              inst.getEpochSecond * 1_000_000 + inst.getNano / 1000
-            case n: Number => n.longValue()
-            case _         => value.toString.toLong
-          v.setSafe(idx, micros)
+          v.setSafe(idx, toMicros(value))
         case v: TimeStampMicroVector =>
-          val micros = value match
-            case ts: java.sql.Timestamp =>
-              ts.getTime * 1000 + (ts.getNanos / 1000) % 1000
-            case inst: java.time.Instant =>
-              inst.getEpochSecond * 1_000_000 + inst.getNano / 1000
-            case n: Number => n.longValue()
-            case _         => value.toString.toLong
-          v.setSafe(idx, micros)
+          v.setSafe(idx, toMicros(value))
         case v: DecimalVector =>
           val bd = value match
             case d: BigDecimal           => d.underlying()
