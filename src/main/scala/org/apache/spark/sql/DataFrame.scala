@@ -1092,9 +1092,11 @@ final class DataFrame private[sql] (
         values(idx) = values(idx) match
           case r: Row =>
             val s = r.getInt(0)
-            val b = r.get(1).asInstanceOf[Array[Byte]]
-            if isGeometry then types.Geometry.fromWKB(b, s)
-            else types.Geography.fromWKB(b, s)
+            r.get(1) match
+              case b: Array[Byte @unchecked] =>
+                if isGeometry then types.Geometry.fromWKB(b, s)
+                else types.Geography.fromWKB(b, s)
+              case _ => r // unexpected inner type, pass through
           case bytes: Array[Byte @unchecked] =>
             val defaultSrid = schema.fields(idx).dataType match
               case g: GeometryType  => g.srid
@@ -1109,9 +1111,10 @@ final class DataFrame private[sql] (
         values(idx) = values(idx) match
           case v: VariantVal           => v
           case r: Row if r.length == 2 =>
-            val v = r.get(0).asInstanceOf[Array[Byte]]
-            val m = r.get(1).asInstanceOf[Array[Byte]]
-            VariantVal(v, m)
+            (r.get(0), r.get(1)) match
+              case (v: Array[Byte @unchecked], m: Array[Byte @unchecked]) =>
+                VariantVal(v, m)
+              case _ => r // unexpected inner types, pass through
           case bytes: Array[Byte @unchecked] =>
             VariantVal(bytes, Array.empty[Byte])
           case other => other

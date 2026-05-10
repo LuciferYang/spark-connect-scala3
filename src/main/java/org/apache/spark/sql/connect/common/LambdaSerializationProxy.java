@@ -29,8 +29,9 @@ import java.lang.invoke.SerializedLambda;
  * is uploaded via {@code addClassDir}, the server's session classloader can find it.
  *
  * <p>Only {@code Function0}, {@code Function1}, and {@code Function2} are implemented as
- * interfaces. Higher-arity {@code apply} overloads are provided as regular methods to avoid
- * {@code tupled}/{@code curried} conflicts between Scala's {@code FunctionN} traits. All SC3
+ * interfaces. {@code Function3} cannot be added due to Java's inability to resolve the
+ * conflicting {@code tupled()} return types between {@code Function2} and {@code Function3}.
+ * Higher-arity {@code apply} overloads are provided as regular methods instead. All SC3
  * UDF adaptors ({@code FlatMapAdaptor}, {@code MapPartitionsAdaptor}, etc.) are {@code Function1},
  * and multi-arg UDFs use {@code Function2}, so this covers all current use cases.
  *
@@ -133,6 +134,7 @@ public final class LambdaSerializationProxy
         return invokeImpl(new Object[]{v1, v2});
     }
 
+    // Function3 (cannot implement interface due to tupled() conflict, but method is available)
     public Object apply(Object v1, Object v2, Object v3) {
         return invokeImpl(new Object[]{v1, v2, v3});
     }

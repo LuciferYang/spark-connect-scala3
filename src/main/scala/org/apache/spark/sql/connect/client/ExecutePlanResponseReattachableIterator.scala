@@ -176,7 +176,15 @@ class ExecutePlanResponseReattachableIterator private[client] (
           def onError(t: Throwable): Unit =
             // Best-effort: try blocking release once on async failure.
             try blockingStub.releaseExecute(req)
-            catch case NonFatal(_) => () // give up silently
+            catch
+              case NonFatal(e) =>
+                System.err.println(
+                  s"[WARN] [SparkConnect] releaseExecute retry failed: ${e.getMessage}"
+                )
           def onCompleted(): Unit = ()
       )
-    catch case NonFatal(_) => () // best-effort
+    catch
+      case NonFatal(e) =>
+        System.err.println(
+          s"[WARN] [SparkConnect] releaseExecute async call failed: ${e.getMessage}"
+        )
