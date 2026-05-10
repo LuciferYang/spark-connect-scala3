@@ -460,6 +460,10 @@ object SparkSession:
       config(map.asScala.toMap)
 
     def build(): SparkSession =
+      require(
+        url != null && url.startsWith("sc://"),
+        s"Invalid Spark Connect URL: '$url'. URL must start with 'sc://'."
+      )
       val client = SparkConnectClient.create(url, configs = configs)
       val session = SparkSession(client)
       if defaultSession.get() == null then defaultSession.compareAndSet(null, session)

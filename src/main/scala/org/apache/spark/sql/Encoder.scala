@@ -90,13 +90,19 @@ object Encoder:
 
   given Encoder[java.sql.Date] with
     def schema = StructType(Seq(StructField("value", DateType)))
-    def fromRow(row: Row) = row.get(0).asInstanceOf[java.sql.Date]
+    def fromRow(row: Row) = row.get(0) match
+      case null             => null
+      case d: java.sql.Date => d
+      case other            => other.asInstanceOf[java.sql.Date]
     def toRow(value: java.sql.Date) = Row(value)
     override def agnosticEncoder = AgnosticEncoders.STRICT_DATE_ENCODER
 
   given Encoder[java.sql.Timestamp] with
     def schema = StructType(Seq(StructField("value", TimestampType)))
-    def fromRow(row: Row) = row.get(0).asInstanceOf[java.sql.Timestamp]
+    def fromRow(row: Row) = row.get(0) match
+      case null                   => null
+      case ts: java.sql.Timestamp => ts
+      case other                  => other.asInstanceOf[java.sql.Timestamp]
     def toRow(value: java.sql.Timestamp) = Row(value)
     override def agnosticEncoder = AgnosticEncoders.STRICT_TIMESTAMP_ENCODER
 

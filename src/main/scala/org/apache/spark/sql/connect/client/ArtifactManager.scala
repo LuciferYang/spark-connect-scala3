@@ -193,7 +193,8 @@ final class ArtifactManager private[client] (
     val in = CheckedInputStream(artifact.storage.stream, CRC32())
     try
       val chunkBuilder = AddArtifactsRequest.ArtifactChunk.newBuilder()
-      var dataChunk = readNextChunk(in)
+      val buf = new Array[Byte](CHUNK_SIZE) // reuse buffer across chunks
+      var dataChunk = readNextChunk(in, buf)
       val numChunks = (artifact.size + (CHUNK_SIZE - 1)) / CHUNK_SIZE
 
       // First message: BeginChunkedArtifact
@@ -207,18 +208,17 @@ final class ArtifactManager private[client] (
       builder.clearBeginChunk()
 
       // Subsequent messages: ArtifactChunk
-      dataChunk = readNextChunk(in)
+      dataChunk = readNextChunk(in, buf)
       while !dataChunk.isEmpty do
         chunkBuilder.setData(dataChunk).setCrc(in.getChecksum.getValue)
         builder.setChunk(chunkBuilder.build())
         stream.onNext(builder.build())
         in.getChecksum.reset()
         builder.clearChunk()
-        dataChunk = readNextChunk(in)
+        dataChunk = readNextChunk(in, buf)
     finally in.close()
 
-  private def readNextChunk(in: java.io.InputStream): ByteString =
-    val buf = new Array[Byte](CHUNK_SIZE)
+  private def readNextChunk(in: java.io.InputStream, buf: Array[Byte]): ByteString =
     var bytesRead = 0
     var count = 0
     while count != -1 && bytesRead < CHUNK_SIZE do
