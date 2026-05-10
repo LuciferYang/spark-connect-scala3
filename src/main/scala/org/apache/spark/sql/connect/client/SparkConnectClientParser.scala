@@ -17,6 +17,7 @@
 package org.apache.spark.sql.connect.client
 
 import scala.annotation.tailrec
+import java.net.URLEncoder
 
 /** Parser that takes an array of (CLI) arguments and produces a [[Config]].
   *
@@ -94,16 +95,19 @@ private[sql] object SparkConnectClientParser:
       case unsupported :: _ =>
         throw IllegalArgumentException(s"$unsupported is an unsupported argument.")
 
-  /** Build a `sc://` URL from a [[Config]]. */
+  /** Build a `sc://` URL from a [[Config]].
+    *
+    * Values containing `;` or `=` are URL-encoded so the URL can round-trip through `parseUrl`.
+    */
   def buildUrl(config: Config): String =
     val base = s"sc://${config.host}:${config.port}"
     val params = Seq.newBuilder[String]
     if config.useSsl then params += "use_ssl=true"
-    config.token.foreach(t => params += s"token=$t")
-    config.userId.foreach(u => params += s"user_id=$u")
-    config.userName.foreach(u => params += s"user_name=$u")
-    config.sessionId.foreach(s => params += s"session_id=$s")
-    config.options.foreach((k, v) => params += s"$k=$v")
+    config.token.foreach(t => params += s"token=${encodeValue(t)}")
+    config.userId.foreach(u => params += s"user_id=${encodeValue(u)}")
+    config.userName.foreach(u => params += s"user_name=${encodeValue(u)}")
+    config.sessionId.foreach(s => params += s"session_id=${encodeValue(s)}")
+    config.options.foreach((k, v) => params += s"${encodeValue(k)}=${encodeValue(v)}")
     val paramSeq = params.result()
     if paramSeq.isEmpty then base
     else base + ";" + paramSeq.mkString(";")
@@ -111,3 +115,7 @@ private[sql] object SparkConnectClientParser:
   private def extract(name: String, args: List[String]): (String, List[String]) =
     require(args.nonEmpty, s"$name option requires a value")
     (args.head, args.tail)
+
+  /** URL-encode a value, escaping `;`, `=`, and other special characters. */
+  private def encodeValue(s: String): String =
+    URLEncoder.encode(s, "UTF-8")

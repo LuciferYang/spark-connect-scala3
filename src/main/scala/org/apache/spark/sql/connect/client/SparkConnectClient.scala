@@ -4,6 +4,7 @@ import io.grpc.{ManagedChannelBuilder, Metadata}
 import io.grpc.stub.MetadataUtils
 import org.apache.spark.connect.proto.*
 
+import java.net.URLDecoder
 import java.util.UUID
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -470,7 +471,7 @@ object SparkConnectClient:
           (h, p)
     val params = parts.tail.flatMap { p =>
       p.split("=", 2) match
-        case Array(k, v) => Some(k -> v)
+        case Array(k, v) => Some(URLDecoder.decode(k, "UTF-8") -> URLDecoder.decode(v, "UTF-8"))
         case _           => None
     }
     (host, port, params)
