@@ -476,8 +476,8 @@ object SparkConnectClient:
   /** User-Agent string sent with all gRPC requests. */
   private val UserAgentString: String = "spark-connect-scala3/0.3.0"
 
-  /** Parse a `sc://host:port` URL into (host, port, params). Params preserve insertion order.
-    * Note: IPv6 literal addresses (e.g., `[::1]`) are not supported.
+  /** Parse a `sc://host:port` URL into (host, port, params). Params preserve insertion order. Note:
+    * IPv6 literal addresses (e.g., `[::1]`) are not supported.
     */
   private[client] def parseUrl(url: String): (String, Int, Seq[(String, String)]) =
     if !url.startsWith("sc://") then
