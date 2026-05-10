@@ -174,7 +174,7 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
       StructField("id", LongType, nullable = false),
       StructField("name", StringType, nullable = true)
     ))
-    st.toDDL shouldBe "id BIGINT NOT NULL, name STRING"
+    st.toDDL shouldBe "`id` BIGINT NOT NULL, `name` STRING"
   }
 
   test("StructType.empty toDDL is empty string") {
@@ -185,7 +185,7 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
     val st = StructType(Seq(
       StructField("amount", DecimalType(10, 2))
     ))
-    st.toDDL shouldBe "amount DECIMAL(10,2)"
+    st.toDDL shouldBe "`amount` DECIMAL(10,2)"
   }
 
   // ---------------------------------------------------------------------------

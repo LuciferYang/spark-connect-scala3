@@ -257,10 +257,13 @@ object Encoder:
 
     def toRow(value: T): Row =
       val product = value.asInstanceOf[Product]
-      val rowValues = (0 until product.productArity).map { i =>
-        unwrapForRow(product.productElement(i))
-      }
-      Row.fromSeq(rowValues)
+      val n = product.productArity
+      val arr = new Array[Any](n)
+      var i = 0
+      while i < n do
+        arr(i) = unwrapForRow(product.productElement(i))
+        i += 1
+      Row.fromSeq(scala.collection.immutable.ArraySeq.unsafeWrapArray(arr))
 
     override def agnosticEncoder: AgnosticEncoder[?] = _agnosticEncoder
 

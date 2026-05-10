@@ -153,7 +153,8 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
   def toDDL: String =
     fields.map { f =>
       val nullStr = if f.nullable then "" else " NOT NULL"
-      s"${f.name} ${f.dataType.sql}$nullStr"
+      val quotedName = s"`${f.name.replace("`", "``")}`"
+      s"$quotedName ${f.dataType.sql}$nullStr"
     }.mkString(", ")
 
   def treeString: String = treeString(Int.MaxValue)
