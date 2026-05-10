@@ -117,7 +117,7 @@ final class Catalog private[sql] (private val session: SparkSession):
     session.sql(s"SHOW VIEWS IN ${quoteIdent(dbName)}")
 
   def listViews(dbName: String, pattern: String): DataFrame =
-    session.sql(s"SHOW VIEWS IN ${quoteIdent(dbName)} LIKE '$pattern'")
+    session.sql(s"SHOW VIEWS IN ${quoteIdent(dbName)} LIKE '${escapeSqlLiteral(pattern)}'")
 
   // ---------------------------------------------------------------------------
   // Get operations
@@ -298,7 +298,10 @@ final class Catalog private[sql] (private val session: SparkSession):
     val ifNotExistsClause = if ifNotExists then " IF NOT EXISTS" else ""
     val propsClause =
       if properties.isEmpty then ""
-      else properties.map((k, v) => s"'$k' = '$v'").mkString(" WITH DBPROPERTIES (", ", ", ")")
+      else
+        properties
+          .map((k, v) => s"'${escapeSqlLiteral(k)}' = '${escapeSqlLiteral(v)}'")
+          .mkString(" WITH DBPROPERTIES (", ", ", ")")
     session.sql(s"CREATE DATABASE$ifNotExistsClause ${quoteIdent(dbName)}$propsClause").collect()
 
   def dropDatabase(
@@ -363,11 +366,15 @@ final class Catalog private[sql] (private val session: SparkSession):
   // Helper
   // ---------------------------------------------------------------------------
 
-  /** Quote an identifier for use in SQL. Multi-part names (e.g. "db.table") are passed through
-    * as-is so Spark SQL can resolve them. Simple names are backtick-quoted.
+  /** Quote an identifier for use in SQL. Multi-part names (e.g. "db.table") have each part
+    * individually quoted. Simple names are backtick-quoted with internal backticks escaped.
     */
   private def quoteIdent(name: String): String =
-    if name.contains(".") then name else s"`$name`"
+    name.split("\\.").map(part => s"`${part.replace("`", "``")}`").mkString(".")
+
+  /** Escape a string literal for safe inclusion in SQL (single quotes doubled). */
+  private def escapeSqlLiteral(s: String): String =
+    s.replace("\\", "\\\\").replace("'", "''")
 
   private[sql] def catalogDf(f: ProtoCatalog.Builder => ProtoCatalog.Builder): DataFrame =
     val catBuilder = ProtoCatalog.newBuilder()

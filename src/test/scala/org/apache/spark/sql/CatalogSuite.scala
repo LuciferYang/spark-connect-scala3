@@ -401,3 +401,25 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     )
     ids.distinct.size shouldBe 3
   }
+
+  // --- R3-4: SQL injection prevention tests ---
+
+  test("listViews escapes single quotes in pattern") {
+    val df = testCatalog.listViews("mydb", "test' OR '1'='1")
+    val query = df.relation.getSql.getQuery
+    query should not include "test' OR"
+    query should include("test'' OR ''1''=''1")
+  }
+
+  test("quoteIdent escapes backticks in identifier") {
+    val df = testCatalog.listPartitions("table`; DROP TABLE foo; --")
+    val query = df.relation.getSql.getQuery
+    query should include("`table``; DROP TABLE foo; --`")
+    query should not include "table`;"
+  }
+
+  test("quoteIdent quotes each part of multi-part name") {
+    val df = testCatalog.listPartitions("db.table")
+    val query = df.relation.getSql.getQuery
+    query should include("`db`.`table`")
+  }

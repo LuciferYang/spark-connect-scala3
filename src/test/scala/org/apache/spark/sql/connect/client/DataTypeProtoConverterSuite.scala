@@ -199,3 +199,26 @@ class DataTypeProtoConverterSuite extends AnyFunSuite with Matchers:
     proto.getGeography.getSrid shouldBe 4326
     DataTypeProtoConverter.fromProto(proto) shouldBe dt
   }
+
+  // --- S-4: UDT class validation tests ---
+
+  test("UDT fromProto rejects non-existent class") {
+    val proto = ProtoDataType.newBuilder()
+      .setUdt(ProtoDataType.UDT.newBuilder().setJvmClass("com.nonexistent.FakeClass").build())
+      .build()
+    val ex = intercept[IllegalArgumentException] {
+      DataTypeProtoConverter.fromProto(proto)
+    }
+    ex.getMessage should include("UDT class not found")
+    ex.getMessage should include("com.nonexistent.FakeClass")
+  }
+
+  test("UDT fromProto rejects class that is not a UserDefinedType") {
+    val proto = ProtoDataType.newBuilder()
+      .setUdt(ProtoDataType.UDT.newBuilder().setJvmClass("java.lang.String").build())
+      .build()
+    val ex = intercept[IllegalArgumentException] {
+      DataTypeProtoConverter.fromProto(proto)
+    }
+    ex.getMessage should include("not a UserDefinedType subclass")
+  }

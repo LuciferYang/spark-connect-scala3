@@ -67,8 +67,26 @@ object DataTypeProtoConverter:
       case KindCase.UDT =>
         val u = proto.getUdt
         if u.hasJvmClass then
-          val udtClass = Class.forName(u.getJvmClass)
-          udtClass.getConstructor().newInstance().asInstanceOf[UserDefinedType[?]]
+          val className = u.getJvmClass
+          val udtClass =
+            try Class.forName(className)
+            catch
+              case e: ClassNotFoundException =>
+                throw IllegalArgumentException(
+                  s"UDT class not found: $className",
+                  e
+                )
+          if !classOf[UserDefinedType[?]].isAssignableFrom(udtClass) then
+            throw IllegalArgumentException(
+              s"Class '$className' is not a UserDefinedType subclass"
+            )
+          try udtClass.getConstructor().newInstance().asInstanceOf[UserDefinedType[?]]
+          catch
+            case e: NoSuchMethodException =>
+              throw IllegalArgumentException(
+                s"UDT class '$className' must have a no-arg constructor",
+                e
+              )
         else throw UnsupportedOperationException("Python UDTs not supported in SC3")
 
       case other =>
