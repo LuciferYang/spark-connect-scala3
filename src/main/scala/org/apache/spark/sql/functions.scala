@@ -63,8 +63,10 @@ object functions:
   def last(colName: String): Column = last(Column(colName))
   def last(colName: String, ignoreNulls: Boolean): Column =
     callFn("last", Column(colName), Column.lit(ignoreNulls))
+  @deprecated("Use count_distinct() instead", "0.4.0")
   def countDistinct(col: Column, cols: Column*): Column =
     callFn("count", isDistinct = true, (col +: cols)*)
+  @deprecated("Use count_distinct() instead", "0.4.0")
   def countDistinct(colName: String, colNames: String*): Column =
     countDistinct(Column(colName), colNames.map(Column(_))*)
   def collect_list(col: Column): Column = callFn("collect_list", col)
@@ -1036,16 +1038,22 @@ object functions:
   def cot(e: Column): Column = callFn("cot", e)
   def csc(e: Column): Column = callFn("csc", e)
   def sec(e: Column): Column = callFn("sec", e)
+  @deprecated("Use degrees() instead", "0.4.0")
   def toDegrees(e: Column): Column = callFn("degrees", e)
+  @deprecated("Use degrees() instead", "0.4.0")
   def toDegrees(colName: String): Column = toDegrees(Column(colName))
+  @deprecated("Use radians() instead", "0.4.0")
   def toRadians(e: Column): Column = callFn("radians", e)
+  @deprecated("Use radians() instead", "0.4.0")
   def toRadians(colName: String): Column = toRadians(Column(colName))
 
   // ---------------------------------------------------------------------------
   // Aggregate functions (extended)
   // ---------------------------------------------------------------------------
 
+  @deprecated("Use sum_distinct() instead", "0.4.0")
   def sumDistinct(col: Column): Column = callFn("sum", isDistinct = true, col)
+  @deprecated("Use sum_distinct() instead", "0.4.0")
   def sumDistinct(colName: String): Column = sumDistinct(Column(colName))
   def approx_count_distinct(col: Column): Column = callFn("approx_count_distinct", col)
   def approx_count_distinct(colName: String): Column = approx_count_distinct(Column(colName))
