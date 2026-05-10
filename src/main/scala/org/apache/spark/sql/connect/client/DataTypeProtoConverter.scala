@@ -28,10 +28,14 @@ object DataTypeProtoConverter:
 
       case KindCase.DAY_TIME_INTERVAL   => DayTimeIntervalType
       case KindCase.YEAR_MONTH_INTERVAL => YearMonthIntervalType
+      case KindCase.CALENDAR_INTERVAL   => CalendarIntervalType
 
       case KindCase.CHAR     => CharType(proto.getChar.getLength)
       case KindCase.VAR_CHAR => VarcharType(proto.getVarChar.getLength)
       case KindCase.TIME     => TimeType(proto.getTime.getPrecision)
+
+      case KindCase.UNPARSED =>
+        UnparsedDataType(proto.getUnparsed.getDataTypeString)
 
       case KindCase.GEOMETRY  => GeometryType(proto.getGeometry.getSrid)
       case KindCase.GEOGRAPHY => GeographyType(proto.getGeography.getSrid)
@@ -133,6 +137,10 @@ object DataTypeProtoConverter:
         ProtoDataType.newBuilder().setYearMonthInterval(
           ProtoDataType.YearMonthInterval.getDefaultInstance
         ).build()
+      case CalendarIntervalType =>
+        ProtoDataType.newBuilder().setCalendarInterval(
+          ProtoDataType.CalendarInterval.getDefaultInstance
+        ).build()
 
       case CharType(length) =>
         ProtoDataType.newBuilder().setChar(
@@ -198,6 +206,11 @@ object DataTypeProtoConverter:
             .setJvmClass(udt.getClass.getName)
             .setSqlType(toProto(udt.sqlType))
             .build()
+        ).build()
+
+      case UnparsedDataType(typeString) =>
+        ProtoDataType.newBuilder().setUnparsed(
+          ProtoDataType.Unparsed.newBuilder().setDataTypeString(typeString).build()
         ).build()
 
       case null =>

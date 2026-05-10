@@ -51,6 +51,24 @@ object LiteralValueProtoConverter:
         val s = literal.getStruct
         val values = s.getElementsList.asScala.map(toScalaValue).toSeq
         Row.fromSeq(values)
+      case LiteralTypeCase.CALENDAR_INTERVAL =>
+        val ci = literal.getCalendarInterval
+        (ci.getMonths, ci.getDays, ci.getMicroseconds)
+      case LiteralTypeCase.YEAR_MONTH_INTERVAL =>
+        literal.getYearMonthInterval
+      case LiteralTypeCase.DAY_TIME_INTERVAL =>
+        literal.getDayTimeInterval
+      case LiteralTypeCase.SPECIALIZED_ARRAY =>
+        val sa = literal.getSpecializedArray
+        if sa.hasBools then sa.getBools.getValuesList.asScala.map(Boolean.unbox).toArray
+        else if sa.hasInts then sa.getInts.getValuesList.asScala.map(Int.unbox).toArray
+        else if sa.hasLongs then sa.getLongs.getValuesList.asScala.map(Long.unbox).toArray
+        else if sa.hasFloats then sa.getFloats.getValuesList.asScala.map(Float.unbox).toArray
+        else if sa.hasDoubles then sa.getDoubles.getValuesList.asScala.map(Double.unbox).toArray
+        else if sa.hasStrings then sa.getStrings.getValuesList.asScala.toArray
+        else Array.empty[Any]
+      case LiteralTypeCase.TIME =>
+        literal.getTime.getNano
       case LiteralTypeCase.LITERALTYPE_NOT_SET =>
         null
       case other =>
@@ -115,4 +133,23 @@ object LiteralValueProtoConverter:
           StructType(s.getElementsList.asScala.zipWithIndex.map { (elem, i) =>
             StructField(s"col$i", toDataType(elem))
           }.toSeq)
-      case _ => NullType
+      case LiteralTypeCase.CALENDAR_INTERVAL   => CalendarIntervalType
+      case LiteralTypeCase.YEAR_MONTH_INTERVAL => YearMonthIntervalType
+      case LiteralTypeCase.DAY_TIME_INTERVAL   => DayTimeIntervalType
+      case LiteralTypeCase.SPECIALIZED_ARRAY   =>
+        val sa = literal.getSpecializedArray
+        if sa.hasBools then ArrayType(BooleanType, containsNull = false)
+        else if sa.hasInts then ArrayType(IntegerType, containsNull = false)
+        else if sa.hasLongs then ArrayType(LongType, containsNull = false)
+        else if sa.hasFloats then ArrayType(FloatType, containsNull = false)
+        else if sa.hasDoubles then ArrayType(DoubleType, containsNull = false)
+        else if sa.hasStrings then ArrayType(StringType, containsNull = false)
+        else ArrayType(NullType, containsNull = false)
+      case LiteralTypeCase.TIME =>
+        val t = literal.getTime
+        TimeType(if t.hasPrecision then t.getPrecision else TimeType.DEFAULT_PRECISION)
+      case LiteralTypeCase.LITERALTYPE_NOT_SET => NullType
+      case other                               =>
+        throw UnsupportedOperationException(
+          s"Unsupported literal type for DataType inference: $other"
+        )

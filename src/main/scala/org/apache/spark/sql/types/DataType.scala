@@ -81,6 +81,10 @@ case object YearMonthIntervalType extends DataType:
   def typeName = "year_month_interval"
   override def sql = "INTERVAL YEAR TO MONTH"
 
+case object CalendarIntervalType extends DataType:
+  def typeName = "calendar_interval"
+  override def sql = "INTERVAL"
+
 final case class TimeType(precision: Int = TimeType.DEFAULT_PRECISION) extends DataType:
   def typeName = s"time($precision)"
   override def sql = s"TIME($precision)"
@@ -173,3 +177,13 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
 
 object StructType:
   val empty: StructType = StructType(Seq.empty)
+
+/** Represents an unparsed data type returned by the server as a raw type string.
+  *
+  * This is used when the server sends a DataType.Unparsed proto that this client cannot resolve to
+  * a concrete type.
+  */
+final case class UnparsedDataType(typeString: String) extends DataType:
+  def typeName = "unparsed"
+  override def simpleString = s"unparsed($typeString)"
+  override def sql = typeString
