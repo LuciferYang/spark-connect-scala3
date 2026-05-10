@@ -594,6 +594,10 @@ object Window:
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setCurrentRow(true).build()
     else
-      val litExpr = Column.lit(value).expr
+      require(
+        value >= Int.MinValue && value <= Int.MaxValue,
+        s"Window frame boundary value $value exceeds Int range"
+      )
+      val litExpr = Column.lit(value.toInt).expr
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setValue(litExpr).build()
