@@ -275,8 +275,17 @@ final class SparkSession private[sql] (
   ): Unit =
     metrics.foreach { (planId, row) =>
       val obs = observationRegistry.get(planId)
-      if obs != null then obs.setMetrics(row)
+      if obs != null then
+        obs.setMetrics(row)
+        observationRegistry.remove(planId)
     }
+
+  /** Fail all pending observations so their `get` unblocks with the given cause. */
+  private[sql] def failPendingObservations(cause: Throwable): Unit =
+    observationRegistry.values().forEach { obs =>
+      obs.failMetrics(cause)
+    }
+    observationRegistry.clear()
 
   // ---------------------------------------------------------------------------
   // Operation Tags

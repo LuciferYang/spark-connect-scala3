@@ -20,6 +20,9 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
   private val listeners = CopyOnWriteArrayList[StreamingQueryListener]()
   private var executionThread: Option[Thread] = None
 
+  /** Timeout for server to confirm listener registration (30 seconds). */
+  private val RegisterListenerTimeoutNanos: Long = 30L * 1_000_000_000L
+
   private val lock = new Object()
 
   def close(): Unit =
@@ -71,15 +74,24 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
 
     val plan = Plan.newBuilder().setCommand(cmdBuilder.build()).build()
     val iterator = session.client.execute(plan)
+    val deadline = System.nanoTime() + RegisterListenerTimeoutNanos
     try
       while iterator.hasNext do
+        if System.nanoTime() > deadline then
+          (iterator: Any) match
+            case c: AutoCloseable => c.close()
+            case _                => ()
+          throw java.util.concurrent.TimeoutException(
+            "Timed out waiting for server to confirm listener registration"
+          )
         val response = iterator.next()
         val result = response.getStreamingQueryListenerEventsResult
         if result.hasListenerBusListenerAdded && result.getListenerBusListenerAdded then
           return iterator
       iterator
     catch
-      case e: Exception =>
+      case e: java.util.concurrent.TimeoutException => throw e
+      case e: Exception                             =>
         (iterator: Any) match
           case c: AutoCloseable => c.close()
           case _                => ()

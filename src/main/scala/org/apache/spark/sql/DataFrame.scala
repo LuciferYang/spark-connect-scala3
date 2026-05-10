@@ -336,9 +336,14 @@ final class DataFrame private[sql] (
       .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
       .setTail(Tail.newBuilder().setInput(relation).setLimit(n).build())
       .build()
-    val (rows, observed) = executeAndCollect(tailRel)
-    if observed.nonEmpty then session.processObservedMetrics(observed)
-    applyPostConversions(rows, schema)
+    try
+      val (rows, observed) = executeAndCollect(tailRel)
+      if observed.nonEmpty then session.processObservedMetrics(observed)
+      applyPostConversions(rows, schema)
+    catch
+      case e: Exception =>
+        session.failPendingObservations(e)
+        throw e
 
   /** Pipeline-style transformation. */
   def transform(f: DataFrame => DataFrame): DataFrame = f(this)
@@ -642,9 +647,14 @@ final class DataFrame private[sql] (
   // ---------------------------------------------------------------------------
 
   def collect(): Array[Row] =
-    val (rows, observed) = executeAndCollect(relation)
-    if observed.nonEmpty then session.processObservedMetrics(observed)
-    applyPostConversions(rows, schema)
+    try
+      val (rows, observed) = executeAndCollect(relation)
+      if observed.nonEmpty then session.processObservedMetrics(observed)
+      applyPostConversions(rows, schema)
+    catch
+      case e: Exception =>
+        session.failPendingObservations(e)
+        throw e
 
   def collectAsList(): java.util.List[Row] = java.util.Arrays.asList(collect()*)
 

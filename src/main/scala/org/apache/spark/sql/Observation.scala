@@ -73,6 +73,10 @@ final class Observation(val name: String):
   private[sql] def setMetrics(row: Row): Boolean =
     promise.trySuccess(row)
 
+  /** Fail the promise so that `get` unblocks with an exception instead of waiting forever. */
+  private[sql] def failMetrics(cause: Throwable): Boolean =
+    promise.tryFailure(cause)
+
   /** The plan ID this observation is bound to (set after observe()). */
   @volatile private[sql] var planId: Long = -1L
 
