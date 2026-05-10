@@ -82,9 +82,9 @@ object DataTypeProtoConverter:
             )
           try udtClass.getConstructor().newInstance().asInstanceOf[UserDefinedType[?]]
           catch
-            case e: NoSuchMethodException =>
+            case e: ReflectiveOperationException =>
               throw IllegalArgumentException(
-                s"UDT class '$className' must have a no-arg constructor",
+                s"UDT class '$className' cannot be instantiated (requires accessible no-arg constructor)",
                 e
               )
         else throw UnsupportedOperationException("Python UDTs not supported in SC3")

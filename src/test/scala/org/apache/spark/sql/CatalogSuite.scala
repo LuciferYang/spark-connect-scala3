@@ -423,3 +423,21 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     val query = df.relation.getSql.getQuery
     query should include("`db`.`table`")
   }
+
+  test("quoteIdent rejects empty string") {
+    intercept[IllegalArgumentException] {
+      testCatalog.listPartitions("")
+    }
+  }
+
+  test("quoteIdent handles trailing dot (split -1 preserves empty trailing parts)") {
+    val df = testCatalog.listPartitions("db.")
+    val query = df.relation.getSql.getQuery
+    query should include("`db`.``")
+  }
+
+  test("escapeSqlLiteral does not escape backslashes (Spark SQL semantics)") {
+    val df = testCatalog.listViews("mydb", "path\\to\\file")
+    val query = df.relation.getSql.getQuery
+    query should include("path\\to\\file")
+  }

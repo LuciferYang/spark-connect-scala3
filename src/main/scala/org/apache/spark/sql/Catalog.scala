@@ -370,11 +370,13 @@ final class Catalog private[sql] (private val session: SparkSession):
     * individually quoted. Simple names are backtick-quoted with internal backticks escaped.
     */
   private def quoteIdent(name: String): String =
-    name.split("\\.").map(part => s"`${part.replace("`", "``")}`").mkString(".")
+    require(name != null && name.nonEmpty, "Identifier must not be null or empty")
+    name.split("\\.", -1).map(part => s"`${part.replace("`", "``")}`").mkString(".")
 
   /** Escape a string literal for safe inclusion in SQL (single quotes doubled). */
   private def escapeSqlLiteral(s: String): String =
-    s.replace("\\", "\\\\").replace("'", "''")
+    require(s != null, "SQL literal must not be null")
+    s.replace("'", "''")
 
   private[sql] def catalogDf(f: ProtoCatalog.Builder => ProtoCatalog.Builder): DataFrame =
     val catBuilder = ProtoCatalog.newBuilder()
