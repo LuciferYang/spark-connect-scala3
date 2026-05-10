@@ -114,8 +114,9 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
             case _ => () // unknown event type, skip
         }
     catch
-      case _: InterruptedException => () // normal shutdown
-      case NonFatal(_)             =>
+      case _: InterruptedException =>
+        Thread.currentThread().interrupt() // restore interrupt status
+      case NonFatal(_) =>
         // Handler thread failed — remove all listeners
         lock.synchronized {
           executionThread = None

@@ -20,17 +20,21 @@ object LiteralValueProtoConverter:
     if literal.hasNull then return null
 
     literal.getLiteralTypeCase match
-      case LiteralTypeCase.BOOLEAN       => literal.getBoolean
-      case LiteralTypeCase.BYTE          => literal.getByte.toByte
-      case LiteralTypeCase.SHORT         => literal.getShort.toShort
-      case LiteralTypeCase.INTEGER       => literal.getInteger
-      case LiteralTypeCase.LONG          => literal.getLong
-      case LiteralTypeCase.FLOAT         => literal.getFloat
-      case LiteralTypeCase.DOUBLE        => literal.getDouble
-      case LiteralTypeCase.STRING        => literal.getString
-      case LiteralTypeCase.BINARY        => literal.getBinary.toByteArray
-      case LiteralTypeCase.DATE          => LocalDate.ofEpochDay(literal.getDate.toLong)
-      case LiteralTypeCase.TIMESTAMP     => Instant.ofEpochSecond(0, literal.getTimestamp * 1000)
+      case LiteralTypeCase.BOOLEAN   => literal.getBoolean
+      case LiteralTypeCase.BYTE      => literal.getByte.toByte
+      case LiteralTypeCase.SHORT     => literal.getShort.toShort
+      case LiteralTypeCase.INTEGER   => literal.getInteger
+      case LiteralTypeCase.LONG      => literal.getLong
+      case LiteralTypeCase.FLOAT     => literal.getFloat
+      case LiteralTypeCase.DOUBLE    => literal.getDouble
+      case LiteralTypeCase.STRING    => literal.getString
+      case LiteralTypeCase.BINARY    => literal.getBinary.toByteArray
+      case LiteralTypeCase.DATE      => LocalDate.ofEpochDay(literal.getDate.toLong)
+      case LiteralTypeCase.TIMESTAMP =>
+        val micros = literal.getTimestamp
+        val secs = Math.floorDiv(micros, 1000000L)
+        val nos = Math.floorMod(micros, 1000000L) * 1000
+        Instant.ofEpochSecond(secs, nos)
       case LiteralTypeCase.TIMESTAMP_NTZ =>
         val micros = literal.getTimestampNtz
         val secs = Math.floorDiv(micros, 1000000L)

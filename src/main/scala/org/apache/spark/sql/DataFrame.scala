@@ -603,7 +603,10 @@ final class DataFrame private[sql] (
       case "codegen"   => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_CODEGEN
       case "cost"      => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_COST
       case "formatted" => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_FORMATTED
-      case _           => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
+      case other       =>
+        throw IllegalArgumentException(
+          s"Unknown explain mode: '$other'. Accepted modes: simple, extended, codegen, cost, formatted."
+        )
     val explainStr = client.analyzeExplain(plan, explainMode)
     println(explainStr)
 

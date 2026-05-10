@@ -61,6 +61,10 @@ final class DataFrameStatFunctions private[sql] (df: DataFrame):
 
   /** Finds frequent items for the given columns using the given support threshold. */
   def freqItems(cols: Seq[String], support: Double): DataFrame =
+    require(
+      support > 0 && support <= 1,
+      s"support must be in (0, 1], got $support"
+    )
     val fiBuilder = StatFreqItems.newBuilder().setInput(df.relation).setSupport(support)
     cols.foreach(fiBuilder.addCols)
     df.withRelation(_.setFreqItems(fiBuilder.build()))
@@ -106,12 +110,16 @@ final class DataFrameStatFunctions private[sql] (df: DataFrame):
 
   /** Builds a Count-min Sketch over a specified column. */
   def countMinSketch(col: Column, depth: Int, width: Int, seed: Int): CountMinSketch =
+    require(depth > 0, s"depth must be positive, got $depth")
+    require(width > 0, s"width must be positive, got $width")
     val eps = 2.0 / width
     val confidence = 1 - 1 / Math.pow(2, depth)
     countMinSketch(col, eps, confidence, seed)
 
   /** Builds a Count-min Sketch over a specified column. */
   def countMinSketch(col: Column, eps: Double, confidence: Double, seed: Int): CountMinSketch =
+    require(eps > 0 && eps < 1, s"eps must be in (0, 1), got $eps")
+    require(confidence > 0 && confidence < 1, s"confidence must be in (0, 1), got $confidence")
     import functions.{count_min_sketch, lit}
     val cms = count_min_sketch(col, lit(eps), lit(confidence), lit(seed))
     val bytes = df.select(cms).head().get(0).asInstanceOf[Array[Byte]]
