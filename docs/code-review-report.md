@@ -12,9 +12,9 @@
 |----------|------|--------|
 | CRITICAL | 5 | 5 ✅ |
 | HIGH | 24 | 22 ✅ |
-| MEDIUM | 72 | 18 ✅ |
+| MEDIUM | 72 | 20 ✅ |
 | LOW | 61 | 2 ✅ |
-| **合计** | **162** | **47** |
+| **合计** | **162** | **49** |
 
 | 兼容性标记 | 数量 | 说明 |
 |------------|------|------|
@@ -67,7 +67,7 @@
 | # | 文件:行号 | 描述 | 状态 |
 |---|-----------|------|------|
 | S-3 | `SparkConnectClientParser.scala:102` | Token 嵌入 `sc://` URL 字符串，可能通过进程命令行、日志可见。 | |
-| S-4 | `DataTypeProtoConverter.scala:70-71` | 从不可信 protobuf 输入执行 `Class.forName` + `newInstance()`（UDT jvmClass），如 MITM 可触发任意类实例化。 | |
+| S-4 | `DataTypeProtoConverter.scala:70-71` | 从不可信 protobuf 输入执行 `Class.forName` + `newInstance()`（UDT jvmClass），如 MITM 可触发任意类实例化。 | ✅ 已修复 (commit 51d43b7)：验证 isAssignableFrom(UserDefinedType) |
 | S-5 | `ArrowDeserializer.scala:24` | `RootAllocator(Long.MaxValue)` 无内存上限，恶意 Arrow batch 可导致 OOM/DoS。 | ✅ 已修复：256GB 上限 |
 | S-6 | `ArrowSerializer.scala:35` | 同上：编码时 `RootAllocator(Long.MaxValue)` 无限制。 | ✅ 已修复：256GB 上限 |
 | S-7 | `ArtifactManager.scala:155` | `Await.result(promise.future, Duration.Inf)` 无超时，gRPC 流不完成则永久阻塞。 | ✅ 已修复：30 分钟超时 |
@@ -355,7 +355,7 @@
 | # | 文件:行号 | 描述 |
 |---|-----------|------|
 | R3-3 | `AgnosticEncoder.scala:642` | ⚠️ **FIX WITH CARE** — `CollectionEncoderProxy.readResolve` 对 "IterableEncoder" 期望 4 参构造函数，但上游 Spark 4.x 只有 3 参，运行时会抛 ClassNotFoundException。（修复须对齐 Spark 4.1.1 实际参数签名） |
-| R3-4 | `Catalog.scala:120` | SQL 注入：`listViews(dbName, pattern)` 中 pattern 直接拼入 SQL 字符串，未转义单引号。`createDatabase` properties 同理。 |
+| R3-4 | `Catalog.scala:120` | SQL 注入：`listViews(dbName, pattern)` 中 pattern 直接拼入 SQL 字符串，未转义单引号。`createDatabase` properties 同理。 | ✅ 已修复 (commit 51d43b7)：escapeSqlLiteral + quoteIdent 加固 |
 | R3-5 | `StreamingQueryListenerBus.scala:76-81` | `registerServerSideListener` 消费 iterator 查找 `listenerBusListenerAdded=true`，若 server 永不发送则无限阻塞。 |
 | R3-6 | `StreamingQueryListenerBus.scala:109` | `postToAll` 持有 lock 调用 listener 回调；若回调调用 addListener/removeListener 有潜在 re-entrant 竞争。 |
 
