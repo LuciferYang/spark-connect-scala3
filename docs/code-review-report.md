@@ -12,9 +12,9 @@
 |----------|------|--------|
 | CRITICAL | 5 | 5 ✅ |
 | HIGH | 24 | 22 ✅ |
-| MEDIUM | 72 | 64 ✅ |
+| MEDIUM | 72 | 66 ✅ |
 | LOW | 61 | 3 ✅ |
-| **合计** | **162** | **94** |
+| **合计** | **162** | **96** |
 
 | 兼容性标记 | 数量 | 说明 |
 |------------|------|------|
@@ -66,7 +66,7 @@
 
 | # | 文件:行号 | 描述 | 状态 |
 |---|-----------|------|------|
-| S-3 | `SparkConnectClientParser.scala:102` | Token 嵌入 `sc://` URL 字符串，可能通过进程命令行、日志可见。 | |
+| S-3 | `SparkConnectClientParser.scala:102` | Token 嵌入 `sc://` URL 字符串，可能通过进程命令行、日志可见。 | ✅ 已缓解：S-2 修复后 connectionUrl 不含 token，仅 fullUrl 内部使用 |
 | S-4 | `DataTypeProtoConverter.scala:70-71` | 从不可信 protobuf 输入执行 `Class.forName` + `newInstance()`（UDT jvmClass），如 MITM 可触发任意类实例化。 | ✅ 已修复 (commit 51d43b7)：验证 isAssignableFrom(UserDefinedType) |
 | S-5 | `ArrowDeserializer.scala:24` | `RootAllocator(Long.MaxValue)` 无内存上限，恶意 Arrow batch 可导致 OOM/DoS。 | ✅ 已修复：256GB 上限 |
 | S-6 | `ArrowSerializer.scala:35` | 同上：编码时 `RootAllocator(Long.MaxValue)` 无限制。 | ✅ 已修复：256GB 上限 |
@@ -445,7 +445,7 @@
 | R5-2 | `LiteralValueProtoConverter.scala:70` | `toDataType` 同样未处理上述枚举值，wildcard case 静默返回 NullType 导致类型不匹配。 | ✅ 已修复：已添加所有 interval + UNPARSED 处理 |
 | R5-3 | `GrpcExceptionConverter.scala:136` | `errorsToException` 未验证 `errorIdx` 在 `resp.getErrorsCount` 范围内，畸形 server 响应导致 IndexOutOfBoundsException。 | ✅ 已修复：bounds check 已添加 |
 | R5-4 | `GrpcExceptionConverter.scala:141` | `errorsToException` 无循环引用检测，循环 cause chain（A→B→A）会 StackOverflow。 | ✅ 已修复：visited Set 循环检测 |
-| R5-5 | `Column.scala:597` | ⚠️ **FIX WITH CARE** — `Window.toBoundary` 将 Long 值截断为 Int（`value.toInt`），超 Int 范围的 frame boundary 静默错误。（修复须确保 proto Expression 仍为合法格式） |
+| R5-5 | `Column.scala:597` | ⚠️ **FIX WITH CARE** — `Window.toBoundary` 将 Long 值截断为 Int（`value.toInt`），超 Int 范围的 frame boundary 静默错误。（修复须确保 proto Expression 仍为合法格式） | ✅ 已修复 (commit dea9dc0)：改用 Column.lit(value) 直接生成 Long literal |
 
 ### LOW
 
