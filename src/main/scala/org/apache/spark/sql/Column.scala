@@ -176,23 +176,12 @@ class Column private[sql] (
   def isInCollection(values: Iterable[?]): Column = isin(values.toSeq*)
 
   /** IN subquery: `col IN (SELECT ... FROM ...)`. */
-  def isin(ds: Dataset[?]): Column =
-    val rel = ds.df.relation
-    val planId = rel.getCommon.getPlanId
-    val subExpr = Expression.newBuilder()
-      .setSubqueryExpression(
-        SubqueryExpression.newBuilder()
-          .setPlanId(planId)
-          .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_IN)
-          .addAllInSubqueryValues(java.util.List.of(expr))
-          .build()
-      )
-      .build()
-    Column(subExpr, this.subqueryRelations :+ rel)
+  def isin(ds: Dataset[?]): Column = buildInSubquery(ds.df.relation)
 
-  /** IN subquery (DataFrame variant): `col IN (SELECT ... FROM ...)`. */
-  def isin(df: DataFrame): Column =
-    val rel = df.relation
+  /** IN subquery (DataFrame variant). */
+  def isin(df: DataFrame): Column = buildInSubquery(df.relation)
+
+  private def buildInSubquery(rel: Relation): Column =
     val planId = rel.getCommon.getPlanId
     val subExpr = Expression.newBuilder()
       .setSubqueryExpression(
