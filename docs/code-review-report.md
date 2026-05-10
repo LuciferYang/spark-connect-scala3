@@ -445,7 +445,7 @@
 | R5-2 | `LiteralValueProtoConverter.scala:70` | `toDataType` 同样未处理上述枚举值，wildcard case 静默返回 NullType 导致类型不匹配。 | ✅ 已修复：已添加所有 interval + UNPARSED 处理 |
 | R5-3 | `GrpcExceptionConverter.scala:136` | `errorsToException` 未验证 `errorIdx` 在 `resp.getErrorsCount` 范围内，畸形 server 响应导致 IndexOutOfBoundsException。 | ✅ 已修复：bounds check 已添加 |
 | R5-4 | `GrpcExceptionConverter.scala:141` | `errorsToException` 无循环引用检测，循环 cause chain（A→B→A）会 StackOverflow。 | ✅ 已修复：visited Set 循环检测 |
-| R5-5 | `Column.scala:597` | ⚠️ **FIX WITH CARE** — `Window.toBoundary` 将 Long 值截断为 Int（`value.toInt`），超 Int 范围的 frame boundary 静默错误。（修复须确保 proto Expression 仍为合法格式） | ✅ 已修复 (commit dea9dc0)：改用 Column.lit(value) 直接生成 Long literal |
+| R5-5 | `Column.scala:597` | ⚠️ **FIX WITH CARE** — `Window.toBoundary` 将 Long 值截断为 Int（`value.toInt`），超 Int 范围的 frame boundary 静默错误。（修复须确保 proto Expression 仍为合法格式） | ✅ 已修复 (commit 7ac9dac)：添加 require() 范围校验，超 Int 范围快速失败 |
 
 ### LOW
 
