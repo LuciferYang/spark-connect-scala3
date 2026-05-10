@@ -1,6 +1,6 @@
 # Spark Connect Scala 3 — 多角色代码审查报告
 
-> 生成日期：2026-05-08
+> 生成日期：2026-05-08（全量分析）/ 2026-05-10（安全加固专项）
 > 分析范围：`src/main/scala/` 全部源码
 > 分析方法：安全专家 + 性能工程师 + 高级工程师 + 一致性审查者 四视角并行分析
 
@@ -13,8 +13,8 @@
 | CRITICAL | 5 | 5 ✅ |
 | HIGH | 24 | 22 ✅ |
 | MEDIUM | 72 | 20 ✅ |
-| LOW | 61 | 2 ✅ |
-| **合计** | **162** | **49** |
+| LOW | 61 | 3 ✅ |
+| **合计** | **162** | **50** |
 
 | 兼容性标记 | 数量 | 说明 |
 |------------|------|------|
@@ -278,7 +278,52 @@
 | Round 35 | Configuration consistency | 0 | 162 |
 | Round 36 | Final complete re-scan | 0 | 162 |
 
-> 连续 20 轮（Round 17-36）无新问题发现，分析终止。
+> 连续 20 轮（Round 17-36）无新问题发现，全量分析终止。
+
+---
+
+## 16. 安全加固专项评审 (S-4 / R3-4 Focused Review)
+
+> 生成日期：2026-05-10
+> 分析范围：commits `755e932` + `7e8aba1`（对 S-4 UDT 安全、R3-4 SQL 注入修复的加固改进）
+> 分析方法：42 轮多角色审查（安全专家、性能工程师、API 设计专家、防御编程专家、Scala 3 习惯审查者、边缘情况猎手、并发专家、供应链安全分析师、高级首席工程师等 20+ 视角）
+> 终止条件：连续 20 轮无新问题发现
+
+### 审查内容
+
+| 文件 | 修改内容 |
+|------|---------|
+| `Catalog.scala:372-382` | `quoteIdent`：null/empty 前置检查、`split("\\.", -1)` 保留尾部空部分 |
+| `Catalog.scala:380-382` | `escapeSqlLiteral`：反斜杠双倍（Spark 解析器处理 `\n`/`\t`/`\\`/`\uXXXX`） + 单引号双倍 |
+| `DataTypeProtoConverter.scala:67-90` | UDT `isAssignableFrom` 验证 + `ReflectiveOperationException` 宽捕获 |
+| `CatalogSuite.scala:405-443` | 6 个安全回归测试 |
+| `DataTypeProtoConverterSuite.scala:203-224` | 2 个 UDT 类验证测试 |
+
+### 迭代记录
+
+| 轮次 | 发现数 | 说明 |
+|------|--------|------|
+| Round 1 | 0 | 初始 3 视角审查通过 |
+| Round 2 | 4 | quoteIdent 边缘情况 + UDT catch 范围 + 反斜杠转义移除（错误） |
+| Rounds 3-19 | 0 | 修复后连续清洁（被 Round 20 中断） |
+| Round 20 | 1 | 发现 Round 2 的反斜杠移除修复有误——Spark 默认确实处理 `\n` 等转义 |
+| Rounds 21-22 | 0 | 修复后重新开始计数 |
+| **Rounds 23-42** | **0** | **连续 20 轮无新问题，评审终止** |
+
+### 修复提交
+
+| Commit | 描述 |
+|--------|------|
+| `755e932` | fix: harden SQL escaping and UDT reflection error handling |
+| `7e8aba1` | fix: restore backslash escaping in escapeSqlLiteral |
+
+### 关键结论
+
+1. **SQL 注入防护完备**：`escapeSqlLiteral` 正确处理反斜杠（双倍）和单引号（双倍），覆盖 Spark 默认解析器的转义序列处理
+2. **标识符注入防护完备**：`quoteIdent` 对空输入拒绝、对多段名逐段引用、对内嵌反引号正确转义
+3. **UDT 任意类实例化已阻断**：`isAssignableFrom(UserDefinedType)` 门控确保仅合法 UDT 子类可实例化
+4. **错误处理一致**：`ReflectiveOperationException` 覆盖所有反射失败模式，错误消息含类名但不泄漏敏感信息
+5. **测试回归保护**：8 个测试锁定所有安全行为，未来修改若回退将立即失败
 
 ---
 
@@ -383,7 +428,7 @@
 
 | # | 文件:行号 | 描述 |
 |---|-----------|------|
-| R4-5 | `Catalog.scala:369` | `quoteIdent` 不转义标识符中的反引号，`table\`name` 产生无效 SQL。 |
+| R4-5 | `Catalog.scala:369` | `quoteIdent` 不转义标识符中的反引号，`table\`name` 产生无效 SQL。 | ✅ 已修复 (commit 755e932)：backtick 双倍转义 |
 | R4-6 | `LiteralValueProtoConverter.scala:33` | `literal.getTimestamp * 1000` 在极大 timestamp 值时 Long 溢出。 |
 | R4-7 | `ResponseValidator.scala:49-51` | `trackSessionId` 中 volatile check-then-set 非原子，并发 unary RPC 可能设置不同值而不检测冲突。 |
 | R4-8 | `ExecutePlanResponseReattachableIterator.scala:76-78` | `hasNext` 中若 `rawReattachExecute()` 反复返回空迭代器且无 ResultComplete，while 循环无限旋转无超时。 |
