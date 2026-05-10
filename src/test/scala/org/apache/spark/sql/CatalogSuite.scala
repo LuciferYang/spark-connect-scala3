@@ -436,8 +436,8 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     query should include("`db`.``")
   }
 
-  test("escapeSqlLiteral does not escape backslashes (Spark SQL semantics)") {
+  test("escapeSqlLiteral escapes backslashes (Spark parser processes escape sequences)") {
     val df = testCatalog.listViews("mydb", "path\\to\\file")
     val query = df.relation.getSql.getQuery
-    query should include("path\\to\\file")
+    query should include("path\\\\to\\\\file")
   }

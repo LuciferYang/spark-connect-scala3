@@ -373,10 +373,13 @@ final class Catalog private[sql] (private val session: SparkSession):
     require(name != null && name.nonEmpty, "Identifier must not be null or empty")
     name.split("\\.", -1).map(part => s"`${part.replace("`", "``")}`").mkString(".")
 
-  /** Escape a string literal for safe inclusion in SQL (single quotes doubled). */
+  /** Escape a string literal for safe inclusion in SQL. Backslashes are doubled (Spark's default
+    * parser processes backslash escape sequences like \n, \t, \\, \uXXXX) and single quotes are
+    * doubled (standard SQL quote escaping).
+    */
   private def escapeSqlLiteral(s: String): String =
     require(s != null, "SQL literal must not be null")
-    s.replace("'", "''")
+    s.replace("\\", "\\\\").replace("'", "''")
 
   private[sql] def catalogDf(f: ProtoCatalog.Builder => ProtoCatalog.Builder): DataFrame =
     val catBuilder = ProtoCatalog.newBuilder()
