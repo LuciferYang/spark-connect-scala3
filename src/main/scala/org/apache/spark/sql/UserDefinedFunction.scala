@@ -130,7 +130,11 @@ final class UserDefinedFunction private[sql] (
     case TimestampType  => AgnosticEncoders.STRICT_TIMESTAMP_ENCODER
     case d: DecimalType => AgnosticEncoders.ScalaDecimalEncoder(d)
     case NullType       => NullEncoder
-    case _              => StringEncoder // fallback
+    case other          =>
+      throw UnsupportedOperationException(
+        s"No AgnosticEncoder available for DataType: ${other.simpleString}. " +
+          "Supported types: Int, Long, Double, Float, Short, Byte, Boolean, String, Binary, Date, Timestamp, Decimal, Null."
+      )
 
 object UserDefinedFunction:
   /** Create a UserDefinedFunction. Used by inline udf() factory methods. */

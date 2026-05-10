@@ -78,10 +78,18 @@ final class StreamingQueryManager private[sql] (private val session: SparkSessio
     val plan = Plan.newBuilder().setCommand(command).build()
     val responses = session.client.execute(plan)
     var result: StreamingQueryManagerCommandResult = null
-    responses.foreach { resp =>
-      if resp.hasStreamingQueryManagerCommandResult then
-        result = resp.getStreamingQueryManagerCommandResult
-    }
+    try
+      responses.foreach { resp =>
+        if resp.hasStreamingQueryManagerCommandResult then
+          result = resp.getStreamingQueryManagerCommandResult
+      }
+    finally
+      (responses: Any) match
+        case c: AutoCloseable => c.close()
+        case _                => ()
     if result == null then
-      throw new RuntimeException("No StreamingQueryManagerCommandResult in response")
+      val cmdCase = cmdBuilder.build().getCommandCase
+      throw new RuntimeException(
+        s"No StreamingQueryManagerCommandResult in response (command=$cmdCase)"
+      )
     result

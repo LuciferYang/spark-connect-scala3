@@ -263,10 +263,6 @@ private[sql] object ClosureCleaner extends Logging {
       return None
     }
 
-    if (func == null) {
-      return None
-    }
-
     if (maybeIndylambdaProxy.isEmpty) {
       cleanNonIndyLambdaClosure(func, cleanTransitively, accessedFields)
     } else {

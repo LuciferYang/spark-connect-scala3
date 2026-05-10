@@ -105,5 +105,7 @@ final class StreamingQuery private[sql] (
         case c: AutoCloseable => c.close()
         case _                => ()
     if result == null then
-      throw new RuntimeException("No StreamingQueryCommandResult in response")
+      throw new RuntimeException(
+        s"No StreamingQueryCommandResult in response for query id=$id, runId=$runId"
+      )
     result
