@@ -604,10 +604,11 @@ final class DataFrame private[sql] (
 
   /** Randomly split this DataFrame into multiple DataFrames by weights. */
   def randomSplit(weights: Array[Double], seed: Long = 0L): Array[DataFrame] =
-    val normalizedWeights = {
-      val sum = weights.sum
-      weights.map(_ / sum)
-    }
+    require(weights.nonEmpty, "weights must not be empty")
+    require(weights.forall(_ >= 0), "weights must be non-negative")
+    val sum = weights.sum
+    require(sum > 0, "weights must have at least one positive value")
+    val normalizedWeights = weights.map(_ / sum)
     var lowerBound = 0.0
     normalizedWeights.map { w =>
       val upper = lowerBound + w

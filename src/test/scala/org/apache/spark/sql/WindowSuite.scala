@@ -8,14 +8,14 @@ class WindowSuite extends AnyFunSuite with Matchers:
 
   test("Window.partitionBy creates WindowSpec with partition expressions") {
     val ws = Window.partitionBy(Column("dept"))
-    ws.partitionExprs should have size 1
+    ws.partitionCols should have size 1
     ws.orderExprs shouldBe empty
     ws.frameSpec shouldBe None
   }
 
   test("Window.orderBy creates WindowSpec with order expressions") {
     val ws = Window.orderBy(Column("salary").desc)
-    ws.partitionExprs shouldBe empty
+    ws.partitionCols shouldBe empty
     ws.orderExprs should have size 1
     ws.frameSpec shouldBe None
   }
@@ -81,7 +81,7 @@ class WindowSuite extends AnyFunSuite with Matchers:
     // orderBy preserves both partition and frame from the existing WindowSpec
     ws.frameSpec shouldBe defined
     ws.orderExprs should have size 1
-    ws.partitionExprs should have size 1
+    ws.partitionCols should have size 1
 
     // Typical usage: partition -> order -> frame
     val ws2 = Window.partitionBy(Column("a"))
@@ -89,5 +89,5 @@ class WindowSuite extends AnyFunSuite with Matchers:
       .rowsBetween(Window.unboundedPreceding, Window.currentRow)
     ws2.frameSpec shouldBe defined
     ws2.orderExprs should have size 1
-    ws2.partitionExprs should have size 1
+    ws2.partitionCols should have size 1
   }

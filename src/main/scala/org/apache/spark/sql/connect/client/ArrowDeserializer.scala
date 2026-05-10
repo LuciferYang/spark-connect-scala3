@@ -196,15 +196,18 @@ object ArrowDeserializer:
             StructField(child.getName, arrowTypeToSparkType(child), child.isNullable)
           }.toSeq)
       case _: ArrowType.Map =>
-        val entriesField = field.getChildren.asScala.head
-        val children = entriesField.getChildren.asScala
-        if children.size == 2 then
-          MapType(
-            arrowTypeToSparkType(children(0)),
-            arrowTypeToSparkType(children(1)),
-            valueContainsNull = true
-          )
-        else MapType(NullType, NullType, valueContainsNull = true)
+        val mapChildren = field.getChildren.asScala
+        if mapChildren.isEmpty then MapType(NullType, NullType, valueContainsNull = true)
+        else
+          val entriesField = mapChildren.head
+          val children = entriesField.getChildren.asScala
+          if children.size == 2 then
+            MapType(
+              arrowTypeToSparkType(children(0)),
+              arrowTypeToSparkType(children(1)),
+              valueContainsNull = true
+            )
+          else MapType(NullType, NullType, valueContainsNull = true)
       case _: ArrowType.Duration    => DayTimeIntervalType
       case _: ArrowType.Interval    => YearMonthIntervalType
       case _: ArrowType.LargeUtf8   => StringType

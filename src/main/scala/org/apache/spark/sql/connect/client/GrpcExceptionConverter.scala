@@ -131,14 +131,22 @@ object GrpcExceptionConverter:
   private def errorsToException(
       resp: FetchErrorDetailsResponse,
       errorIdx: Int,
-      originalCause: StatusRuntimeException
+      originalCause: StatusRuntimeException,
+      visited: Set[Int] = Set.empty
   ): SparkException =
+    if errorIdx < 0 || errorIdx >= resp.getErrorsCount then
+      throw IllegalArgumentException(
+        s"Invalid error index $errorIdx (errors count: ${resp.getErrorsCount})"
+      )
     val error = resp.getErrors(errorIdx)
     val message = error.getMessage
 
-    // Recursive cause
+    // Recursive cause with circular reference detection
     val cause: Throwable =
-      if error.hasCauseIdx then errorsToException(resp, error.getCauseIdx, originalCause)
+      if error.hasCauseIdx then
+        val causeIdx = error.getCauseIdx
+        if visited.contains(causeIdx) then originalCause // break cycle
+        else errorsToException(resp, causeIdx, originalCause, visited + errorIdx)
       else originalCause
 
     // SparkThrowable fields

@@ -435,10 +435,11 @@ class Column private[sql] (
   def over(window: WindowSpec): Column =
     val windowBuilder = Expression.Window.newBuilder()
       .setWindowFunction(expr)
-    window.partitionExprs.foreach(windowBuilder.addPartitionSpec)
+    window.partitionCols.foreach(c => windowBuilder.addPartitionSpec(c.expr))
     window.orderExprs.foreach(c => windowBuilder.addOrderSpec(c.toSortOrder))
     window.frameSpec.foreach(windowBuilder.setFrameSpec)
-    val windowRels = window.orderExprs.flatMap(_.subqueryRelations)
+    val windowRels = window.partitionCols.flatMap(_.subqueryRelations) ++
+      window.orderExprs.flatMap(_.subqueryRelations)
     Column(
       Expression.newBuilder().setWindow(windowBuilder.build()).build(),
       this.subqueryRelations ++ windowRels
@@ -525,19 +526,19 @@ object Column:
 
 /** WindowSpec with partition, order, and frame specifications. */
 final class WindowSpec private[sql] (
-    private[sql] val partitionExprs: Seq[Expression],
+    private[sql] val partitionCols: Seq[Column],
     private[sql] val orderExprs: Seq[Column],
     private[sql] val frameSpec: Option[Expression.Window.WindowFrame] = None
 ):
   def partitionBy(cols: Column*): WindowSpec =
-    WindowSpec(cols.map(_.expr), orderExprs, frameSpec)
+    WindowSpec(cols.toSeq, orderExprs, frameSpec)
 
   def orderBy(cols: Column*): WindowSpec =
-    WindowSpec(partitionExprs, cols.toSeq, frameSpec)
+    WindowSpec(partitionCols, cols.toSeq, frameSpec)
 
   def rowsBetween(start: Long, end: Long): WindowSpec =
     WindowSpec(
-      partitionExprs,
+      partitionCols,
       orderExprs,
       Some(
         Expression.Window.WindowFrame.newBuilder()
@@ -550,7 +551,7 @@ final class WindowSpec private[sql] (
 
   def rangeBetween(start: Long, end: Long): WindowSpec =
     WindowSpec(
-      partitionExprs,
+      partitionCols,
       orderExprs,
       Some(
         Expression.Window.WindowFrame.newBuilder()
@@ -572,7 +573,7 @@ object Window:
   val currentRow: Long = 0L
 
   def partitionBy(cols: Column*): WindowSpec =
-    WindowSpec(cols.map(_.expr), Seq.empty)
+    WindowSpec(cols.toSeq, Seq.empty)
 
   def orderBy(cols: Column*): WindowSpec =
     WindowSpec(Seq.empty, cols.toSeq)
@@ -594,6 +595,6 @@ object Window:
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setCurrentRow(true).build()
     else
-      val litExpr = Column.lit(value.toInt).expr
+      val litExpr = Column.lit(value).expr
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setValue(litExpr).build()

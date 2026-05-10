@@ -9,7 +9,8 @@ import org.apache.spark.connect.proto.{
   Relation,
   RelationCommon,
   ScalarScalaUDF,
-  SubqueryExpression
+  SubqueryExpression,
+  WithRelations
 }
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.ProductEncoder
@@ -354,13 +355,31 @@ final class Dataset[T: ClassTag] private[sql] (
           .build()
       )
 
-    val newRelation = Relation.newBuilder()
-      .setCommon(RelationCommon.newBuilder().setPlanId(df.session.nextPlanId()).build())
-      .setJoin(joinBuilder.build())
-      .build()
-
     val tupleEnc = Encoders.tuple(encoder, other.encoder)
-    Dataset(DataFrame(df.session, newRelation), tupleEnc)
+    val subqueryRels = condition.subqueryRelations
+    if subqueryRels.isEmpty then
+      val newRelation = Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(df.session.nextPlanId()).build())
+        .setJoin(joinBuilder.build())
+        .build()
+      Dataset(DataFrame(df.session, newRelation), tupleEnc)
+    else
+      val innerRel = Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(df.session.nextPlanId()).build())
+        .setJoin(joinBuilder.build())
+        .build()
+      import scala.jdk.CollectionConverters.*
+      val uniqueRefs = subqueryRels.distinctBy(_.getCommon.getPlanId)
+      val wrRel = Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(df.session.nextPlanId()).build())
+        .setWithRelations(
+          WithRelations.newBuilder()
+            .setRoot(innerRel)
+            .addAllReferences(uniqueRefs.asJava)
+            .build()
+        )
+        .build()
+      Dataset(DataFrame(df.session, wrRel), tupleEnc)
 
   def observe(name: String, expr: Column, exprs: Column*): Dataset[T] =
     Dataset(df.observe(name, expr, exprs*), encoder)

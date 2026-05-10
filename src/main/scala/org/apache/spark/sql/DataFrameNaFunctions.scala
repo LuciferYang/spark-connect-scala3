@@ -112,4 +112,7 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
     case v: Float   => Expression.Literal.newBuilder().setFloat(v).build()
     case v: Double  => Expression.Literal.newBuilder().setDouble(v).build()
     case v: String  => Expression.Literal.newBuilder().setString(v).build()
-    case v          => Expression.Literal.newBuilder().setString(v.toString).build()
+    case v          => throw IllegalArgumentException(
+        s"Unsupported fill value type: ${v.getClass.getName}. " +
+          "Supported types: Boolean, Int, Long, Float, Double, String."
+      )

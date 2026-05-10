@@ -631,15 +631,30 @@ final class CollectionEncoderProxy(
     encoderName match
       case "OptionEncoder" =>
         val clazz = Class.forName(s"${encPkg}OptionEncoder", true, cl)
-        val ctor = clazz.getConstructors.find(_.getParameterCount == 1).get
+        val ctor = clazz.getConstructors.find(_.getParameterCount == 1).getOrElse(
+          throw ClassNotFoundException(
+            s"OptionEncoder constructor with 1 parameter not found. " +
+              s"Available: ${clazz.getConstructors.map(_.getParameterCount).mkString(", ")}"
+          )
+        )
         ctor.newInstance(element)
       case "ArrayEncoder" =>
         val clazz = Class.forName(s"${encPkg}ArrayEncoder", true, cl)
-        val ctor = clazz.getConstructors.find(_.getParameterCount == 2).get
+        val ctor = clazz.getConstructors.find(_.getParameterCount == 2).getOrElse(
+          throw ClassNotFoundException(
+            s"ArrayEncoder constructor with 2 parameters not found. " +
+              s"Available: ${clazz.getConstructors.map(_.getParameterCount).mkString(", ")}"
+          )
+        )
         ctor.newInstance(element, java.lang.Boolean.valueOf(containsNull.getOrElse(false)))
       case "IterableEncoder" =>
         val clazz = Class.forName(s"${encPkg}IterableEncoder", true, cl)
-        val ctor = clazz.getConstructors.find(_.getParameterCount == 4).get
+        val ctor = clazz.getConstructors.find(_.getParameterCount == 4).getOrElse(
+          throw ClassNotFoundException(
+            s"IterableEncoder constructor with 4 parameters not found. " +
+              s"Available: ${clazz.getConstructors.map(_.getParameterCount).mkString(", ")}"
+          )
+        )
         val runtimeClass = Class.forName(className.get, true, cl)
         val clsTagModule = Class.forName("scala.reflect.ClassTag$", true, cl)
         val ctModule = clsTagModule.getField("MODULE$").get(null)
