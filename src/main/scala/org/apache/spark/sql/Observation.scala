@@ -26,9 +26,6 @@ final class Observation(val name: String):
 
   def this() = this(UUID.randomUUID().toString)
 
-  /** Maximum time to wait for observation metrics (10 minutes). */
-  private val ObservationTimeout: Duration = Duration(10, "minutes")
-
   private val registered = AtomicBoolean(false)
   private val promise = Promise[Row]()
 
@@ -40,13 +37,14 @@ final class Observation(val name: String):
     * Blocks until the first action on the observed dataset completes.
     */
   @throws[InterruptedException]
+  @throws[TimeoutException]
   def get: Map[String, Any] =
     val row =
-      try Await.result(future, ObservationTimeout)
+      try Await.result(future, Observation.ObservationTimeout)
       catch
         case _: TimeoutException =>
           throw TimeoutException(
-            s"Observation '$name' timed out after $ObservationTimeout waiting for metrics"
+            s"Observation '$name' timed out after ${Observation.ObservationTimeout} waiting for metrics"
           )
     if row == null then Map.empty
     else
@@ -59,6 +57,7 @@ final class Observation(val name: String):
     * Java-friendly variant of `get`. Blocks until the first action completes.
     */
   @throws[InterruptedException]
+  @throws[TimeoutException]
   def getAsJava: java.util.Map[String, Any] =
     import scala.jdk.CollectionConverters.*
     get.asJava
@@ -78,5 +77,8 @@ final class Observation(val name: String):
   @volatile private[sql] var planId: Long = -1L
 
 object Observation:
+  /** Maximum time to wait for observation metrics (10 minutes). */
+  private val ObservationTimeout: Duration = Duration(10, "minutes")
+
   def apply(): Observation = Observation(UUID.randomUUID().toString)
   def apply(name: String): Observation = new Observation(name)

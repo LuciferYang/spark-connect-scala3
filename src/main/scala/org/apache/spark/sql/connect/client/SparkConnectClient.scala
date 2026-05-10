@@ -476,18 +476,48 @@ object SparkConnectClient:
   /** User-Agent string sent with all gRPC requests. */
   private val UserAgentString: String = "spark-connect-scala3/0.3.0"
 
-  /** Parse a `sc://host:port` URL into (host, port, params). Params preserve insertion order. */
-  private def parseUrl(url: String): (String, Int, Seq[(String, String)]) =
+  /** Parse a `sc://host:port` URL into (host, port, params). Params preserve insertion order.
+    * Note: IPv6 literal addresses (e.g., `[::1]`) are not supported.
+    */
+  private[client] def parseUrl(url: String): (String, Int, Seq[(String, String)]) =
+    if !url.startsWith("sc://") then
+      throw new IllegalArgumentException(
+        "Invalid Spark Connect URL: must start with 'sc://'. Expected format: sc://host[:port][;key=value...]"
+      )
     // sc://host:port;key=value;key=value
     val stripped = url.stripPrefix("sc://")
     val parts = stripped.split(";").toSeq
-    val hostPort = parts.head.split(":")
-    if hostPort.isEmpty || hostPort(0).isBlank then
-      throw new IllegalArgumentException(
-        s"Invalid Spark Connect URL '$url': host must not be empty. Expected format: sc://host[:port][;key=value...]"
-      )
-    val host = hostPort(0)
-    val port = if hostPort.length > 1 then hostPort(1).toInt else 15002
+    val hostPortStr = parts.head
+    // Split host and port — only split on the LAST colon to be forward-compatible
+    val (host, port) = hostPortStr.lastIndexOf(':') match
+      case -1 =>
+        val h = hostPortStr.trim
+        if h.isEmpty then
+          throw new IllegalArgumentException(
+            "Invalid Spark Connect URL: host must not be empty. Expected format: sc://host[:port][;key=value...]"
+          )
+        (h, 15002)
+      case idx =>
+        val h = hostPortStr.substring(0, idx).trim
+        val portStr = hostPortStr.substring(idx + 1).trim
+        if h.isEmpty then
+          throw new IllegalArgumentException(
+            "Invalid Spark Connect URL: host must not be empty. Expected format: sc://host[:port][;key=value...]"
+          )
+        if portStr.isEmpty then (h, 15002)
+        else
+          val p =
+            try portStr.toInt
+            catch
+              case _: NumberFormatException =>
+                throw new IllegalArgumentException(
+                  s"Invalid Spark Connect URL: port must be a valid integer, got '$portStr'"
+                )
+          if p < 1 || p > 65535 then
+            throw new IllegalArgumentException(
+              s"Invalid Spark Connect URL: port must be between 1 and 65535, got $p"
+            )
+          (h, p)
     val params = parts.tail.flatMap { p =>
       p.split("=", 2) match
         case Array(k, v) => Some(k -> v)

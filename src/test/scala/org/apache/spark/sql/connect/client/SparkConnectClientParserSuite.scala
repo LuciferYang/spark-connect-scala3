@@ -195,3 +195,70 @@ class SparkConnectClientParserSuite extends AnyFunSuite:
     val url = buildUrl(Config(host = "h", port = 1234, token = Some("tok"), useSsl = true))
     assert(url.contains("token=tok"))
   }
+
+  // --- SparkConnectClient.parseUrl validation tests ---
+
+  test("parseUrl rejects URL without sc:// scheme") {
+    assertThrows[IllegalArgumentException] {
+      SparkConnectClient.parseUrl("http://localhost:15002")
+    }
+  }
+
+  test("parseUrl rejects empty host") {
+    assertThrows[IllegalArgumentException] {
+      SparkConnectClient.parseUrl("sc://:15002")
+    }
+  }
+
+  test("parseUrl rejects non-numeric port") {
+    assertThrows[IllegalArgumentException] {
+      SparkConnectClient.parseUrl("sc://localhost:abc")
+    }
+  }
+
+  test("parseUrl rejects port out of range") {
+    assertThrows[IllegalArgumentException] {
+      SparkConnectClient.parseUrl("sc://localhost:99999")
+    }
+    assertThrows[IllegalArgumentException] {
+      SparkConnectClient.parseUrl("sc://localhost:0")
+    }
+  }
+
+  test("parseUrl accepts valid URL") {
+    val (host, port, params) = SparkConnectClient.parseUrl("sc://myhost:9999;use_ssl=true")
+    assert(host == "myhost")
+    assert(port == 9999)
+    assert(params == Seq("use_ssl" -> "true"))
+  }
+
+  test("parseUrl trims host whitespace") {
+    val (host, port, _) = SparkConnectClient.parseUrl("sc:// myhost :15002")
+    assert(host == "myhost")
+    assert(port == 15002)
+  }
+
+  test("parseUrl uses default port when not specified") {
+    val (host, port, _) = SparkConnectClient.parseUrl("sc://myhost")
+    assert(host == "myhost")
+    assert(port == 15002)
+  }
+
+  test("parseUrl error messages do not contain token values") {
+    val ex = intercept[IllegalArgumentException] {
+      SparkConnectClient.parseUrl("http://host:15002;token=secret123")
+    }
+    assert(!ex.getMessage.contains("secret123"))
+  }
+
+  test("parseUrl rejects empty URL after scheme") {
+    assertThrows[IllegalArgumentException] {
+      SparkConnectClient.parseUrl("sc://")
+    }
+  }
+
+  test("parseUrl trims port whitespace") {
+    val (host, port, _) = SparkConnectClient.parseUrl("sc://myhost: 9999 ")
+    assert(host == "myhost")
+    assert(port == 9999)
+  }

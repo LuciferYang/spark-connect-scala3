@@ -162,6 +162,8 @@ object Row:
         case '\n'         => sb.append("\\n")
         case '\r'         => sb.append("\\r")
         case '\t'         => sb.append("\\t")
+        case '\u2028'     => sb.append("\\u2028")
+        case '\u2029'     => sb.append("\\u2029")
         case c if c < ' ' =>
           sb.append("\\u")
           sb.append(f"${c.toInt}%04x")

@@ -58,18 +58,21 @@ class ResponseValidator:
         )
       case _ => // matches — ok
 
-  /** Cache of field descriptors keyed by message Descriptor to avoid repeated reflection. */
+  /** Cache of field descriptors keyed by message Descriptor to avoid repeated reflection. Uses
+    * Optional to handle the case where findFieldByName returns null (field absent), since
+    * ConcurrentHashMap does not permit null values.
+    */
   private val fieldDescriptorCache =
-    ConcurrentHashMap[Descriptors.Descriptor, Descriptors.FieldDescriptor]()
+    ConcurrentHashMap[Descriptors.Descriptor, java.util.Optional[Descriptors.FieldDescriptor]]()
 
   private def extractServerSideSessionId(msg: GeneratedMessage): Option[String] =
     val descriptor = msg.getDescriptorForType
-    val fd = fieldDescriptorCache.computeIfAbsent(
+    val fdOpt = fieldDescriptorCache.computeIfAbsent(
       descriptor,
-      d => d.findFieldByName("server_side_session_id")
+      d => java.util.Optional.ofNullable(d.findFieldByName("server_side_session_id"))
     )
-    if fd != null then
-      val value = msg.getField(fd)
+    if fdOpt.isPresent then
+      val value = msg.getField(fdOpt.get)
       value match
         case s: String if s.nonEmpty => Some(s)
         case _                       => None
