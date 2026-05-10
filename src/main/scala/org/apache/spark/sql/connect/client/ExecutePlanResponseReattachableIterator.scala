@@ -115,7 +115,7 @@ class ExecutePlanResponseReattachableIterator private[client] (
     catch
       case e: StatusRuntimeException if isRetryableExecuteStatus(e) =>
         iter = rawExecutePlan(request)
-        throw GrpcRetryHandler.RetryException()
+        throw GrpcRetryHandler.RetryException(e)
 
   private def isRetryableExecuteStatus(e: StatusRuntimeException): Boolean =
     val desc = Option(e.getStatus.getDescription).getOrElse("")

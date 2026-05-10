@@ -22,7 +22,8 @@ class GrpcRetryHandler(
     while attempt <= policy.maxRetries do
       try return fn
       catch
-        case _: GrpcRetryHandler.RetryException if attempt < policy.maxRetries =>
+        case re: GrpcRetryHandler.RetryException if attempt < policy.maxRetries =>
+          if re.getCause != null then lastException = re.getCause
           attempt += 1 // immediate retry, no backoff
         case e: Throwable if policy.canRetry(e) && attempt < policy.maxRetries =>
           lastException = e
@@ -42,4 +43,4 @@ class GrpcRetryHandler(
 
 object GrpcRetryHandler:
   /** Always-retryable exception that triggers immediate retry without backoff. */
-  class RetryException extends Throwable
+  class RetryException(cause: Throwable = null) extends Throwable(cause)
