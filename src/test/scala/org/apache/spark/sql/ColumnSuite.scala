@@ -774,6 +774,40 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     sq.getInSubqueryValuesCount shouldBe 2
   }
 
+  test("isin(null: Dataset) treats null as single-value IN list") {
+    val c = Column("id").isin(null: Dataset[?])
+    // Falls back to value-list variant with a single null literal
+    c.expr.hasUnresolvedFunction shouldBe true
+    c.expr.getUnresolvedFunction.getFunctionName shouldBe "in"
+  }
+
+  test("isin(null: DataFrame) treats null as single-value IN list") {
+    val c = Column("id").isin(null: DataFrame)
+    c.expr.hasUnresolvedFunction shouldBe true
+    c.expr.getUnresolvedFunction.getFunctionName shouldBe "in"
+  }
+
+  test("when(cond, null) and otherwise(null) build Null literals") {
+    val c = functions.when(Column("x") > 0, null).otherwise(null)
+    c.expr.hasUnresolvedFunction shouldBe true
+    val uf = c.expr.getUnresolvedFunction
+    uf.getFunctionName shouldBe "when"
+    uf.getArgumentsCount shouldBe 3 // cond, nullVal, nullOtherwise
+    uf.getArguments(1).getLiteral.hasNull shouldBe true
+    uf.getArguments(2).getLiteral.hasNull shouldBe true
+  }
+
+  test("rangeBetween with fine-grained boundary values") {
+    val ws = Window.partitionBy(Column("dept")).orderBy(Column("salary"))
+    // (Long.MinValue+1, Long.MaxValue-1) should be finite VALUE boundaries, not UNBOUNDED
+    val spec = ws.rangeBetween(Long.MinValue + 1, Long.MaxValue - 1)
+    val frame = spec.frameSpec.get
+    frame.getLower.hasUnbounded shouldBe false
+    frame.getUpper.hasUnbounded shouldBe false
+    frame.getLower.getValue.getLiteral.getLong shouldBe (Long.MinValue + 1)
+    frame.getUpper.getValue.getLiteral.getLong shouldBe (Long.MaxValue - 1)
+  }
+
   // ---------- Coverage boost: dropFields single field ----------
 
   test("dropFields with single field creates UpdateFields without nesting") {

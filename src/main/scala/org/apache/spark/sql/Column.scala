@@ -177,10 +177,15 @@ class Column private[sql] (
   def isInCollection(values: Iterable[?]): Column = isin(values.toSeq*)
 
   /** IN subquery: `col IN (SELECT ... FROM ...)`. */
-  def isin(ds: Dataset[?]): Column = buildInSubquery(ds.df.relation)
+  def isin(ds: Dataset[?]): Column =
+    // Match upstream: a null Dataset is treated as a single-value IN list (`isin(null)`).
+    if ds == null then isin(null: Any)
+    else buildInSubquery(ds.df.relation)
 
   /** IN subquery (DataFrame variant). */
-  def isin(df: DataFrame): Column = buildInSubquery(df.relation)
+  def isin(df: DataFrame): Column =
+    if df == null then isin(null: Any)
+    else buildInSubquery(df.relation)
 
   private def buildInSubquery(rel: Relation): Column =
     val planId = rel.getCommon.getPlanId

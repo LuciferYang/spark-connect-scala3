@@ -1097,8 +1097,10 @@ final class DataFrame private[sql] (
                 if isGeometry then types.Geometry.fromWKB(b, s)
                 else types.Geography.fromWKB(b, s)
               case inner =>
+                val f = schema.fields(idx)
                 throw IllegalStateException(
-                  s"Unexpected inner type in spatial envelope at column $idx: " +
+                  s"Unexpected inner type in spatial envelope at column $idx " +
+                    s"(name='${f.name}', type=${f.dataType}): " +
                     s"${if inner == null then "null" else inner.getClass.getName}"
                 )
           case bytes: Array[Byte] =>
@@ -1119,8 +1121,10 @@ final class DataFrame private[sql] (
               case (v: Array[Byte], m: Array[Byte]) =>
                 VariantVal(v, m)
               case pair =>
+                val f = schema.fields(idx)
                 throw IllegalStateException(
-                  s"Unexpected inner types in variant envelope at column $idx: " +
+                  s"Unexpected inner types in variant envelope at column $idx " +
+                    s"(name='${f.name}', type=${f.dataType}): " +
                     s"(${pair._1}, ${pair._2})"
                 )
           case bytes: Array[Byte] =>

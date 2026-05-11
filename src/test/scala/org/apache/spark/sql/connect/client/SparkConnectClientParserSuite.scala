@@ -262,3 +262,34 @@ class SparkConnectClientParserSuite extends AnyFunSuite:
     assert(host == "myhost")
     assert(port == 9999)
   }
+
+  test("parseUrl reports context on malformed percent-encoding") {
+    val ex = intercept[IllegalArgumentException] {
+      SparkConnectClient.parseUrl("sc://h:15002;k=%ZZ")
+    }
+    assert(ex.getMessage.contains("%ZZ") || ex.getMessage.contains("k=%ZZ"))
+    // Cause should be preserved for debugging
+    assert(ex.getCause.isInstanceOf[IllegalArgumentException])
+  }
+
+  test("parseUrl round-trips values with special characters from buildUrl") {
+    val original = Map(
+      "k1" -> "has;semicolon",
+      "k2" -> "has=equals",
+      "k3" -> "has space",
+      "k4" -> "unicode-中文-here",
+      "k5" -> "has%percent",
+      "k6" -> "has+plus"
+    )
+    val config = SparkConnectClientParser.Config(
+      host = "myhost",
+      port = 15002,
+      options = original
+    )
+    val url = SparkConnectClientParser.buildUrl(config)
+    val (_, _, params) = SparkConnectClient.parseUrl(url)
+    val decoded = params.toMap
+    original.foreach { case (k, v) =>
+      assert(decoded(k) == v, s"round-trip failed for $k=$v → ${decoded.get(k)}")
+    }
+  }
