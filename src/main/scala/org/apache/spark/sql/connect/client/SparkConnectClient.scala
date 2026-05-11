@@ -5,6 +5,7 @@ import io.grpc.stub.MetadataUtils
 import org.apache.spark.connect.proto.*
 
 import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -471,8 +472,20 @@ object SparkConnectClient:
           (h, p)
     val params = parts.tail.flatMap { p =>
       p.split("=", 2) match
-        case Array(k, v) => Some(URLDecoder.decode(k, "UTF-8") -> URLDecoder.decode(v, "UTF-8"))
-        case _           => None
+        case Array(k, v) =>
+          try
+            Some(
+              URLDecoder.decode(k, StandardCharsets.UTF_8) ->
+                URLDecoder.decode(v, StandardCharsets.UTF_8)
+            )
+          catch
+            case e: IllegalArgumentException =>
+              throw IllegalArgumentException(
+                s"Invalid URL-encoded value in Spark Connect URL parameter '$p': " +
+                  s"${e.getMessage}",
+                e
+              )
+        case _ => None
     }
     (host, port, params)
 

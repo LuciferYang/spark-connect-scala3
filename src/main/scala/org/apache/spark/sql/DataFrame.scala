@@ -1096,7 +1096,11 @@ final class DataFrame private[sql] (
               case b: Array[Byte @unchecked] =>
                 if isGeometry then types.Geometry.fromWKB(b, s)
                 else types.Geography.fromWKB(b, s)
-              case _ => r // unexpected inner type, pass through
+              case other =>
+                throw IllegalStateException(
+                  s"Unexpected inner type in spatial envelope at column $idx: " +
+                    s"${if other == null then "null" else other.getClass.getName}"
+                )
           case bytes: Array[Byte @unchecked] =>
             val defaultSrid = schema.fields(idx).dataType match
               case g: GeometryType  => g.srid
@@ -1114,7 +1118,11 @@ final class DataFrame private[sql] (
             (r.get(0), r.get(1)) match
               case (v: Array[Byte @unchecked], m: Array[Byte @unchecked]) =>
                 VariantVal(v, m)
-              case _ => r // unexpected inner types, pass through
+              case other =>
+                throw IllegalStateException(
+                  s"Unexpected inner types in variant envelope at column $idx: " +
+                    s"(${other._1}, ${other._2})"
+                )
           case bytes: Array[Byte @unchecked] =>
             VariantVal(bytes, Array.empty[Byte])
           case other => other

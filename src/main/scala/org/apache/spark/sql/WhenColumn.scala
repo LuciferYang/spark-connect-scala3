@@ -4,21 +4,27 @@ import org.apache.spark.connect.proto.{Expression, Relation}
 
 /** A Column subtype representing a CASE WHEN chain.
   *
-  * Instances are produced only by `functions.when(cond, value)` and subsequent chained
-  * `.when(...)` / `.otherwise(...)` calls on a `WhenColumn`. The dedicated type (rather than
-  * string matching the function name) prevents invalid chains such as
-  * `col.alias("x").when(...)` or `callFn("when", ...).when(...)` from being silently accepted.
+  * Instances are produced only by `functions.when(cond, value)` and subsequent chained `.when(...)`
+  * / `.otherwise(...)` calls on a `WhenColumn`. The dedicated type (rather than string matching the
+  * function name) prevents invalid chains such as `col.alias("x").when(...)` or a
+  * `callFn("when", ...)`-constructed Column from being silently accepted.
   *
   * The underlying proto is still an `UnresolvedFunction("when", args)` where args are
   * `(cond1, val1, cond2, val2, ..., [otherwise])`.
+  *
+  * '''Design invariant''': Any `Column` operation that returns a plain `Column` (e.g. `alias`,
+  * `cast`, `as`, comparison operators) MUST lose the `WhenColumn` type. The `final` modifier and
+  * the fact that `Column.withExpr` / `Column.as` construct `Column(...)` directly keep this
+  * invariant. Adding `WhenColumn`-returning overrides for `alias`/`cast`/`withExpr` would silently
+  * re-enable the exact edge cases this class was introduced to reject.
   */
-private[sql] final class WhenColumn private[sql] (
+final private[sql] class WhenColumn private[sql] (
     private val branches: Seq[(Expression, Expression)],
     private val otherwiseExpr: Option[Expression],
-    subqueryRelationsIn: Seq[Relation]
+    inheritedSubqueryRelations: Seq[Relation]
 ) extends Column(
       WhenColumn.buildExpr(branches, otherwiseExpr),
-      subqueryRelationsIn
+      inheritedSubqueryRelations
     ):
 
   override def when(condition: Column, value: Any): Column =
@@ -56,6 +62,7 @@ private[sql] object WhenColumn:
     )
 
   private def asColumn(value: Any): Column = value match
+    case null      => Column.lit(null)
     case c: Column => c
     case other     => Column.lit(other)
 

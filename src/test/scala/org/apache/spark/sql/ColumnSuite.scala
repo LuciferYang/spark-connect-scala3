@@ -157,6 +157,13 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     }
   }
 
+  test("when() after cast() on a when chain throws") {
+    val chain = functions.when(Column("x") > 0, "pos").cast("string")
+    assertThrows[IllegalArgumentException] {
+      chain.when(Column("x") === 0, "zero")
+    }
+  }
+
   test("otherwise() after alias() on a when chain throws") {
     val chain = functions.when(Column("x") > 0, "pos").alias("x")
     assertThrows[IllegalArgumentException] {

@@ -547,10 +547,7 @@ object Window:
     WindowSpec(Seq.empty, Seq.empty).rangeBetween(start, end)
 
   private[sql] def toBoundary(value: Long): Expression.Window.WindowFrame.FrameBoundary =
-    if value == Long.MinValue then
-      Expression.Window.WindowFrame.FrameBoundary.newBuilder()
-        .setUnbounded(true).build()
-    else if value == Long.MaxValue then
+    if value == Long.MinValue || value == Long.MaxValue then
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setUnbounded(true).build()
     else if value == 0L then
@@ -559,7 +556,9 @@ object Window:
     else
       require(
         value >= Int.MinValue && value <= Int.MaxValue,
-        s"Window frame boundary value $value exceeds Int range"
+        s"Window frame boundary value $value is outside the supported Int range " +
+          s"[${Int.MinValue}, ${Int.MaxValue}]. Use Window.unboundedPreceding / " +
+          s"Window.unboundedFollowing for unbounded frames."
       )
       val litExpr = Column.lit(value.toInt).expr
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
