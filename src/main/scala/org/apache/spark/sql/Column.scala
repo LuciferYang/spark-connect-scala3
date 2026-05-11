@@ -519,8 +519,8 @@ final class WindowSpec private[sql] (
       Some(
         Expression.Window.WindowFrame.newBuilder()
           .setFrameType(Expression.Window.WindowFrame.FrameType.FRAME_TYPE_ROW)
-          .setLower(Window.toRowBoundary(start))
-          .setUpper(Window.toRowBoundary(end))
+          .setLower(Window.toRowBoundary(start, isStart = true))
+          .setUpper(Window.toRowBoundary(end, isStart = false))
           .build()
       )
     )
@@ -532,8 +532,8 @@ final class WindowSpec private[sql] (
       Some(
         Expression.Window.WindowFrame.newBuilder()
           .setFrameType(Expression.Window.WindowFrame.FrameType.FRAME_TYPE_RANGE)
-          .setLower(Window.toRangeBoundary(start))
-          .setUpper(Window.toRangeBoundary(end))
+          .setLower(Window.toRangeBoundary(start, isStart = true))
+          .setUpper(Window.toRangeBoundary(end, isStart = false))
           .build()
       )
     )
@@ -564,9 +564,21 @@ object Window:
     *
     * Row offsets are row indices and must fit in Int (matches upstream Spark's
     * `WindowSpec.rowsBetween`, which requires values in `[Int.MinValue, Int.MaxValue]`).
+    *
+    * Matches upstream semantics exactly:
+    *   - `start == Long.MinValue` → unbounded preceding (only for start, not end)
+    *   - `end == Long.MaxValue` → unbounded following (only for end, not start)
+    *   - `value == 0` → current row
+    *   - else: Int-range literal
     */
-  private[sql] def toRowBoundary(value: Long): Expression.Window.WindowFrame.FrameBoundary =
-    if value == Long.MinValue || value == Long.MaxValue then
+  private[sql] def toRowBoundary(
+      value: Long,
+      isStart: Boolean
+  ): Expression.Window.WindowFrame.FrameBoundary =
+    if isStart && value == Long.MinValue then
+      Expression.Window.WindowFrame.FrameBoundary.newBuilder()
+        .setUnbounded(true).build()
+    else if !isStart && value == Long.MaxValue then
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setUnbounded(true).build()
     else if value == 0L then
@@ -587,9 +599,21 @@ object Window:
     *
     * Range offsets are value-space comparisons against the ORDER BY column and accept the full Long
     * range (matches upstream `WindowSpec.rangeBetween`).
+    *
+    * Matches upstream semantics exactly:
+    *   - `start == Long.MinValue` → unbounded preceding (only for start)
+    *   - `end == Long.MaxValue` → unbounded following (only for end)
+    *   - `value == 0` → current row
+    *   - else: Long literal (no range check)
     */
-  private[sql] def toRangeBoundary(value: Long): Expression.Window.WindowFrame.FrameBoundary =
-    if value == Long.MinValue || value == Long.MaxValue then
+  private[sql] def toRangeBoundary(
+      value: Long,
+      isStart: Boolean
+  ): Expression.Window.WindowFrame.FrameBoundary =
+    if isStart && value == Long.MinValue then
+      Expression.Window.WindowFrame.FrameBoundary.newBuilder()
+        .setUnbounded(true).build()
+    else if !isStart && value == Long.MaxValue then
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setUnbounded(true).build()
     else if value == 0L then

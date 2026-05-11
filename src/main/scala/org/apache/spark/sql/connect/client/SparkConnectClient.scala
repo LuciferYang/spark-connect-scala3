@@ -474,10 +474,12 @@ object SparkConnectClient:
       p.split("=", 2) match
         case Array(k, v) =>
           try
-            Some(
-              URLDecoder.decode(k, StandardCharsets.UTF_8) ->
-                URLDecoder.decode(v, StandardCharsets.UTF_8)
+            val decodedKey = URLDecoder.decode(k, StandardCharsets.UTF_8)
+            require(
+              decodedKey.nonEmpty,
+              s"Invalid Spark Connect URL parameter '$p': key must be non-empty"
             )
+            Some(decodedKey -> URLDecoder.decode(v, StandardCharsets.UTF_8))
           catch
             case e: IllegalArgumentException =>
               throw IllegalArgumentException(
@@ -485,7 +487,10 @@ object SparkConnectClient:
                   s"${e.getMessage}",
                 e
               )
-        case _ => None
+        case _ =>
+          throw IllegalArgumentException(
+            s"Invalid Spark Connect URL parameter '$p': expected 'key=value' format"
+          )
     }
     (host, port, params)
 

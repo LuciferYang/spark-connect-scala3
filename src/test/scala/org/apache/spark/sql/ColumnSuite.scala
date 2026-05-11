@@ -808,6 +808,30 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     frame.getUpper.getValue.getLiteral.getLong shouldBe (Long.MaxValue - 1)
   }
 
+  test("rangeBetween asymmetric sentinel: only start==MinValue and end==MaxValue are unbounded") {
+    val ws = Window.partitionBy(Column("dept")).orderBy(Column("salary"))
+
+    // start==Long.MinValue → unbounded preceding
+    val s1 = ws.rangeBetween(Long.MinValue, 5L).frameSpec.get
+    s1.getLower.hasUnbounded shouldBe true
+
+    // end==Long.MaxValue → unbounded following
+    val s2 = ws.rangeBetween(-5L, Long.MaxValue).frameSpec.get
+    s2.getUpper.hasUnbounded shouldBe true
+
+    // start==Long.MaxValue → literal (NOT unbounded, matches upstream)
+    val s3 = ws.rangeBetween(Long.MaxValue, Long.MaxValue).frameSpec.get
+    s3.getLower.hasUnbounded shouldBe false
+    s3.getLower.getValue.getLiteral.getLong shouldBe Long.MaxValue
+    s3.getUpper.hasUnbounded shouldBe true // end Max IS unbounded
+
+    // end==Long.MinValue → literal (NOT unbounded)
+    val s4 = ws.rangeBetween(Long.MinValue, Long.MinValue).frameSpec.get
+    s4.getLower.hasUnbounded shouldBe true // start Min IS unbounded
+    s4.getUpper.hasUnbounded shouldBe false
+    s4.getUpper.getValue.getLiteral.getLong shouldBe Long.MinValue
+  }
+
   // ---------- Coverage boost: dropFields single field ----------
 
   test("dropFields with single field creates UpdateFields without nesting") {

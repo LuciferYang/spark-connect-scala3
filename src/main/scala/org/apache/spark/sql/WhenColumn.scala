@@ -19,13 +19,15 @@ import org.apache.spark.connect.proto.{Expression, Relation}
   * re-enable the exact edge cases this class was introduced to reject.
   */
 final private[sql] class WhenColumn private[sql] (
-    private val branches: Seq[(Expression, Expression)],
+    private val branches: Vector[(Expression, Expression)],
     private val otherwiseExpr: Option[Expression],
     inheritedSubqueryRelations: Seq[Relation]
 ) extends Column(
       WhenColumn.buildExpr(branches, otherwiseExpr),
       inheritedSubqueryRelations
     ):
+
+  require(branches.nonEmpty, "WhenColumn must have at least one branch")
 
   override def when(condition: Column, value: Any): Column =
     if otherwiseExpr.isDefined then
@@ -56,7 +58,7 @@ private[sql] object WhenColumn:
   def apply(condition: Column, value: Any): WhenColumn =
     val v = asColumn(value)
     new WhenColumn(
-      Seq(condition.expr -> v.expr),
+      Vector(condition.expr -> v.expr),
       None,
       condition.subqueryRelations ++ v.subqueryRelations
     )
@@ -67,7 +69,7 @@ private[sql] object WhenColumn:
     case other     => Column.lit(other)
 
   private def buildExpr(
-      branches: Seq[(Expression, Expression)],
+      branches: Vector[(Expression, Expression)],
       otherwiseExpr: Option[Expression]
   ): Expression =
     val uf = Expression.UnresolvedFunction.newBuilder().setFunctionName("when")

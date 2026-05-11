@@ -272,6 +272,20 @@ class SparkConnectClientParserSuite extends AnyFunSuite:
     assert(ex.getCause.isInstanceOf[IllegalArgumentException])
   }
 
+  test("parseUrl rejects segments without '=' as invalid") {
+    val ex = intercept[IllegalArgumentException] {
+      SparkConnectClient.parseUrl("sc://h:15002;invalidparam")
+    }
+    assert(ex.getMessage.contains("invalidparam"))
+    assert(ex.getMessage.contains("key=value") || ex.getMessage.contains("expected"))
+  }
+
+  test("parseUrl rejects segments with empty key") {
+    assertThrows[IllegalArgumentException] {
+      SparkConnectClient.parseUrl("sc://h:15002;=value")
+    }
+  }
+
   test("parseUrl round-trips values with special characters from buildUrl") {
     val original = Map(
       "k1" -> "has;semicolon",
