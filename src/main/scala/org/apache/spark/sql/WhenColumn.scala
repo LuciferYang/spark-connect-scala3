@@ -30,7 +30,7 @@ final private[sql] class WhenColumn private[sql] (
   override def when(condition: Column, value: Any): Column =
     if otherwiseExpr.isDefined then
       throw IllegalArgumentException(
-        "when() cannot be applied after otherwise() has been called"
+        "when() cannot be applied once otherwise() is applied"
       )
     val v = WhenColumn.asColumn(value)
     new WhenColumn(

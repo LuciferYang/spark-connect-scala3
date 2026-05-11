@@ -734,6 +734,46 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     c.expr.getWindow.hasFrameSpec shouldBe true
   }
 
+  test("rowsBetween rejects Long values outside Int range") {
+    val ws = Window.partitionBy(Column("dept")).orderBy(Column("salary"))
+    assertThrows[IllegalArgumentException] {
+      ws.rowsBetween(Int.MaxValue.toLong + 1, 5L)
+    }
+    assertThrows[IllegalArgumentException] {
+      ws.rowsBetween(-5L, Int.MinValue.toLong - 1)
+    }
+  }
+
+  test("rangeBetween accepts Long values outside Int range") {
+    val ws = Window.partitionBy(Column("dept")).orderBy(Column("salary"))
+    // Should not throw — range frames are value-space comparisons, Long is valid
+    val large = Int.MaxValue.toLong + 1
+    val spec = ws.rangeBetween(-large, large)
+    spec.frameSpec.isDefined shouldBe true
+    val frame = spec.frameSpec.get
+    frame.getFrameType shouldBe
+      org.apache.spark.connect.proto.Expression.Window.WindowFrame.FrameType.FRAME_TYPE_RANGE
+    // Lower/upper should be Long literals, not truncated Ints
+    frame.getLower.getValue.getLiteral.getLong shouldBe -large
+    frame.getUpper.getValue.getLiteral.getLong shouldBe large
+  }
+
+  test("isin subquery unwraps struct into value list") {
+    val session = SparkSession(null)
+    import org.apache.spark.connect.proto.{Relation, RelationCommon, LocalRelation}
+    val rel = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+      .setLocalRelation(LocalRelation.getDefaultInstance)
+      .build()
+    val df = DataFrame(session, rel)
+    val structCol = functions.struct(Column("a"), Column("b"))
+    val c = structCol.isin(df)
+    c.expr.hasSubqueryExpression shouldBe true
+    val sq = c.expr.getSubqueryExpression
+    // After struct unwrap, there should be 2 values (a, b), not 1 struct wrapper
+    sq.getInSubqueryValuesCount shouldBe 2
+  }
+
   // ---------- Coverage boost: dropFields single field ----------
 
   test("dropFields with single field creates UpdateFields without nesting") {
