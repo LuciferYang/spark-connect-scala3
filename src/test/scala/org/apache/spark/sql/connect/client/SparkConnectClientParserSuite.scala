@@ -277,7 +277,7 @@ class SparkConnectClientParserSuite extends AnyFunSuite:
       SparkConnectClient.parseUrl("sc://h:15002;invalidparam")
     }
     assert(ex.getMessage.contains("invalidparam"))
-    assert(ex.getMessage.contains("key=value") || ex.getMessage.contains("expected"))
+    assert(ex.getMessage.contains("expected 'key=value' format"))
   }
 
   test("parseUrl rejects segments with empty key") {

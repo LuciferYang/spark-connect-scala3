@@ -778,13 +778,19 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     val c = Column("id").isin(null: Dataset[?])
     // Falls back to value-list variant with a single null literal
     c.expr.hasUnresolvedFunction shouldBe true
-    c.expr.getUnresolvedFunction.getFunctionName shouldBe "in"
+    val uf = c.expr.getUnresolvedFunction
+    uf.getFunctionName shouldBe "in"
+    uf.getArgumentsCount shouldBe 2 // self + null literal
+    uf.getArguments(1).getLiteral.hasNull shouldBe true
   }
 
   test("isin(null: DataFrame) treats null as single-value IN list") {
     val c = Column("id").isin(null: DataFrame)
     c.expr.hasUnresolvedFunction shouldBe true
-    c.expr.getUnresolvedFunction.getFunctionName shouldBe "in"
+    val uf = c.expr.getUnresolvedFunction
+    uf.getFunctionName shouldBe "in"
+    uf.getArgumentsCount shouldBe 2
+    uf.getArguments(1).getLiteral.hasNull shouldBe true
   }
 
   test("when(cond, null) and otherwise(null) build Null literals") {
@@ -830,6 +836,39 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     s4.getLower.hasUnbounded shouldBe true // start Min IS unbounded
     s4.getUpper.hasUnbounded shouldBe false
     s4.getUpper.getValue.getLiteral.getLong shouldBe Long.MinValue
+  }
+
+  test("rowsBetween asymmetric sentinel: only start==MinValue and end==MaxValue are unbounded") {
+    val ws = Window.partitionBy(Column("dept")).orderBy(Column("salary"))
+
+    // start==Long.MinValue → unbounded preceding
+    val s1 = ws.rowsBetween(Long.MinValue, 5L).frameSpec.get
+    s1.getLower.hasUnbounded shouldBe true
+
+    // end==Long.MaxValue → unbounded following
+    val s2 = ws.rowsBetween(-5L, Long.MaxValue).frameSpec.get
+    s2.getUpper.hasUnbounded shouldBe true
+
+    // end==Long.MinValue → NOT unbounded; must reject since Long.MinValue is outside Int range
+    assertThrows[IllegalArgumentException] {
+      ws.rowsBetween(-5L, Long.MinValue)
+    }
+
+    // start==Long.MaxValue → NOT unbounded; must reject since Long.MaxValue is outside Int range
+    assertThrows[IllegalArgumentException] {
+      ws.rowsBetween(Long.MaxValue, 5L)
+    }
+  }
+
+  test("functions.when returns a WhenColumn instance (type-based dispatch, not name match)") {
+    val w = functions.when(Column("x") > 0, "pos")
+    assert(w.isInstanceOf[WhenColumn])
+    // Chained when should also be a WhenColumn
+    val w2 = w.when(Column("x") === 0, "zero")
+    assert(w2.isInstanceOf[WhenColumn])
+    // alias returns plain Column, loses WhenColumn type
+    val aliased = w.alias("x")
+    assert(!aliased.isInstanceOf[WhenColumn])
   }
 
   // ---------- Coverage boost: dropFields single field ----------
