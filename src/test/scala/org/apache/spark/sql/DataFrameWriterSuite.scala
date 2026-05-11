@@ -79,10 +79,13 @@ class DataFrameWriterSuite extends AnyFunSuite with Matchers:
     op.getMode shouldBe WriteOperation.SaveMode.SAVE_MODE_IGNORE
   }
 
-  test("mode(String) sets error for unknown mode") {
+  test("mode(String) throws on unknown mode") {
     val writer = DataFrameWriter(stubDf).mode("unknown")
-    val op = buildWriteOp(writer)
-    op.getMode shouldBe WriteOperation.SaveMode.SAVE_MODE_ERROR_IF_EXISTS
+    val ex = intercept[java.lang.reflect.InvocationTargetException] {
+      buildWriteOp(writer)
+    }
+    assert(ex.getCause.isInstanceOf[IllegalArgumentException])
+    assert(ex.getCause.getMessage.contains("Unknown save mode"))
   }
 
   test("mode(String) errorifexists alias") {

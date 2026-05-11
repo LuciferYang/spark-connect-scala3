@@ -918,6 +918,10 @@ final class DataFrame private[sql] (
     * The DataFrame must return exactly one row and one column.
     */
   def scalar(): Column =
+    require(
+      relation.hasCommon,
+      "DataFrame used as a scalar subquery has no RelationCommon (plan_id missing)"
+    )
     val planId = relation.getCommon.getPlanId
     Column(
       Expression.newBuilder()
@@ -933,6 +937,10 @@ final class DataFrame private[sql] (
 
   /** Return this DataFrame as an EXISTS subquery Column. */
   def exists(): Column =
+    require(
+      relation.hasCommon,
+      "DataFrame used as an EXISTS subquery has no RelationCommon (plan_id missing)"
+    )
     val planId = relation.getCommon.getPlanId
     Column(
       Expression.newBuilder()
@@ -1182,7 +1190,8 @@ final class DataFrame private[sql] (
 
   private[sql] def toJoinType(s: String): Join.JoinType =
     require(s != null, "joinType must not be null")
-    s.toLowerCase(java.util.Locale.ROOT) match
+    // Match upstream: strip underscores so "left_outer" == "leftouter"
+    s.toLowerCase(java.util.Locale.ROOT).replace("_", "") match
       case "inner"                        => Join.JoinType.JOIN_TYPE_INNER
       case "left" | "leftouter"           => Join.JoinType.JOIN_TYPE_LEFT_OUTER
       case "right" | "rightouter"         => Join.JoinType.JOIN_TYPE_RIGHT_OUTER
@@ -1190,7 +1199,13 @@ final class DataFrame private[sql] (
       case "cross"                        => Join.JoinType.JOIN_TYPE_CROSS
       case "semi" | "leftsemi"            => Join.JoinType.JOIN_TYPE_LEFT_SEMI
       case "anti" | "leftanti"            => Join.JoinType.JOIN_TYPE_LEFT_ANTI
-      case _                              => Join.JoinType.JOIN_TYPE_INNER
+      case _                              =>
+        throw IllegalArgumentException(
+          s"Unsupported join type: '$s'. Supported: " +
+            "'inner', 'cross', 'outer', 'full', 'fullouter', 'full_outer', " +
+            "'left', 'leftouter', 'left_outer', 'right', 'rightouter', 'right_outer', " +
+            "'semi', 'leftsemi', 'left_semi', 'anti', 'leftanti', 'left_anti'."
+        )
 
 object DataFrame:
   private[sql] def apply(session: SparkSession, relation: Relation): DataFrame =

@@ -18,11 +18,16 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
   def drop(how: String, cols: Array[String]): DataFrame = drop(how, cols.toSeq)
 
   def drop(how: String, cols: Seq[String]): DataFrame =
+    require(how != null, "how must not be null")
     val naDropBuilder = NADrop.newBuilder().setInput(df.relation)
     cols.foreach(naDropBuilder.addCols)
-    how.toLowerCase match
+    how.toLowerCase(java.util.Locale.ROOT) match
       case "all" => naDropBuilder.setMinNonNulls(1)
-      case _     => // 'any' or default — don't set minNonNulls
+      case "any" => // default — don't set minNonNulls
+      case _ =>
+        throw IllegalArgumentException(
+          s"Unknown 'how' for drop: '$how'. Accepted: 'any', 'all'."
+        )
     df.withRelation(_.setDropNa(naDropBuilder.build()))
 
   def drop(minNonNulls: Int): DataFrame =

@@ -1363,8 +1363,10 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     df.toJoinType("leftsemi") shouldBe Join.JoinType.JOIN_TYPE_LEFT_SEMI
     df.toJoinType("anti") shouldBe Join.JoinType.JOIN_TYPE_LEFT_ANTI
     df.toJoinType("leftanti") shouldBe Join.JoinType.JOIN_TYPE_LEFT_ANTI
-    // unknown defaults to INNER
-    df.toJoinType("unknown") shouldBe Join.JoinType.JOIN_TYPE_INNER
+    // unknown throws (matches upstream behavior)
+    assertThrows[IllegalArgumentException] {
+      df.toJoinType("unknown")
+    }
   }
 
   // ---------- method existence tests for server-requiring methods ----------
@@ -2218,4 +2220,33 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     val result = df.dropDuplicates(Array("id"))
     result.relation.hasDeduplicate shouldBe true
     result.relation.getDeduplicate.getColumnNamesList.asScala shouldBe Seq("id")
+  }
+
+  test("explain rejects null mode with require()") {
+    val df = testDf()
+    val ex = intercept[IllegalArgumentException] {
+      df.explain(null: String)
+    }
+    assert(ex.getMessage.contains("must not be null"))
+  }
+
+  test("toJoinType rejects null and unknown join types") {
+    val df = testDf()
+    val nullEx = intercept[IllegalArgumentException] {
+      df.toJoinType(null)
+    }
+    assert(nullEx.getMessage.contains("must not be null"))
+
+    val unknownEx = intercept[IllegalArgumentException] {
+      df.toJoinType("not-a-join-type")
+    }
+    assert(unknownEx.getMessage.contains("Unsupported join type"))
+  }
+
+  test("toJoinType accepts underscore-separated aliases") {
+    val df = testDf()
+    // Upstream Spark strips underscores so 'left_outer' == 'leftouter'
+    df.toJoinType("left_outer") shouldBe Join.JoinType.JOIN_TYPE_LEFT_OUTER
+    df.toJoinType("full_outer") shouldBe Join.JoinType.JOIN_TYPE_FULL_OUTER
+    df.toJoinType("LEFT_ANTI") shouldBe Join.JoinType.JOIN_TYPE_LEFT_ANTI
   }

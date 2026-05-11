@@ -684,6 +684,10 @@ final class Dataset[T: ClassTag] private[sql] (
     */
   def scalar(): Column =
     val rel = df.relation
+    require(
+      rel.hasCommon,
+      "Dataset used as a scalar subquery has no RelationCommon (plan_id missing)"
+    )
     val planId = rel.getCommon.getPlanId
     Column(
       Expression.newBuilder()
@@ -706,6 +710,10 @@ final class Dataset[T: ClassTag] private[sql] (
     */
   def exists(): Column =
     val rel = df.relation
+    require(
+      rel.hasCommon,
+      "Dataset used as an EXISTS subquery has no RelationCommon (plan_id missing)"
+    )
     val planId = rel.getCommon.getPlanId
     Column(
       Expression.newBuilder()

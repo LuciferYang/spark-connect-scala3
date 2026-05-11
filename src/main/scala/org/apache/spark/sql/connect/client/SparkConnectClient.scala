@@ -432,6 +432,7 @@ object SparkConnectClient:
     * IPv6 literal addresses (e.g., `[::1]`) are not supported.
     */
   private[client] def parseUrl(url: String): (String, Int, Seq[(String, String)]) =
+    require(url != null, "Spark Connect URL must not be null")
     if !url.startsWith("sc://") then
       throw new IllegalArgumentException(
         "Invalid Spark Connect URL: must start with 'sc://'. Expected format: sc://host[:port][;key=value...]"
