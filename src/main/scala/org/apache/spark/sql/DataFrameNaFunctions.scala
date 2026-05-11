@@ -24,7 +24,7 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
     how.toLowerCase(java.util.Locale.ROOT) match
       case "all" => naDropBuilder.setMinNonNulls(1)
       case "any" => // default — don't set minNonNulls
-      case _ =>
+      case _     =>
         throw IllegalArgumentException(
           s"Unknown 'how' for drop: '$how'. Accepted: 'any', 'all'."
         )

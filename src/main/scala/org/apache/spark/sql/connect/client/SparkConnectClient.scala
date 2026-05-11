@@ -4,7 +4,7 @@ import io.grpc.{ManagedChannelBuilder, Metadata}
 import io.grpc.stub.MetadataUtils
 import org.apache.spark.connect.proto.*
 
-import java.net.URLDecoder
+import java.net.{URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import scala.collection.mutable
@@ -32,7 +32,7 @@ final class SparkConnectClient private (
 
   /** Reconstruct the full URL (with token) for internal use only. */
   private def fullUrl: String = token match
-    case Some(t) => s"$connectionUrl;token=$t"
+    case Some(t) => s"$connectionUrl;token=${URLEncoder.encode(t, StandardCharsets.UTF_8)}"
     case None    => connectionUrl
 
   override def toString: String =
@@ -548,8 +548,16 @@ object SparkConnectClient:
     configs.foreach((k, v) => client.setConfig(k, v))
     client
 
-  /** Build a sanitized `sc://` URL from host, port, and ordered params (token excluded). */
+  /** Build a sanitized `sc://` URL from host, port, and ordered params (token excluded).
+    *
+    * Keys and values are URL-encoded so the output can round-trip through `parseUrl` — values
+    * containing `;` or `=` would otherwise corrupt the URL and break `cloneSession` / retry
+    * workflows that re-parse `fullUrl`.
+    */
   private def buildSanitizedUrl(host: String, port: Int, params: Seq[(String, String)]): String =
     val base = s"sc://$host:$port"
     if params.isEmpty then base
-    else base + ";" + params.map((k, v) => s"$k=$v").mkString(";")
+    else
+      base + ";" + params.map { (k, v) =>
+        s"${URLEncoder.encode(k, StandardCharsets.UTF_8)}=${URLEncoder.encode(v, StandardCharsets.UTF_8)}"
+      }.mkString(";")
