@@ -596,6 +596,7 @@ final class DataFrame private[sql] (
 
   /** Explain this plan with a mode string. */
   def explain(mode: String): Unit =
+    require(mode != null, "explain mode must not be null")
     val plan = Plan.newBuilder().setRoot(relation).build()
     val explainMode = mode.toLowerCase(java.util.Locale.ROOT) match
       case "simple"    => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
@@ -1180,6 +1181,7 @@ final class DataFrame private[sql] (
     ))
 
   private[sql] def toJoinType(s: String): Join.JoinType =
+    require(s != null, "joinType must not be null")
     s.toLowerCase(java.util.Locale.ROOT) match
       case "inner"                        => Join.JoinType.JOIN_TYPE_INNER
       case "left" | "leftouter"           => Join.JoinType.JOIN_TYPE_LEFT_OUTER

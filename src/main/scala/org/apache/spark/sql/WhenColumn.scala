@@ -31,6 +31,7 @@ final private[sql] class WhenColumn private[sql] (
   // branches.nonEmpty — a WhenColumn always has at least one when-branch.
 
   override def when(condition: Column, value: Any): Column =
+    require(condition != null, "when() condition must not be null")
     if otherwiseExpr.isDefined then
       throw IllegalArgumentException(
         "when() cannot be applied once otherwise() is applied"

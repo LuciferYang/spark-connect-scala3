@@ -407,6 +407,7 @@ object functions:
   // ---------------------------------------------------------------------------
 
   def when(condition: Column, value: Any): Column =
+    require(condition != null, "when() condition must not be null")
     WhenColumn(condition, value)
 
   // ---------------------------------------------------------------------------

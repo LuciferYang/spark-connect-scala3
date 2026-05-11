@@ -860,6 +860,35 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     }
   }
 
+  test("functions.when throws clear error on null condition") {
+    val ex = intercept[IllegalArgumentException] {
+      functions.when(null, 1)
+    }
+    assert(ex.getMessage.contains("must not be null"))
+  }
+
+  test("WhenColumn.when throws clear error on null condition in chain") {
+    val chain = functions.when(Column("x") > 0, "pos")
+    val ex = intercept[IllegalArgumentException] {
+      chain.when(null, "zero")
+    }
+    assert(ex.getMessage.contains("must not be null"))
+  }
+
+  test("isin(df) on a Column already containing a subquery throws") {
+    val session = SparkSession(null)
+    import org.apache.spark.connect.proto.{Relation, RelationCommon, LocalRelation}
+    val rel = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+      .setLocalRelation(LocalRelation.getDefaultInstance)
+      .build()
+    val df = DataFrame(session, rel)
+    val first = Column("id").isin(df)
+    assertThrows[IllegalArgumentException] {
+      first.isin(df) // chained subquery — should reject
+    }
+  }
+
   test("functions.when returns a WhenColumn instance (type-based dispatch, not name match)") {
     val w = functions.when(Column("x") > 0, "pos")
     assert(w.isInstanceOf[WhenColumn])

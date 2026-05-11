@@ -199,6 +199,11 @@ class Column private[sql] (
       "DataFrame used in IN-subquery has no RelationCommon (plan_id missing) — " +
         "ensure the DataFrame was constructed through a SparkSession"
     )
+    require(
+      !expr.hasSubqueryExpression,
+      "isin(Dataset)/isin(DataFrame) cannot be chained on a Column that already contains " +
+        "a subquery expression"
+    )
     val planId = rel.getCommon.getPlanId
     // Upstream Spark unwraps struct() expressions into their argument list so multi-column IN
     // subqueries work correctly, e.g. `struct($"a", $"b").isin(df)` sends (a, b) as the value
