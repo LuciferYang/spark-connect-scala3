@@ -12,9 +12,9 @@
 |----------|------|--------|
 | CRITICAL | 5 | 5 ✅ |
 | HIGH | 24 | 22 ✅ |
-| MEDIUM | 72 | 66 ✅ |
+| MEDIUM | 72 | 67 ✅ |
 | LOW | 61 | 6 ✅ |
-| **合计** | **162** | **99** |
+| **合计** | **162** | **100** |
 
 | 兼容性标记 | 数量 | 说明 |
 |------------|------|------|
@@ -558,7 +558,7 @@
 | # | 文件:行号 | 描述 |
 |---|-----------|------|
 | R10-1 | `SparkConnectClientParser.scala:99-109` | `buildUrl` 直接拼接用户提供的 token/option 值（`s"token=$t"`）。若 token 或 option 值含 `;` 或 `=`，生成的 URL 在 `parseUrl` round-trip 时不可解析。未执行 URL 编码或转义。 | ✅ 已修复 (commit eeba667)：buildUrl URL-encode + parseUrl URL-decode |
-| R10-2 | `Column.scala:216` | `when()` 通过 `expr.hasUnresolvedFunction && getFunctionName == "when"` 检测是否为 when 链。若表达式被包装（alias、cast）后再调用 `.when()`，检测失败产生误导性错误。另外若用户通过 `callFn("when", ...)` 创建同名函数的 Column，可错误通过检查。 | ⏳ 延后：上游用专用 AST 节点 `CaseWhenOtherwise` 模式匹配；本项目是 proto-thin client 无 IR 层，须引入 Column 标记字段或建本地 AST（侵入性大） |
+| R10-2 | `Column.scala:216` | `when()` 通过 `expr.hasUnresolvedFunction && getFunctionName == "when"` 检测是否为 when 链。若表达式被包装（alias、cast）后再调用 `.when()`，检测失败产生误导性错误。另外若用户通过 `callFn("when", ...)` 创建同名函数的 Column，可错误通过检查。 | ✅ 已修复 (commit 6a7ff4b)：引入 `WhenColumn` 子类，类型驱动判定替代字符串匹配，对齐上游 `CaseWhenOtherwise` 设计 |
 
 ### LOW
 
