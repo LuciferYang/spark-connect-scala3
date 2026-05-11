@@ -123,10 +123,10 @@
 |---|-----------|------|------|
 | P-14 | `ArrowDeserializer.scala:108` | StructVector: `getChildrenFromFields.asScala.toSeq` 每行调用，应提取到循环外。 | ✅ 已修复：StructVectorMeta 缓存 |
 | P-15 | `ArrowDeserializer.scala:100-106` | `isVariantStruct` 每个 StructVector cell 调用，含 `.find()` + metadata 查找，应缓存。 | ✅ 已修复：StructVectorMeta 缓存 |
-| P-16 | `ArrowDeserializer.scala:47-48` | 原始类型 extractValue 返回 boxed java 类型，每行每列 boxing。 | |
+| P-16 | `ArrowDeserializer.scala:47-48` | 原始类型 extractValue 返回 boxed java 类型，每行每列 boxing。 | ⛔ 不修复：JVM 泛型不支持 specialization，消除 boxing 需为每种类型写独立分支，ROI 低 |
 | P-17 | `ArrowSerializer.scala:186-189` | Map 序列化：`m.toSeq` + `entries.zipWithIndex` 双重中间集合。 | ✅ 已修复：直接迭代 + 手动计数 |
 | P-18 | `ArrowSerializer.scala:204-207` | List 序列化：value match 统一 `.toSeq` 产生不必要中间集合。 | ✅ 已修复：直接 foreach 各类型 |
-| P-19 | `DataFrame.scala:995` | `resp.getArrowBatch.getData.toByteArray` 全拷贝 protobuf ByteString，大 batch 临时翻倍内存。 | |
+| P-19 | `DataFrame.scala:995` | `resp.getArrowBatch.getData.toByteArray` 全拷贝 protobuf ByteString，大 batch 临时翻倍内存。 | ⛔ 不修复：Protobuf ByteString API 限制，ArrowStreamReader 要求 byte[]/InputStream，无法零拷贝 |
 | P-20 | `ResponseValidator.scala:60-66` | `extractServerSideSessionId` 每条响应用 protobuf 反射查找字段描述符，应缓存。 | ✅ 已修复：ConcurrentHashMap 缓存 + Optional null 安全 (f700732) |
 | P-21 | `ArtifactManager.scala:217-225` | `readNextChunk` 每 chunk 分配新 32KB byte[]，应复用 buffer。 | ✅ 已修复：传入可复用 buffer |
 | P-22 | `DataFrame.scala:741-746` | `toLocalIterator` 使用 `flatMap` 立即解析整个 batch，违背惰性迭代初衷。 | ✅ 非问题：Iterator.flatMap 本身是惰性的 |
@@ -175,7 +175,7 @@
 | Q-14 | `ClosureCleaner.scala:97` | `copyStream` 捕获 `Throwable`（含 OOM）静默吞掉，应只捕获 IOException。 | ✅ 已修复（已改为 catch Exception） |
 | Q-15 | `ClosureCleaner.scala:616` | `cloneIndyLambda` 捕获所有 Throwable，应只捕获 Exception。 | ✅ 已修复（已改为 catch Exception） |
 | Q-16 | `ClosureCleaner.scala:266` | `func == null` 检查在 func 已被解引用之后（259 行），死代码。 | ✅ 已修复：移除死代码 |
-| Q-17 | `Encoder.scala:31` | `agnosticEncoder` 默认为 null，调用方须 null-check，应用 Option。 |
+| Q-17 | `Encoder.scala:31` | `agnosticEncoder` 默认为 null，调用方须 null-check，应用 Option。 | ⛔ 不修复：改为 Option 是 breaking API change，涉及所有 Encoder 实现和调用点 |
 | Q-18 | `Encoder.scala:93` | `Encoder[java.sql.Date].fromRow` 使用 `asInstanceOf` 无 null/类型检查。 | ✅ 已修复：pattern match + null case |
 | Q-19 | `Encoder.scala:247` | `DerivedEncoder.fromRow` 无验证的 `asInstanceOf`，字段数不匹配时产生晦涩错误。 | ✅ 已修复：row.size 前置校验 |
 | Q-20 | `GrpcExceptionConverter.scala:67` | `convert()` 只捕获 `StatusRuntimeException`，其他 gRPC 异常类型未处理。 | ✅ 已修复：增加 StatusException 捕获 |
@@ -399,7 +399,7 @@
 
 | # | 文件:行号 | 描述 |
 |---|-----------|------|
-| R3-3 | `AgnosticEncoder.scala:642` | ⚠️ **FIX WITH CARE** — `CollectionEncoderProxy.readResolve` 对 "IterableEncoder" 期望 4 参构造函数，但上游 Spark 4.x 只有 3 参，运行时会抛 ClassNotFoundException。（修复须对齐 Spark 4.1.1 实际参数签名） |
+| R3-3 | `AgnosticEncoder.scala:642` | ⚠️ **FIX WITH CARE** — `CollectionEncoderProxy.readResolve` 对 "IterableEncoder" 期望 4 参构造函数，但上游 Spark 4.x 只有 3 参，运行时会抛 ClassNotFoundException。（修复须对齐 Spark 4.1.1 实际参数签名） | ⛔ 不修复：须精确对齐 Spark 4.1.1 IterableEncoder 序列化签名，贸然修改会破坏 client/server 兼容 |
 | R3-4 | `Catalog.scala:120` | SQL 注入：`listViews(dbName, pattern)` 中 pattern 直接拼入 SQL 字符串，未转义单引号。`createDatabase` properties 同理。 | ✅ 已修复 (commit 51d43b7)：escapeSqlLiteral + quoteIdent 加固 |
 | R3-5 | `StreamingQueryListenerBus.scala:76-81` | `registerServerSideListener` 消费 iterator 查找 `listenerBusListenerAdded=true`，若 server 永不发送则无限阻塞。 | ✅ 非问题：已有超时逻辑保护（gRPC deadline） |
 | R3-6 | `StreamingQueryListenerBus.scala:109` | `postToAll` 持有 lock 调用 listener 回调；若回调调用 addListener/removeListener 有潜在 re-entrant 竞争。 |
