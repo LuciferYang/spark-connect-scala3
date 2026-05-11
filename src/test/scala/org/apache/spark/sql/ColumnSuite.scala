@@ -149,6 +149,53 @@ class ColumnSuite extends AnyFunSuite with Matchers:
     }
   }
 
+  // R10-2: prevent invalid chains after wrapping or from arbitrary callFn
+  test("when() after alias() on a when chain throws") {
+    val chain = functions.when(Column("x") > 0, "pos").alias("x")
+    assertThrows[IllegalArgumentException] {
+      chain.when(Column("x") === 0, "zero")
+    }
+  }
+
+  test("otherwise() after alias() on a when chain throws") {
+    val chain = functions.when(Column("x") > 0, "pos").alias("x")
+    assertThrows[IllegalArgumentException] {
+      chain.otherwise("other")
+    }
+  }
+
+  test("when() on a Column with a \"when\" UnresolvedFunction expr throws") {
+    // Fake a Column whose expr is UnresolvedFunction("when", ...) but not a WhenColumn
+    import org.apache.spark.connect.proto.Expression
+    val fakeExpr = Expression.newBuilder()
+      .setUnresolvedFunction(
+        Expression.UnresolvedFunction.newBuilder()
+          .setFunctionName("when")
+          .addArguments(Column("x").expr)
+          .addArguments(Column.lit(1).expr)
+          .build()
+      )
+      .build()
+    val fake = Column(fakeExpr, Seq.empty)
+    assertThrows[IllegalArgumentException] {
+      fake.when(Column("x") === 0, "zero")
+    }
+  }
+
+  test("when() after otherwise() throws") {
+    val chain = functions.when(Column("x") > 0, "pos").otherwise("other")
+    assertThrows[IllegalArgumentException] {
+      chain.when(Column("x") === 0, "zero")
+    }
+  }
+
+  test("otherwise() twice throws") {
+    val chain = functions.when(Column("x") > 0, "pos").otherwise("other")
+    assertThrows[IllegalArgumentException] {
+      chain.otherwise("another")
+    }
+  }
+
   test("getItem creates UnresolvedExtractValue") {
     val c = Column("m").getItem("key")
     c.expr.hasUnresolvedExtractValue shouldBe true

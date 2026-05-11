@@ -407,10 +407,7 @@ object functions:
   // ---------------------------------------------------------------------------
 
   def when(condition: Column, value: Any): Column =
-    val v = value match
-      case c: Column => c
-      case other     => Column.lit(other)
-    callFn("when", condition, v)
+    WhenColumn(condition, value)
 
   // ---------------------------------------------------------------------------
   // Collection functions
