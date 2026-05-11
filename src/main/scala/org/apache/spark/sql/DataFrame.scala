@@ -598,7 +598,7 @@ final class DataFrame private[sql] (
   def explain(mode: String): Unit =
     require(mode != null, "explain mode must not be null")
     val plan = Plan.newBuilder().setRoot(relation).build()
-    val explainMode = mode.toLowerCase(java.util.Locale.ROOT) match
+    val explainMode = mode.trim.toLowerCase(java.util.Locale.ROOT) match
       case "simple"    => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
       case "extended"  => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_EXTENDED
       case "codegen"   => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_CODEGEN
@@ -1190,8 +1190,8 @@ final class DataFrame private[sql] (
 
   private[sql] def toJoinType(s: String): Join.JoinType =
     require(s != null, "joinType must not be null")
-    // Match upstream: strip underscores so "left_outer" == "leftouter"
-    s.toLowerCase(java.util.Locale.ROOT).replace("_", "") match
+    // Match upstream: trim, then strip underscores so "left_outer" == "leftouter"
+    s.trim.toLowerCase(java.util.Locale.ROOT).replace("_", "") match
       case "inner"                        => Join.JoinType.JOIN_TYPE_INNER
       case "left" | "leftouter"           => Join.JoinType.JOIN_TYPE_LEFT_OUTER
       case "right" | "rightouter"         => Join.JoinType.JOIN_TYPE_RIGHT_OUTER

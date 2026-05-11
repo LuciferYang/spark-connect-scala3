@@ -148,12 +148,13 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
   private def toProtoMode(mode: String): WriteOperation.SaveMode =
     require(mode != null, "save mode must not be null")
     mode.toLowerCase(java.util.Locale.ROOT) match
-      case "overwrite"               => WriteOperation.SaveMode.SAVE_MODE_OVERWRITE
-      case "append"                  => WriteOperation.SaveMode.SAVE_MODE_APPEND
-      case "ignore"                  => WriteOperation.SaveMode.SAVE_MODE_IGNORE
-      case "error" | "errorifexists" => WriteOperation.SaveMode.SAVE_MODE_ERROR_IF_EXISTS
-      case _                         =>
+      case "overwrite"                           => WriteOperation.SaveMode.SAVE_MODE_OVERWRITE
+      case "append"                              => WriteOperation.SaveMode.SAVE_MODE_APPEND
+      case "ignore"                              => WriteOperation.SaveMode.SAVE_MODE_IGNORE
+      case "error" | "errorifexists" | "default" =>
+        WriteOperation.SaveMode.SAVE_MODE_ERROR_IF_EXISTS
+      case _ =>
         throw IllegalArgumentException(
           s"Unknown save mode: '$mode'. Accepted: 'overwrite', 'append', 'ignore', " +
-            "'error', 'errorifexists'."
+            "'error', 'errorifexists', 'default'."
         )
