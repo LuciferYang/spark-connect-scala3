@@ -176,13 +176,19 @@ class Column private[sql] (
   /** Scala collection variant of isin. */
   def isInCollection(values: Iterable[?]): Column = isin(values.toSeq*)
 
-  /** IN subquery: `col IN (SELECT ... FROM ...)`. */
+  /** IN subquery: `col IN (SELECT ... FROM ...)`.
+    *
+    * Passing `null` is treated as a single-value IN list (`isin(null)`) to match upstream Spark.
+    */
   def isin(ds: Dataset[?]): Column =
     // Match upstream: a null Dataset is treated as a single-value IN list (`isin(null)`).
     if ds == null then isin(null: Any)
     else buildInSubquery(ds.df.relation)
 
-  /** IN subquery (DataFrame variant). */
+  /** IN subquery (DataFrame variant).
+    *
+    * Passing `null` is treated as a single-value IN list, matching upstream Spark.
+    */
   def isin(df: DataFrame): Column =
     if df == null then isin(null: Any)
     else buildInSubquery(df.relation)

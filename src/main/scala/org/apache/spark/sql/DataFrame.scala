@@ -1122,10 +1122,11 @@ final class DataFrame private[sql] (
                 VariantVal(v, m)
               case pair =>
                 val f = schema.fields(idx)
+                val t1 = if pair._1 == null then "null" else pair._1.getClass.getName
+                val t2 = if pair._2 == null then "null" else pair._2.getClass.getName
                 throw IllegalStateException(
                   s"Unexpected inner types in variant envelope at column $idx " +
-                    s"(name='${f.name}', type=${f.dataType}): " +
-                    s"(${pair._1}, ${pair._2})"
+                    s"(name='${f.name}', type=${f.dataType}): ($t1, $t2)"
                 )
           case bytes: Array[Byte] =>
             VariantVal(bytes, Array.empty[Byte])
