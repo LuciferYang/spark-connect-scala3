@@ -281,9 +281,12 @@ class SparkConnectClientParserSuite extends AnyFunSuite:
   }
 
   test("parseUrl rejects segments with empty key") {
-    assertThrows[IllegalArgumentException] {
+    val ex = intercept[IllegalArgumentException] {
       SparkConnectClient.parseUrl("sc://h:15002;=value")
     }
+    // Error message should refer to key, not URL decoding
+    assert(ex.getMessage.contains("key must be non-empty"))
+    assert(!ex.getMessage.contains("URL-encoded"))
   }
 
   test("parseUrl round-trips values with special characters from buildUrl") {
