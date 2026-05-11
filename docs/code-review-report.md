@@ -365,8 +365,8 @@
 | R2-4 | `LiteralValueProtoConverter.scala:33` | Timestamp 转换：负微秒值时 `Instant.ofEpochSecond(0, negativeMicros * 1000)` 结果错误。 | ✅ 已修复：改用 Math.floorDiv/floorMod |
 | R2-5 | `DataFrameNaFunctions.scala:115` | `toLiteral` fallthrough 将不支持的类型（Byte/Short/BigDecimal）静默转为 String，导致错误的 fill 行为。 | ✅ 已修复：改为 throw IllegalArgumentException |
 | R2-6 | `StreamingQueryListenerBus.scala:101` | `queryEventHandler` 静默吞掉所有 NonFatal 异常并移除全部 listener，不通知用户。 | ✅ 已修复：添加 stderr 警告日志 |
-| R2-7 | `StreamingQueryListenerBus.scala:109` | `postToAll` 持有 `lock.synchronized` 调用 listener 回调；慢/阻塞的 listener 会阻塞 append/remove。 |
-| R2-8 | `RetryPolicy.scala:11` | 默认 maxRetries=15 + backoffMultiplier=4.0 总重试时长可超 15 分钟，可能无限期阻塞线程。 |
+| R2-7 | `StreamingQueryListenerBus.scala:109` | `postToAll` 持有 `lock.synchronized` 调用 listener 回调；慢/阻塞的 listener 会阻塞 append/remove。 | ⏳ 延后：需重新设计 bus 为 lock-free queue 或异步 dispatch，架构性改动 |
+| R2-8 | `RetryPolicy.scala:11` | 默认 maxRetries=15 + backoffMultiplier=4.0 总重试时长可超 15 分钟，可能无限期阻塞线程。 | ⏳ 延后：设计选择，缩短默认值可能破坏依赖长重试的场景 |
 
 ### LOW
 
@@ -402,7 +402,7 @@
 | R3-3 | `AgnosticEncoder.scala:642` | ⚠️ **FIX WITH CARE** — `CollectionEncoderProxy.readResolve` 对 "IterableEncoder" 期望 4 参构造函数，但上游 Spark 4.x 只有 3 参，运行时会抛 ClassNotFoundException。（修复须对齐 Spark 4.1.1 实际参数签名） | ⛔ 不修复：须精确对齐 Spark 4.1.1 IterableEncoder 序列化签名，贸然修改会破坏 client/server 兼容 |
 | R3-4 | `Catalog.scala:120` | SQL 注入：`listViews(dbName, pattern)` 中 pattern 直接拼入 SQL 字符串，未转义单引号。`createDatabase` properties 同理。 | ✅ 已修复 (commit 51d43b7)：escapeSqlLiteral + quoteIdent 加固 |
 | R3-5 | `StreamingQueryListenerBus.scala:76-81` | `registerServerSideListener` 消费 iterator 查找 `listenerBusListenerAdded=true`，若 server 永不发送则无限阻塞。 | ✅ 非问题：已有超时逻辑保护（gRPC deadline） |
-| R3-6 | `StreamingQueryListenerBus.scala:109` | `postToAll` 持有 lock 调用 listener 回调；若回调调用 addListener/removeListener 有潜在 re-entrant 竞争。 |
+| R3-6 | `StreamingQueryListenerBus.scala:109` | `postToAll` 持有 lock 调用 listener 回调；若回调调用 addListener/removeListener 有潜在 re-entrant 竞争。 | ⏳ 延后：同 R2-7，架构性改动 |
 
 ### LOW
 
@@ -558,7 +558,7 @@
 | # | 文件:行号 | 描述 |
 |---|-----------|------|
 | R10-1 | `SparkConnectClientParser.scala:99-109` | `buildUrl` 直接拼接用户提供的 token/option 值（`s"token=$t"`）。若 token 或 option 值含 `;` 或 `=`，生成的 URL 在 `parseUrl` round-trip 时不可解析。未执行 URL 编码或转义。 | ✅ 已修复 (commit eeba667)：buildUrl URL-encode + parseUrl URL-decode |
-| R10-2 | `Column.scala:216` | `when()` 通过 `expr.hasUnresolvedFunction && getFunctionName == "when"` 检测是否为 when 链。若表达式被包装（alias、cast）后再调用 `.when()`，检测失败产生误导性错误。另外若用户通过 `callFn("when", ...)` 创建同名函数的 Column，可错误通过检查。 |
+| R10-2 | `Column.scala:216` | `when()` 通过 `expr.hasUnresolvedFunction && getFunctionName == "when"` 检测是否为 when 链。若表达式被包装（alias、cast）后再调用 `.when()`，检测失败产生误导性错误。另外若用户通过 `callFn("when", ...)` 创建同名函数的 Column，可错误通过检查。 | ⏳ 延后：上游用专用 AST 节点 `CaseWhenOtherwise` 模式匹配；本项目是 proto-thin client 无 IR 层，须引入 Column 标记字段或建本地 AST（侵入性大） |
 
 ### LOW
 
