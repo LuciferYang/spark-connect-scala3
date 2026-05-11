@@ -476,7 +476,7 @@ object SparkConnectClient:
           try
             val decodedKey = URLDecoder.decode(k, StandardCharsets.UTF_8)
             require(
-              decodedKey.nonEmpty,
+              decodedKey.trim.nonEmpty,
               s"Invalid Spark Connect URL parameter '$p': key must be non-empty"
             )
             Some(decodedKey -> URLDecoder.decode(v, StandardCharsets.UTF_8))

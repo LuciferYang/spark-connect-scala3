@@ -188,6 +188,11 @@ class Column private[sql] (
     else buildInSubquery(df.relation)
 
   private def buildInSubquery(rel: Relation): Column =
+    require(
+      rel.hasCommon,
+      "DataFrame used in IN-subquery has no RelationCommon (plan_id missing) — " +
+        "ensure the DataFrame was constructed through a SparkSession"
+    )
     val planId = rel.getCommon.getPlanId
     // Upstream Spark unwraps struct() expressions into their argument list so multi-column IN
     // subqueries work correctly, e.g. `struct($"a", $"b").isin(df)` sends (a, b) as the value

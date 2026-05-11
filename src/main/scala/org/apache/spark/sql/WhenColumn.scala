@@ -27,7 +27,8 @@ final private[sql] class WhenColumn private[sql] (
       inheritedSubqueryRelations
     ):
 
-  require(branches.nonEmpty, "WhenColumn must have at least one branch")
+  // Invariant (checked eagerly inside buildExpr, which runs as a super-constructor argument):
+  // branches.nonEmpty — a WhenColumn always has at least one when-branch.
 
   override def when(condition: Column, value: Any): Column =
     if otherwiseExpr.isDefined then
@@ -72,6 +73,7 @@ private[sql] object WhenColumn:
       branches: Vector[(Expression, Expression)],
       otherwiseExpr: Option[Expression]
   ): Expression =
+    require(branches.nonEmpty, "WhenColumn must have at least one branch")
     val uf = Expression.UnresolvedFunction.newBuilder().setFunctionName("when")
     branches.foreach: (cond, v) =>
       uf.addArguments(cond)
