@@ -32,8 +32,9 @@ final class SparkConnectClient private (
 
   /** Reconstruct the full URL (with token) for internal use only. */
   private def fullUrl: String = token match
-    case Some(t) => s"$connectionUrl;token=${URLEncoder.encode(t, StandardCharsets.UTF_8)}"
-    case None    => connectionUrl
+    case Some(t) =>
+      s"$connectionUrl;token=${URLEncoder.encode(t, StandardCharsets.UTF_8)}"
+    case None => connectionUrl
 
   override def toString: String =
     s"SparkConnectClient(session=$sessionId, url=$connectionUrl)"
@@ -558,6 +559,6 @@ object SparkConnectClient:
     val base = s"sc://$host:$port"
     if params.isEmpty then base
     else
-      base + ";" + params.map { (k, v) =>
-        s"${URLEncoder.encode(k, StandardCharsets.UTF_8)}=${URLEncoder.encode(v, StandardCharsets.UTF_8)}"
-      }.mkString(";")
+      base + ";" + params.map((k, v) => s"${encode(k)}=${encode(v)}").mkString(";")
+
+  private def encode(s: String): String = URLEncoder.encode(s, StandardCharsets.UTF_8)
