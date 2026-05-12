@@ -424,8 +424,20 @@ object SparkConnectClient:
   /** Maximum inbound gRPC message size (128 MB). */
   private val MaxInboundMessageSize: Int = 128 * 1024 * 1024
 
-  /** User-Agent string sent with all gRPC requests. */
-  private val UserAgentString: String = "spark-connect-scala3/0.3.0"
+  /** Client identifier sent to the server (without version). Kept stable across releases. */
+  private val ClientName: String = "spark-connect-scala3"
+
+  /** Client version, read from the JAR manifest's `Implementation-Version` attribute populated by
+    * sbt at publish time. Falls back to `"unknown"` when running from sbt in dev mode where no
+    * manifest is available.
+    */
+  private val ClientVersion: String =
+    Option(classOf[SparkConnectClient].getPackage)
+      .flatMap(p => Option(p.getImplementationVersion))
+      .getOrElse("unknown")
+
+  /** User-Agent string sent with all gRPC requests, e.g. `spark-connect-scala3/0.5.0`. */
+  private val UserAgentString: String = s"$ClientName/$ClientVersion"
 
   /** Parse a `sc://host:port` URL into (host, port, params). Params preserve insertion order. Note:
     * IPv6 literal addresses (e.g., `[::1]`) are not supported.

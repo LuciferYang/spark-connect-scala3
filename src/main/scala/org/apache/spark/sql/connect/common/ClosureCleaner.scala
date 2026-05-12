@@ -666,6 +666,13 @@ private[sql] object ClosureCleaner extends Logging {
     callSite.getTarget
   }
 
+  /** `MethodHandles.Lookup` access-mode bit set that grants ALL access rights (equivalent to
+    * `PUBLIC | PRIVATE | PROTECTED | PACKAGE | MODULE | UNCONDITIONAL` — i.e. no restrictions).
+    * Chosen as the `allModes` value in the hidden Lookup constructor: the JDK uses all-ones (`-1`
+    * in signed int) to mean "every mode". Must match the value the JDK itself uses internally.
+    */
+  private val LookupFullPowerMode: Int = -1
+
   private def getFullPowerLookupFor(targetClass: Class[_]): MethodHandles.Lookup = {
     val replLookupCtor = classOf[MethodHandles.Lookup].getDeclaredConstructor(
       classOf[Class[_]],
@@ -673,8 +680,7 @@ private[sql] object ClosureCleaner extends Logging {
       classOf[Int]
     )
     replLookupCtor.setAccessible(true)
-    // -1 means full-power.
-    replLookupCtor.newInstance(targetClass, null, -1)
+    replLookupCtor.newInstance(targetClass, null, LookupFullPowerMode)
   }
 }
 

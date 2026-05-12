@@ -409,6 +409,9 @@ object SparkSession:
   private val activeSession = InheritableThreadLocal[SparkSession]()
   private val defaultSession = AtomicReference[SparkSession]()
 
+  /** Default Spark Connect server URL when no explicit `.remote(...)` is supplied. */
+  private[sql] val DefaultRemoteUrl: String = "sc://localhost:15002"
+
   def builder(): Builder = Builder()
 
   /** Return the active SparkSession for the current thread. */
@@ -436,7 +439,7 @@ object SparkSession:
   def clearDefaultSession(): Unit = defaultSession.set(null)
 
   final class Builder:
-    private var url: String = "sc://localhost:15002"
+    private var url: String = SparkSession.DefaultRemoteUrl
     private var configs: Map[String, String] = Map.empty
 
     def remote(connectionString: String): Builder =
