@@ -22,13 +22,23 @@ private[sql] object StringEnumParser:
   /** @param input
     *   raw user input (may be null)
     * @param paramName
-    *   human-readable parameter name for error messages (e.g. "joinType", "save mode")
+    *   human-readable parameter name for error messages (e.g. "joinType", "save mode"). Used in
+    *   both the null-error ("$paramName must not be null") and the unknown-error ("$errorVerb
+    *   $paramName: ...") messages.
     * @param mapping
     *   accepted input keys (already normalized — see `trim`/`stripUnderscore`) to values
     * @param trim
     *   if true, strip leading/trailing whitespace before matching
     * @param stripUnderscore
     *   if true, remove all `_` from the input before matching
+    * @param errorVerb
+    *   first word of the unknown-value error message. Defaults to "Unknown". For API parity with
+    *   upstream Apache Spark, `toJoinType` passes "Unsupported".
+    * @param acceptedDisplay
+    *   optional override for what to list after "Accepted values:" in the error message. Defaults
+    *   to the sorted `mapping.keys`; callers with user-visible aliases can pass a grouped listing
+    *   (e.g. include both `"left_outer"` and `"leftouter"` even though only the normalized form is
+    *   in `mapping`).
     * @tparam T
     *   the enum-like target type
     * @throws IllegalArgumentException
@@ -39,17 +49,19 @@ private[sql] object StringEnumParser:
       paramName: String,
       mapping: Map[String, T],
       trim: Boolean = false,
-      stripUnderscore: Boolean = false
+      stripUnderscore: Boolean = false,
+      errorVerb: String = "Unknown",
+      acceptedDisplay: Option[Seq[String]] = None
   ): T =
     require(input != null, s"$paramName must not be null")
-    var normalized = input
-    if trim then normalized = normalized.trim
-    normalized = normalized.toLowerCase(Locale.ROOT)
-    if stripUnderscore then normalized = normalized.replace("_", "")
+    val trimmed = if trim then input.trim else input
+    val lowered = trimmed.toLowerCase(Locale.ROOT)
+    val normalized = if stripUnderscore then lowered.replace("_", "") else lowered
     mapping.get(normalized) match
       case Some(v) => v
       case None    =>
+        val accepted = acceptedDisplay.getOrElse(mapping.keys.toSeq.sorted)
         throw IllegalArgumentException(
-          s"Unknown $paramName: '$input'. Accepted values: " +
-            mapping.keys.toSeq.sorted.mkString("'", "', '", "'") + "."
+          s"$errorVerb $paramName: '$input'. Accepted values: " +
+            accepted.mkString("'", "', '", "'") + "."
         )

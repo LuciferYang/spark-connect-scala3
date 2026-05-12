@@ -1,6 +1,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
+import org.apache.spark.sql.internal.StringEnumParser
 
 /** Writer for saving DataFrames to external storage.
   *
@@ -146,7 +147,7 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
     df.session.client.executeCommand(command)
 
   private def toProtoMode(mode: String): WriteOperation.SaveMode =
-    org.apache.spark.sql.internal.StringEnumParser.parse(
+    StringEnumParser.parse(
       input = mode,
       paramName = "save mode",
       mapping = DataFrameWriter.SaveModeMapping

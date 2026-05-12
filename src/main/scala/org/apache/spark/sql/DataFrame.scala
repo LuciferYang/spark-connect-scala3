@@ -7,6 +7,7 @@ import org.apache.spark.sql.connect.client.{
   SparkConnectClient
 }
 import org.apache.spark.sql.connect.common.LiteralValueProtoConverter
+import org.apache.spark.sql.internal.StringEnumParser
 import org.apache.spark.sql.types.{
   GeographyType, GeometryType, StructField, StructType, VariantType, VariantVal
 }
@@ -597,7 +598,7 @@ final class DataFrame private[sql] (
   /** Explain this plan with a mode string. */
   def explain(mode: String): Unit =
     val plan = Plan.newBuilder().setRoot(relation).build()
-    val explainMode = org.apache.spark.sql.internal.StringEnumParser.parse(
+    val explainMode = StringEnumParser.parse(
       input = mode,
       paramName = "explain mode",
       mapping = DataFrame.ExplainModeMapping,
@@ -1154,12 +1155,14 @@ final class DataFrame private[sql] (
     ))
 
   private[sql] def toJoinType(s: String): Join.JoinType =
-    org.apache.spark.sql.internal.StringEnumParser.parse(
+    StringEnumParser.parse(
       input = s,
-      paramName = "join type",
+      paramName = "joinType",
       mapping = DataFrame.JoinTypeMapping,
       trim = true,
-      stripUnderscore = true
+      stripUnderscore = true,
+      errorVerb = "Unsupported",
+      acceptedDisplay = Some(DataFrame.JoinTypeDisplay)
     )
 
 object DataFrame:
@@ -1194,4 +1197,29 @@ object DataFrame:
     "leftsemi" -> Join.JoinType.JOIN_TYPE_LEFT_SEMI,
     "anti" -> Join.JoinType.JOIN_TYPE_LEFT_ANTI,
     "leftanti" -> Join.JoinType.JOIN_TYPE_LEFT_ANTI
+  )
+
+  /** User-facing display list for invalid `toJoinType` inputs — includes both normalized and
+    * underscore-separated aliases so users know the latter are accepted too. Grouped by semantic
+    * family.
+    */
+  private val JoinTypeDisplay: Seq[String] = Seq(
+    "inner",
+    "cross",
+    "outer",
+    "full",
+    "fullouter",
+    "full_outer",
+    "left",
+    "leftouter",
+    "left_outer",
+    "right",
+    "rightouter",
+    "right_outer",
+    "semi",
+    "leftsemi",
+    "left_semi",
+    "anti",
+    "leftanti",
+    "left_anti"
   )

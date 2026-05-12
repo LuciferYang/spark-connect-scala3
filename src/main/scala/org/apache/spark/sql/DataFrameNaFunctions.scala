@@ -2,6 +2,7 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
 import org.apache.spark.connect.proto.DataType as ProtoDataType
+import org.apache.spark.sql.internal.StringEnumParser
 
 /** Functions for handling missing data (null / NaN) in DataFrames.
   */
@@ -18,9 +19,9 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
   def drop(how: String, cols: Array[String]): DataFrame = drop(how, cols.toSeq)
 
   def drop(how: String, cols: Seq[String]): DataFrame =
-    val parsed = org.apache.spark.sql.internal.StringEnumParser.parse(
+    val parsed = StringEnumParser.parse(
       input = how,
-      paramName = "drop 'how'",
+      paramName = "how",
       mapping = DataFrameNaFunctions.DropHowMapping
     )
     val naDropBuilder = NADrop.newBuilder().setInput(df.relation)
