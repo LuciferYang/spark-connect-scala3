@@ -1294,6 +1294,30 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     col.subqueryRelations.head shouldBe df.relation
   }
 
+  test("scalar() rejects DataFrame whose relation is missing RelationCommon") {
+    val rel = Relation.newBuilder()
+      .setLocalRelation(LocalRelation.getDefaultInstance)
+      .build()
+    val df = DataFrame(SparkSession(null), rel)
+    val ex = intercept[IllegalArgumentException] {
+      df.scalar()
+    }
+    assert(ex.getMessage.contains("DataFrame used as a scalar subquery"))
+    assert(ex.getMessage.contains("RelationCommon"))
+  }
+
+  test("exists() rejects DataFrame whose relation is missing RelationCommon") {
+    val rel = Relation.newBuilder()
+      .setLocalRelation(LocalRelation.getDefaultInstance)
+      .build()
+    val df = DataFrame(SparkSession(null), rel)
+    val ex = intercept[IllegalArgumentException] {
+      df.exists()
+    }
+    assert(ex.getMessage.contains("DataFrame used as an EXISTS subquery"))
+    assert(ex.getMessage.contains("RelationCommon"))
+  }
+
   // ---------- repartition with columns ----------
 
   test("repartition(numPartitions, cols) builds RepartitionByExpression") {

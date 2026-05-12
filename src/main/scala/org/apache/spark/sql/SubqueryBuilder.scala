@@ -18,13 +18,18 @@ private[sql] object SubqueryBuilder:
 
   /** Build a subquery Column.
     *
-    * @param rel the DataFrame relation to wrap as a subquery
-    * @param subqueryType IN / SCALAR / EXISTS
-    * @param description human-readable description used in the `require` error message, e.g.
-    *   "DataFrame used as a scalar subquery" or "DataFrame used in IN-subquery"
-    * @param inValues values list for IN subqueries; ignored (empty) for SCALAR/EXISTS
-    * @param baseRelations additional subquery relations to prepend before appending `rel`;
-    *   used by `Column.buildInSubquery` to inherit the receiver's accumulated relations
+    * @param rel
+    *   the DataFrame relation to wrap as a subquery
+    * @param subqueryType
+    *   IN / SCALAR / EXISTS
+    * @param description
+    *   human-readable description used in the `require` error message, e.g. "DataFrame used as a
+    *   scalar subquery" or "DataFrame used in IN-subquery"
+    * @param inValues
+    *   values list for IN subqueries; ignored (empty) for SCALAR/EXISTS
+    * @param baseRelations
+    *   additional subquery relations to prepend before appending `rel`; used by
+    *   `Column.buildInSubquery` to inherit the receiver's accumulated relations
     */
   def build(
       rel: Relation,
@@ -42,7 +47,7 @@ private[sql] object SubqueryBuilder:
     val sqBuilder = SubqueryExpression.newBuilder()
       .setPlanId(planId)
       .setSubqueryType(subqueryType)
-    if !inValues.isEmpty then sqBuilder.addAllInSubqueryValues(inValues)
+      .addAllInSubqueryValues(inValues) // no-op for empty list (SCALAR/EXISTS)
     val subExpr = Expression.newBuilder()
       .setSubqueryExpression(sqBuilder.build())
       .build()
