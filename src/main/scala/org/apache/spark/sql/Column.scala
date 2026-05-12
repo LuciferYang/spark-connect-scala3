@@ -486,24 +486,24 @@ object Column:
     new Column(expr, subqueryRelations)
 
   /** Create a literal Column. */
-  def lit(value: Any): Column =
-    val literal = value match
-      case null => Expression.Literal.newBuilder()
-          .setNull(ProtoDataType.newBuilder()
-            .setNull(ProtoDataType.NULL.getDefaultInstance).build())
-          .build()
-      case v: Boolean => Expression.Literal.newBuilder().setBoolean(v).build()
-      case v: Byte    => Expression.Literal.newBuilder().setByte(v.toInt).build()
-      case v: Short   => Expression.Literal.newBuilder().setShort(v.toInt).build()
-      case v: Int     => Expression.Literal.newBuilder().setInteger(v).build()
-      case v: Long    => Expression.Literal.newBuilder().setLong(v).build()
-      case v: Float   => Expression.Literal.newBuilder().setFloat(v).build()
-      case v: Double  => Expression.Literal.newBuilder().setDouble(v).build()
-      case v: String  => Expression.Literal.newBuilder().setString(v).build()
-      case v: Column  => return v // pass through
-      case v          => Expression.Literal.newBuilder().setString(v.toString).build()
-
-    Column(Expression.newBuilder().setLiteral(literal).build())
+  def lit(value: Any): Column = value match
+    case c: Column => c // already a Column — pass through
+    case _         =>
+      val literal = value match
+        case null => Expression.Literal.newBuilder()
+            .setNull(ProtoDataType.newBuilder()
+              .setNull(ProtoDataType.NULL.getDefaultInstance).build())
+            .build()
+        case v: Boolean => Expression.Literal.newBuilder().setBoolean(v).build()
+        case v: Byte    => Expression.Literal.newBuilder().setByte(v.toInt).build()
+        case v: Short   => Expression.Literal.newBuilder().setShort(v.toInt).build()
+        case v: Int     => Expression.Literal.newBuilder().setInteger(v).build()
+        case v: Long    => Expression.Literal.newBuilder().setLong(v).build()
+        case v: Float   => Expression.Literal.newBuilder().setFloat(v).build()
+        case v: Double  => Expression.Literal.newBuilder().setDouble(v).build()
+        case v: String  => Expression.Literal.newBuilder().setString(v).build()
+        case v          => Expression.Literal.newBuilder().setString(v.toString).build()
+      Column(Expression.newBuilder().setLiteral(literal).build())
 
 /** WindowSpec with partition, order, and frame specifications. */
 final class WindowSpec private[sql] (

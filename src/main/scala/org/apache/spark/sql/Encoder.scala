@@ -224,7 +224,7 @@ object Encoder:
         val name = constValue[l].toString
         val dt = sparkTypeOf[t]
         val nullable = isOption[t]
-        StructField(name, dt, nullable = nullable || !dt.isInstanceOf[DataType]) ::
+        StructField(name, dt, nullable = nullable) ::
           fieldsOf[ts, ls]
 
   /** Extract value from Row at index, handling Option fields. */
