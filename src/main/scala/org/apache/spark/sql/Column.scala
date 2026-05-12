@@ -195,16 +195,10 @@ class Column private[sql] (
 
   private def buildInSubquery(rel: Relation): Column =
     require(
-      rel.hasCommon,
-      "DataFrame used in IN-subquery has no RelationCommon (plan_id missing) — " +
-        "ensure the DataFrame was constructed through a SparkSession"
-    )
-    require(
       !expr.hasSubqueryExpression,
       "isin(Dataset)/isin(DataFrame) cannot be chained on a Column that already contains " +
         "a subquery expression"
     )
-    val planId = rel.getCommon.getPlanId
     // Upstream Spark unwraps struct() expressions into their argument list so multi-column IN
     // subqueries work correctly, e.g. `struct($"a", $"b").isin(df)` sends (a, b) as the value
     // list rather than the struct itself.
@@ -213,16 +207,13 @@ class Column private[sql] (
         expr.getUnresolvedFunction.getFunctionName == "struct"
       then expr.getUnresolvedFunction.getArgumentsList
       else java.util.List.of(expr)
-    val subExpr = Expression.newBuilder()
-      .setSubqueryExpression(
-        SubqueryExpression.newBuilder()
-          .setPlanId(planId)
-          .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_IN)
-          .addAllInSubqueryValues(values)
-          .build()
-      )
-      .build()
-    Column(subExpr, this.subqueryRelations :+ rel)
+    SubqueryBuilder.build(
+      rel,
+      SubqueryExpression.SubqueryType.SUBQUERY_TYPE_IN,
+      description = "DataFrame used in IN-subquery",
+      inValues = values,
+      baseRelations = this.subqueryRelations
+    )
 
   // ---------------------------------------------------------------------------
   // when / otherwise (case-when chaining)

@@ -918,40 +918,18 @@ final class DataFrame private[sql] (
     * The DataFrame must return exactly one row and one column.
     */
   def scalar(): Column =
-    require(
-      relation.hasCommon,
-      "DataFrame used as a scalar subquery has no RelationCommon (plan_id missing)"
-    )
-    val planId = relation.getCommon.getPlanId
-    Column(
-      Expression.newBuilder()
-        .setSubqueryExpression(
-          SubqueryExpression.newBuilder()
-            .setPlanId(planId)
-            .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_SCALAR)
-            .build()
-        )
-        .build(),
-      Seq(relation)
+    SubqueryBuilder.build(
+      relation,
+      SubqueryExpression.SubqueryType.SUBQUERY_TYPE_SCALAR,
+      description = "DataFrame used as a scalar subquery"
     )
 
   /** Return this DataFrame as an EXISTS subquery Column. */
   def exists(): Column =
-    require(
-      relation.hasCommon,
-      "DataFrame used as an EXISTS subquery has no RelationCommon (plan_id missing)"
-    )
-    val planId = relation.getCommon.getPlanId
-    Column(
-      Expression.newBuilder()
-        .setSubqueryExpression(
-          SubqueryExpression.newBuilder()
-            .setPlanId(planId)
-            .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_EXISTS)
-            .build()
-        )
-        .build(),
-      Seq(relation)
+    SubqueryBuilder.build(
+      relation,
+      SubqueryExpression.SubqueryType.SUBQUERY_TYPE_EXISTS,
+      description = "DataFrame used as an EXISTS subquery"
     )
 
   /** Define a watermark on an event-time column for streaming aggregations. */

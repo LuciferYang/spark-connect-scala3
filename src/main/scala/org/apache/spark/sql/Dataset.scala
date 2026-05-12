@@ -3,7 +3,6 @@ package org.apache.spark.sql
 import com.google.protobuf.ByteString
 import org.apache.spark.connect.proto.{
   CommonInlineUserDefinedFunction,
-  Expression,
   Join,
   MapPartitions,
   Relation,
@@ -683,22 +682,10 @@ final class Dataset[T: ClassTag] private[sql] (
     * }}}
     */
   def scalar(): Column =
-    val rel = df.relation
-    require(
-      rel.hasCommon,
-      "Dataset used as a scalar subquery has no RelationCommon (plan_id missing)"
-    )
-    val planId = rel.getCommon.getPlanId
-    Column(
-      Expression.newBuilder()
-        .setSubqueryExpression(
-          SubqueryExpression.newBuilder()
-            .setPlanId(planId)
-            .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_SCALAR)
-            .build()
-        )
-        .build(),
-      Seq(rel)
+    SubqueryBuilder.build(
+      df.relation,
+      SubqueryExpression.SubqueryType.SUBQUERY_TYPE_SCALAR,
+      description = "Dataset used as a scalar subquery"
     )
 
   /** Return this Dataset as an EXISTS subquery Column.
@@ -709,22 +696,10 @@ final class Dataset[T: ClassTag] private[sql] (
     * }}}
     */
   def exists(): Column =
-    val rel = df.relation
-    require(
-      rel.hasCommon,
-      "Dataset used as an EXISTS subquery has no RelationCommon (plan_id missing)"
-    )
-    val planId = rel.getCommon.getPlanId
-    Column(
-      Expression.newBuilder()
-        .setSubqueryExpression(
-          SubqueryExpression.newBuilder()
-            .setPlanId(planId)
-            .setSubqueryType(SubqueryExpression.SubqueryType.SUBQUERY_TYPE_EXISTS)
-            .build()
-        )
-        .build(),
-      Seq(rel)
+    SubqueryBuilder.build(
+      df.relation,
+      SubqueryExpression.SubqueryType.SUBQUERY_TYPE_EXISTS,
+      description = "Dataset used as an EXISTS subquery"
     )
 
   // ---------------------------------------------------------------------------
