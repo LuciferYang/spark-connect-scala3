@@ -1,8 +1,8 @@
 # Spark Connect Scala 3 — 多角色代码审查报告
 
-> 生成日期：2026-05-08（全量分析）/ 2026-05-10（安全加固专项）
+> 生成日期：2026-05-08（全量分析）/ 2026-05-10（安全加固专项）/ 2026-05-11（hardening 迭代 1-20）/ 2026-05-12（SubqueryBuilder 重构 + 多角色加固 1-18）
 > 分析范围：`src/main/scala/` 全部源码
-> 分析方法：安全专家 + 性能工程师 + 高级工程师 + 一致性审查者 四视角并行分析
+> 分析方法：安全专家 + 性能工程师 + 高级工程师 + 一致性审查者 四视角并行分析，多轮加固直到连续 10 轮无新问题
 
 ---
 
@@ -350,6 +350,103 @@
 |---|------|------|-----------|
 | S-1 | 安全 | gRPC channel 默认明文传输（无 TLS） | 需 TLS 基础设施增强，涉及证书管理和部署配置 |
 | C-1 + C-2 | 一致性 | functions.scala(2069行) + DataFrame.scala(1155行) 超长 | 需大规模文件拆分，属架构重构 |
+
+---
+
+## 17. Hardening 迭代 R1-R20 (2026-05-11)
+
+> 对 hardening 修复（C-3/C-9/C-13/C-14/C-18/Q-7/Q-8/Q-22/R5-5/R10-1/R10-2）逐轮执行多角色评审，持续到连续 10 轮无新问题发现。
+
+### 修复的新问题（不在原 162 项内，为 hardening 派生）
+
+| 轮次 | 发现 | 修复 commit |
+|------|------|------------|
+| R1 | `DataFrame.convertRowPost` 的 `case _ => r` 让畸形 spatial/variant 返回 envelope Row 作为单元格值（Q-7/Q-8 回归） | `427d3d0` 改为抛 IllegalStateException |
+| R1 | `Column.toBoundary` MinValue/MaxValue 两分支重复 | `427d3d0` 合并 |
+| R1 | `WhenColumn.asColumn` 缺 null case | `427d3d0` 添加 |
+| R1 | `URLDecoder.decode(_, "UTF-8")` 应用 `StandardCharsets` 重载 | `427d3d0` |
+| R2 | `Column.toBoundary` 不区分 rows/range，R5-5 的 Int check 破坏了 `rangeBetween` 的 Long 支持 | `3ef62bc` 拆分 `toRowBoundary` / `toRangeBoundary` |
+| R2 | `Column.buildInSubquery` 未对 `struct` 参数解包，上游会 | `3ef62bc` 添加 struct unwrap |
+| R2 | `Column.isin(Any*)` 缺 `@scala.annotation.varargs` | `3ef62bc` 加标注 |
+| R3 | `Column.isin(null: Dataset/DataFrame)` NPE | `09e9087` 返回 null 单值列表 |
+| R3 | `convertRowPost` 错误消息缺 column name/type | `09e9087` 补全 |
+| R4 | `toRowBoundary/toRangeBoundary` 对 Long.MinValue/MaxValue 不对称映射（upstream 只在 start=MinValue / end=MaxValue 时 unbounded） | `813f000` 引入 isStart 参数 |
+| R4 | `parseUrl` 畸形段 `k`（无 `=`）静默丢弃，upstream 抛 | `813f000` 改为抛 |
+| R5 | `DataFrame.explain(mode)` / `toJoinType` 使用默认 locale（Turkish locale bug） | `8cb058e` 固定 `Locale.ROOT` |
+| R6 | `Column.buildInSubquery` 未 `require(rel.hasCommon)` | `89a97bc` 添加 |
+| R6 | `WhenColumn.require(branches.nonEmpty)` 在 super-ctor 后才执行 | `89a97bc` 移到 buildExpr 内 |
+| R6 | `parseUrl` 空 key 未检测 | `89a97bc` 添加 trim.nonEmpty |
+| R8 | `functions.when(null)` NPE | `d004424` 添加 require |
+| R8 | `Column.isin(df1).isin(df2)` 嵌套 subquery 未检测 | `d004424` require `!hasSubqueryExpression` |
+| R8 | `DataFrame.toJoinType/explain(null)` NPE | `d004424` require |
+| R11 | `DataFrame.scalar/exists` + `Dataset.scalar/exists` 未 `require(hasCommon)` | `71454c3` |
+| R11 | `toJoinType` 对未知类型 silent fallback 到 INNER（upstream 抛 AnalysisException） | `71454c3` 改为抛 + strip underscores |
+| R11 | `DataFrameWriter.toProtoMode` / `DataFrameNaFunctions.drop(how)` silent fallback + 默认 locale | `71454c3` 改为抛 + Locale.ROOT |
+| R12 | `SparkConnectClient.buildSanitizedUrl` 不 URL 编码（与 parseUrl 的 decode 不对称，cloneSession round-trip 破坏） | `e400d5a` URL-encode 输出 |
+| R15-16 | `explain` / `toJoinType` 缺 `.trim`；`toProtoMode` 缺 `"default"` 别名（upstream 有） | `4c6ef86` 对齐 |
+| R17-18 | `buildSanitizedUrl` 行长超 100 | `3731102` 提取 encode helper |
+| R20 | `parseUrl` 空 key 的 `require` 放在 try 内，被外层 catch 重包装为"URL-encoded value"误导 | `332433f` 把 require 移出 try |
+
+**R13/R14/R17/R19/R21-R30 均 CLEAN**，R24 只有 DRY 建议（非 bug，视作 clean）。最终连续 10 轮无新发现（R21-R30），hardening 审查终止。
+
+---
+
+## 18. SubqueryBuilder 重构 + R1-R18 多角色加固 (2026-05-12)
+
+> 针对 R24 的 DRY 建议落地：消除 `Column.buildInSubquery` / `DataFrame.scalar-exists` / `Dataset.scalar-exists` 五处 subquery 构造样板。
+
+| 轮次 | 发现 | 修复 commit |
+|------|------|------------|
+| (base) | 引入 `SubqueryBuilder.build`，5 处 call site 全部改写，净 -79/+23 | `1813bc4` |
+| R1 | 冗余 `if !inValues.isEmpty` 守卫 + 缺 DataFrame.scalar/exists 负面测试 | `3fddde7` |
+| R3 | 缺 `require(description nonEmpty)` + 缺 `require(subqueryType != UNKNOWN)` | `bba4a3e` |
+| R4 | stringly-typed `description: String` 回退为 `SubqueryKind` enum（携带 protoType + description） | `48d0fcf` |
+| R6 | `require(rel.hasCommon)` 应升级为 `require(rel.hasCommon && rel.getCommon.hasPlanId)` 对齐 upstream | `8ff37e1` |
+| R8 | 缺 Dataset.scalar/exists + buildInSubquery 对 `planId=absent` 的负面测试（7 个） | `672cfe2` |
+
+**R2/R5/R7/R9-R18 均 CLEAN**，连续 10 轮（R9-R18）无新问题，终止。
+
+---
+
+## 19. 当前未修复问题汇总
+
+### HIGH（2 个，均属架构/基础设施）
+
+| # | 类别 | 描述 | 原因 |
+|---|------|------|------|
+| **S-1** | 安全 | gRPC channel 默认明文传输（无 TLS） | 需 TLS 证书 + 部署配置；非纯客户端修复 |
+| **C-1 + C-2** | 一致性 | `functions.scala` (2069 行) + `DataFrame.scala` (1155 行) 超长 | 需大规模文件拆分，架构重构 |
+
+### MEDIUM（5 个）
+
+**⛔ 不修复（4 个）— 平台/API 限制：**
+
+| # | 文件 | 描述 | 原因 |
+|---|------|------|------|
+| **P-16** | `ArrowDeserializer.scala:47` | 原始类型 `extractValue` boxing | JVM 不支持泛型 specialization，消除 boxing 需每种原始类型独立分支 |
+| **P-19** | `DataFrame.scala:995` | `ByteString.toByteArray` 全拷贝 | Protobuf API 限制，无零拷贝替代 |
+| **Q-17** | `Encoder.scala:31` | `agnosticEncoder` 默认 null，应为 Option | 改为 Option 是 breaking API change，波及所有 encoder 实现 |
+| **R3-3** | `AgnosticEncoder.scala:642` | `CollectionEncoderProxy.readResolve` 期望 4 参构造，Spark 4.x 只有 3 参 | 须精确对齐 Spark 4.1.1 序列化签名，贸然改会破坏兼容性 |
+
+**⏳ 延后（2 个，独立问题）— 架构性/设计决策：**
+
+| # | 文件 | 描述 | 原因 |
+|---|------|------|------|
+| **R2-7 / R3-6** | `StreamingQueryListenerBus.scala:109` | `postToAll` 持有 `lock.synchronized` 调用 listener 回调；可能阻塞/re-entrant 竞争 | 需重构为 lock-free queue 或异步 dispatch，架构性改动 |
+| **R2-8** | `RetryPolicy.scala:11` | 默认 `maxRetries=15` + `backoffMultiplier=4.0` 总重试时长可超 15 分钟 | 设计选择，缩短可能破坏依赖长重试的用户场景 |
+
+### LOW（55 个未修复）
+
+多为命名、文档、scaladoc、minor boxing 等改进。每个 ROI 低，批量处理价值可考虑。
+
+### R24 DRY 建议（已处理 1 个，剩 3 个可考虑）
+
+| 建议 | 状态 |
+|------|------|
+| ✅ 消除 subquery 构造 5 处重复 | 已做（Section 18） |
+| 共享 `encode` helper（SparkConnectClient + ClientParser） | 未做 |
+| `toRowBoundary` / `toRangeBoundary` 提取共享分支 | 未做 |
+| String→Enum normalizer 统一（`toJoinType` / `toProtoMode` / `drop(how)` / `explain(mode)`） | 未做 |
 
 ---
 
