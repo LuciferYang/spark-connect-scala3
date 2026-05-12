@@ -4,8 +4,6 @@ import io.grpc.{ManagedChannelBuilder, Metadata}
 import io.grpc.stub.MetadataUtils
 import org.apache.spark.connect.proto.*
 
-import java.net.{URLDecoder, URLEncoder}
-import java.nio.charset.StandardCharsets
 import java.util.UUID
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -33,7 +31,7 @@ final class SparkConnectClient private (
   /** Reconstruct the full URL (with token) for internal use only. */
   private def fullUrl: String = token match
     case Some(t) =>
-      s"$connectionUrl;token=${URLEncoder.encode(t, StandardCharsets.UTF_8)}"
+      s"$connectionUrl;token=${UrlEncoding.encode(t)}"
     case None => connectionUrl
 
   override def toString: String =
@@ -477,10 +475,7 @@ object SparkConnectClient:
         case Array(k, v) =>
           val (decodedKey, decodedValue) =
             try
-              (
-                URLDecoder.decode(k, StandardCharsets.UTF_8),
-                URLDecoder.decode(v, StandardCharsets.UTF_8)
-              )
+              (UrlEncoding.decode(k), UrlEncoding.decode(v))
             catch
               case e: IllegalArgumentException =>
                 throw IllegalArgumentException(
@@ -563,6 +558,6 @@ object SparkConnectClient:
     val base = s"sc://$host:$port"
     if params.isEmpty then base
     else
-      base + ";" + params.map((k, v) => s"${encode(k)}=${encode(v)}").mkString(";")
-
-  private def encode(s: String): String = URLEncoder.encode(s, StandardCharsets.UTF_8)
+      base + ";" + params.map { (k, v) =>
+        s"${UrlEncoding.encode(k)}=${UrlEncoding.encode(v)}"
+      }.mkString(";")

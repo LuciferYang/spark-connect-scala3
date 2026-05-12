@@ -17,8 +17,6 @@
 package org.apache.spark.sql.connect.client
 
 import scala.annotation.tailrec
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 /** Parser that takes an array of (CLI) arguments and produces a [[Config]].
   *
@@ -120,7 +118,6 @@ private[sql] object SparkConnectClientParser:
   /** URL-encode a value, escaping `;`, `=`, and other special characters.
     *
     * Uses `application/x-www-form-urlencoded` encoding (space → `+`, then `%`-encoded otherwise).
-    * `parseUrl`'s `URLDecoder` inverts this exactly, so round-trip is lossless for all Strings.
+    * `parseUrl` inverts this exactly, so round-trip is lossless for all Strings.
     */
-  private def encodeValue(s: String): String =
-    URLEncoder.encode(s, StandardCharsets.UTF_8)
+  private def encodeValue(s: String): String = UrlEncoding.encode(s)
