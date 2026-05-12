@@ -60,8 +60,16 @@ private[sql] object StringEnumParser:
     mapping.get(normalized) match
       case Some(v) => v
       case None    =>
-        val accepted = acceptedDisplay.getOrElse(mapping.keys.toSeq.sorted)
+        val accepted = acceptedDisplay match
+          case Some(xs) if xs.nonEmpty => xs
+          case _                       => mapping.keys.toSeq.sorted
+        // Sanitize input for the error message: render control characters (newlines, tabs, …)
+        // via their escape form so a malicious input cannot forge log lines or smuggle ANSI.
+        val sanitized = input.flatMap {
+          case c if c.isControl => f"\\u${c.toInt}%04x"
+          case c                => c.toString
+        }
         throw IllegalArgumentException(
-          s"$errorVerb $paramName: '$input'. Accepted values: " +
+          s"$errorVerb $paramName: '$sanitized'. Accepted values: " +
             accepted.mkString("'", "', '", "'") + "."
         )
