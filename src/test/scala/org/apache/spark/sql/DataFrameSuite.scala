@@ -2254,6 +2254,27 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     assert(ex.getMessage.contains("must not be null"))
   }
 
+  test("explain rejects unknown mode with listing") {
+    val df = testDf()
+    val ex = intercept[IllegalArgumentException] {
+      df.explain("bogus-mode")
+    }
+    assert(ex.getMessage.contains("Unknown explain mode"))
+    assert(ex.getMessage.contains("bogus-mode"))
+    assert(ex.getMessage.contains("simple"))
+    assert(ex.getMessage.contains("extended"))
+  }
+
+  test("explain(\"  simple  \") trims before matching (no IAE thrown)") {
+    val df = testDf()
+    // Without trim, this would throw IllegalArgumentException("Unknown explain mode: '  simple  '").
+    // With trim, "  simple  " normalizes to "simple" and we proceed past the parser.
+    // A downstream NPE is expected since the stub session has no client.
+    assertThrows[NullPointerException] {
+      df.explain("  simple  ")
+    }
+  }
+
   test("toJoinType rejects null and unknown join types") {
     val df = testDf()
     val nullEx = intercept[IllegalArgumentException] {
@@ -2265,6 +2286,10 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
       df.toJoinType("not-a-join-type")
     }
     assert(unknownEx.getMessage.contains("Unsupported joinType"))
+    assert(unknownEx.getMessage.contains("not-a-join-type"))
+    // JoinTypeDisplay override surfaces both normalized and underscore variants
+    assert(unknownEx.getMessage.contains("leftouter"))
+    assert(unknownEx.getMessage.contains("left_outer"))
   }
 
   test("toJoinType accepts underscore-separated aliases") {

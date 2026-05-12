@@ -305,3 +305,20 @@ class DataFrameNaFunctionsSuite extends AnyFunSuite with Matchers:
     naReplace.getColsList.asScala.toSeq shouldBe Seq("col1")
     naReplace.getReplacementsCount shouldBe 1
   }
+
+  test("drop(null, cols) rejects with clear error message") {
+    val ex = intercept[IllegalArgumentException] {
+      naFunctions.drop(null: String, Seq("col1"))
+    }
+    assert(ex.getMessage.contains("how must not be null"))
+  }
+
+  test("drop(unknown how, cols) rejects with accepted-values listing") {
+    val ex = intercept[IllegalArgumentException] {
+      naFunctions.drop("bogus", Seq("col1"))
+    }
+    assert(ex.getMessage.contains("Unknown how"))
+    assert(ex.getMessage.contains("bogus"))
+    assert(ex.getMessage.contains("any"))
+    assert(ex.getMessage.contains("all"))
+  }
