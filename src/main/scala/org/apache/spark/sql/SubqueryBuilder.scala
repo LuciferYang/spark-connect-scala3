@@ -39,6 +39,14 @@ private[sql] object SubqueryBuilder:
       baseRelations: Seq[Relation] = Seq.empty
   ): Column =
     require(
+      description != null && description.nonEmpty,
+      "description must be non-empty"
+    )
+    require(
+      subqueryType != SubqueryExpression.SubqueryType.SUBQUERY_TYPE_UNKNOWN,
+      "subqueryType must be set (not SUBQUERY_TYPE_UNKNOWN)"
+    )
+    require(
       rel.hasCommon,
       s"$description has no RelationCommon (plan_id missing) — " +
         "ensure the DataFrame was constructed through a SparkSession"
