@@ -14,18 +14,25 @@ import java.util.Locale
   *   3. lower-case via Locale.ROOT (avoids Turkish locale bug)
   *   4. optional underscore strip (for joinType: "left_outer" → "leftouter")
   *
-  * Lookup is a single `Map[String, T]` pass. Unknown inputs produce a uniform error message
-  * listing accepted values.
+  * Lookup is a single `Map[String, T]` pass. Unknown inputs produce a uniform error message listing
+  * accepted values.
   */
 private[sql] object StringEnumParser:
 
-  /** @param input raw user input (may be null)
-    * @param paramName human-readable parameter name for error messages (e.g. "joinType", "save mode")
-    * @param mapping accepted input keys (already normalized — see `trim`/`stripUnderscore`) to values
-    * @param trim if true, strip leading/trailing whitespace before matching
-    * @param stripUnderscore if true, remove all `_` from the input before matching
-    * @tparam T the enum-like target type
-    * @throws IllegalArgumentException on null input or unrecognized value
+  /** @param input
+    *   raw user input (may be null)
+    * @param paramName
+    *   human-readable parameter name for error messages (e.g. "joinType", "save mode")
+    * @param mapping
+    *   accepted input keys (already normalized — see `trim`/`stripUnderscore`) to values
+    * @param trim
+    *   if true, strip leading/trailing whitespace before matching
+    * @param stripUnderscore
+    *   if true, remove all `_` from the input before matching
+    * @tparam T
+    *   the enum-like target type
+    * @throws IllegalArgumentException
+    *   on null input or unrecognized value
     */
   def parse[T](
       input: String,
