@@ -1,6 +1,6 @@
 # Spark Connect Scala 3 — 多角色代码审查报告
 
-> 生成日期：2026-05-08（全量分析）/ 2026-05-10（安全加固专项）/ 2026-05-11（hardening 迭代 1-20）/ 2026-05-12（SubqueryBuilder 重构 + 多角色加固 1-18）
+> 生成日期：2026-05-08（全量分析）/ 2026-05-10（安全加固专项）/ 2026-05-11（hardening 迭代 1-20）/ 2026-05-12（SubqueryBuilder 重构 + 多角色加固 1-18 + DRY 批次 2：UrlEncoding + StringEnumParser）
 > 分析范围：`src/main/scala/` 全部源码
 > 分析方法：安全专家 + 性能工程师 + 高级工程师 + 一致性审查者 四视角并行分析，多轮加固直到连续 10 轮无新问题
 
@@ -439,14 +439,43 @@
 
 多为命名、文档、scaladoc、minor boxing 等改进。每个 ROI 低，批量处理价值可考虑。
 
-### R24 DRY 建议（已处理 1 个，剩 3 个可考虑）
+### R24 DRY 建议
 
-| 建议 | 状态 |
-|------|------|
-| ✅ 消除 subquery 构造 5 处重复 | 已做（Section 18） |
-| 共享 `encode` helper（SparkConnectClient + ClientParser） | 未做 |
-| `toRowBoundary` / `toRangeBoundary` 提取共享分支 | 未做 |
-| String→Enum normalizer 统一（`toJoinType` / `toProtoMode` / `drop(how)` / `explain(mode)`） | 未做 |
+| 建议 | 状态 | Commit |
+|------|------|--------|
+| 消除 subquery 构造 5 处重复 | ✅ 已做 | `1813bc4` → `672cfe2` (Section 18) |
+| 共享 URL encode/decode helper（SparkConnectClient + ClientParser） | ✅ 已做 | `667cb2f` (Section 20) |
+| String→Enum normalizer 统一（`toJoinType` / `toProtoMode` / `drop(how)` / `explain(mode)`） | ✅ 已做 | `2d2b673` (Section 20) |
+| `toRowBoundary` / `toRangeBoundary` 提取共享分支 | ⏳ 未做 | — |
+
+---
+
+## 20. DRY 重构批次 2 (2026-05-12)
+
+> 接续 Section 18 的 SubqueryBuilder，消除剩余 R24 DRY 建议中的 2 项。
+
+### UrlEncoding 共享工具 (`667cb2f`)
+
+新 `private[client] object UrlEncoding` 合并：
+- `SparkConnectClient.encode` (companion, 用于 `buildSanitizedUrl`)
+- `SparkConnectClient.fullUrl` 内联 `URLEncoder.encode`
+- `SparkConnectClient.parseUrl` 内联 `URLDecoder.decode` (×2)
+- `SparkConnectClientParser.encodeValue`
+
+确保 `buildUrl → parseUrl` 和 `parseUrl → buildSanitizedUrl → parseUrl` 两条 round-trip 路径共用同一 UTF-8 form-urlencoded 实现。
+
+### StringEnumParser 统一 (`2d2b673`)
+
+新 `private[sql] object StringEnumParser.parse[T](input, paramName, mapping, trim, stripUnderscore)` 替代 4 处重复的 `null-check → lowercase → match → throw` 模板。
+
+| Call site | trim | stripUnderscore | Mapping 位置 |
+|-----------|------|-----------------|--------------|
+| `DataFrame.toJoinType` | ✓ | ✓ | `DataFrame.JoinTypeMapping` |
+| `DataFrame.explain(mode)` | ✓ | ✗ | `DataFrame.ExplainModeMapping` |
+| `DataFrameWriter.toProtoMode` | ✗ | ✗ | `DataFrameWriter.SaveModeMapping` |
+| `DataFrameNaFunctions.drop(how)` | ✗ | ✗ | `DataFrameNaFunctions.DropHowMapping`（私有 `DropHow` enum）|
+
+匹配表成为数据而非代码，新增别名是添加一个 Map 条目。
 
 ---
 
