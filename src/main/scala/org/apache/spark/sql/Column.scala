@@ -580,25 +580,19 @@ object Window:
       value: Long,
       isStart: Boolean
   ): Expression.Window.WindowFrame.FrameBoundary =
-    if isStart && value == Long.MinValue then
-      Expression.Window.WindowFrame.FrameBoundary.newBuilder()
-        .setUnbounded(true).build()
-    else if !isStart && value == Long.MaxValue then
-      Expression.Window.WindowFrame.FrameBoundary.newBuilder()
-        .setUnbounded(true).build()
-    else if value == 0L then
-      Expression.Window.WindowFrame.FrameBoundary.newBuilder()
-        .setCurrentRow(true).build()
-    else
-      require(
-        value >= Int.MinValue && value <= Int.MaxValue,
-        s"Row frame boundary value $value is outside the supported Int range " +
-          s"[${Int.MinValue}, ${Int.MaxValue}]. Use Window.unboundedPreceding / " +
-          s"Window.unboundedFollowing for unbounded frames."
-      )
-      val litExpr = Column.lit(value.toInt).expr
-      Expression.Window.WindowFrame.FrameBoundary.newBuilder()
-        .setValue(litExpr).build()
+    toBoundary(
+      value,
+      isStart,
+      finiteLit = { v =>
+        require(
+          v >= Int.MinValue && v <= Int.MaxValue,
+          s"Row frame boundary value $v is outside the supported Int range " +
+            s"[${Int.MinValue}, ${Int.MaxValue}]. Use Window.unboundedPreceding / " +
+            s"Window.unboundedFollowing for unbounded frames."
+        )
+        Column.lit(v.toInt).expr
+      }
+    )
 
   /** Build a frame boundary for a RANGE frame.
     *
@@ -615,6 +609,19 @@ object Window:
       value: Long,
       isStart: Boolean
   ): Expression.Window.WindowFrame.FrameBoundary =
+    toBoundary(value, isStart, finiteLit = v => Column.lit(v).expr)
+
+  /** Shared sentinel-handling core for `toRowBoundary` / `toRangeBoundary`.
+    *
+    * Handles the three common cases (unbounded-preceding start, unbounded-following end, current
+    * row), then delegates finite-value literal construction to `finiteLit` which is the only bit
+    * that differs between row (Int-range literal) and range (Long literal) frames.
+    */
+  private def toBoundary(
+      value: Long,
+      isStart: Boolean,
+      finiteLit: Long => Expression
+  ): Expression.Window.WindowFrame.FrameBoundary =
     if isStart && value == Long.MinValue then
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setUnbounded(true).build()
@@ -625,6 +632,5 @@ object Window:
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
         .setCurrentRow(true).build()
     else
-      val litExpr = Column.lit(value).expr
       Expression.Window.WindowFrame.FrameBoundary.newBuilder()
-        .setValue(litExpr).build()
+        .setValue(finiteLit(value)).build()
