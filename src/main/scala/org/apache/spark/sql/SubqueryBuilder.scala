@@ -63,8 +63,8 @@ private[sql] object SubqueryBuilder:
       baseRelations: Seq[Relation] = Seq.empty
   ): Column =
     require(
-      rel.hasCommon,
-      s"${kind.description} has no RelationCommon (plan_id missing) — " +
+      rel.hasCommon && rel.getCommon.hasPlanId,
+      s"${kind.description} has no RelationCommon plan_id — " +
         "ensure the DataFrame was constructed through a SparkSession"
     )
     val planId = rel.getCommon.getPlanId
