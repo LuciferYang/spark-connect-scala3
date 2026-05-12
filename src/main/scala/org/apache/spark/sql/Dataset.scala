@@ -8,7 +8,6 @@ import org.apache.spark.connect.proto.{
   Relation,
   RelationCommon,
   ScalarScalaUDF,
-  SubqueryExpression,
   WithRelations
 }
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
@@ -682,11 +681,7 @@ final class Dataset[T: ClassTag] private[sql] (
     * }}}
     */
   def scalar(): Column =
-    SubqueryBuilder.build(
-      df.relation,
-      SubqueryExpression.SubqueryType.SUBQUERY_TYPE_SCALAR,
-      description = "Dataset used as a scalar subquery"
-    )
+    SubqueryBuilder.build(df.relation, SubqueryBuilder.SubqueryKind.ScalarFromDataset)
 
   /** Return this Dataset as an EXISTS subquery Column.
     *
@@ -696,11 +691,7 @@ final class Dataset[T: ClassTag] private[sql] (
     * }}}
     */
   def exists(): Column =
-    SubqueryBuilder.build(
-      df.relation,
-      SubqueryExpression.SubqueryType.SUBQUERY_TYPE_EXISTS,
-      description = "Dataset used as an EXISTS subquery"
-    )
+    SubqueryBuilder.build(df.relation, SubqueryBuilder.SubqueryKind.ExistsFromDataset)
 
   // ---------------------------------------------------------------------------
   // Convert to another type

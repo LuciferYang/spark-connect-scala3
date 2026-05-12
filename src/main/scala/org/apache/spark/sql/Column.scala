@@ -3,7 +3,6 @@ package org.apache.spark.sql
 import org.apache.spark.connect.proto.{
   Expression,
   Relation,
-  SubqueryExpression,
   DataType as ProtoDataType
 }
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
@@ -209,8 +208,7 @@ class Column private[sql] (
       else java.util.List.of(expr)
     SubqueryBuilder.build(
       rel,
-      SubqueryExpression.SubqueryType.SUBQUERY_TYPE_IN,
-      description = "DataFrame used in IN-subquery",
+      SubqueryBuilder.SubqueryKind.In,
       inValues = values,
       baseRelations = this.subqueryRelations
     )

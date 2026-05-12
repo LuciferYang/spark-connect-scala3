@@ -11,50 +11,66 @@ import org.apache.spark.connect.proto.{Expression, Relation, SubqueryExpression}
   *
   * Each of those call sites previously duplicated the same `require(rel.hasCommon, ...)` guard,
   * plan-id extraction, and `SubqueryExpression` builder wiring. All share identical proto shape;
-  * only the `SubqueryType` enum value, the optional in-subquery values list, and the base
-  * `subqueryRelations` to propagate differ.
+  * only the `SubqueryKind`, the optional in-subquery values list, and the base `subqueryRelations`
+  * to propagate differ.
   */
 private[sql] object SubqueryBuilder:
+
+  /** The three subquery categories supported by the Spark Connect proto. Each carries its
+    * corresponding proto enum value and a stable description used in error messages — avoids
+    * stringly-typed call sites and keeps messages uniform.
+    */
+  enum SubqueryKind(val protoType: SubqueryExpression.SubqueryType, val description: String):
+    case In extends SubqueryKind(
+          SubqueryExpression.SubqueryType.SUBQUERY_TYPE_IN,
+          "DataFrame used in IN-subquery"
+        )
+    case ScalarFromDataFrame extends SubqueryKind(
+          SubqueryExpression.SubqueryType.SUBQUERY_TYPE_SCALAR,
+          "DataFrame used as a scalar subquery"
+        )
+    case ExistsFromDataFrame extends SubqueryKind(
+          SubqueryExpression.SubqueryType.SUBQUERY_TYPE_EXISTS,
+          "DataFrame used as an EXISTS subquery"
+        )
+    case ScalarFromDataset extends SubqueryKind(
+          SubqueryExpression.SubqueryType.SUBQUERY_TYPE_SCALAR,
+          "Dataset used as a scalar subquery"
+        )
+    case ExistsFromDataset extends SubqueryKind(
+          SubqueryExpression.SubqueryType.SUBQUERY_TYPE_EXISTS,
+          "Dataset used as an EXISTS subquery"
+        )
 
   /** Build a subquery Column.
     *
     * @param rel
     *   the DataFrame relation to wrap as a subquery
-    * @param subqueryType
-    *   IN / SCALAR / EXISTS
-    * @param description
-    *   human-readable description used in the `require` error message, e.g. "DataFrame used as a
-    *   scalar subquery" or "DataFrame used in IN-subquery"
+    * @param kind
+    *   which subquery category this is (determines proto type + error message wording)
     * @param inValues
     *   values list for IN subqueries; ignored (empty) for SCALAR/EXISTS
     * @param baseRelations
     *   additional subquery relations to prepend before appending `rel`; used by
-    *   `Column.buildInSubquery` to inherit the receiver's accumulated relations
+    *   `Column.buildInSubquery` to inherit the receiver's accumulated relations.
+    *   DataFrame/Dataset's `scalar()`/`exists()` pass the default empty — these callers have no
+    *   upstream `subqueryRelations` to carry (only `Column` accumulates them).
     */
   def build(
       rel: Relation,
-      subqueryType: SubqueryExpression.SubqueryType,
-      description: String,
+      kind: SubqueryKind,
       inValues: java.util.List[Expression] = java.util.List.of(),
       baseRelations: Seq[Relation] = Seq.empty
   ): Column =
     require(
-      description != null && description.nonEmpty,
-      "description must be non-empty"
-    )
-    require(
-      subqueryType != SubqueryExpression.SubqueryType.SUBQUERY_TYPE_UNKNOWN,
-      "subqueryType must be set (not SUBQUERY_TYPE_UNKNOWN)"
-    )
-    require(
       rel.hasCommon,
-      s"$description has no RelationCommon (plan_id missing) — " +
+      s"${kind.description} has no RelationCommon (plan_id missing) — " +
         "ensure the DataFrame was constructed through a SparkSession"
     )
     val planId = rel.getCommon.getPlanId
     val sqBuilder = SubqueryExpression.newBuilder()
       .setPlanId(planId)
-      .setSubqueryType(subqueryType)
+      .setSubqueryType(kind.protoType)
       .addAllInSubqueryValues(inValues) // no-op for empty list (SCALAR/EXISTS)
     val subExpr = Expression.newBuilder()
       .setSubqueryExpression(sqBuilder.build())

@@ -918,19 +918,11 @@ final class DataFrame private[sql] (
     * The DataFrame must return exactly one row and one column.
     */
   def scalar(): Column =
-    SubqueryBuilder.build(
-      relation,
-      SubqueryExpression.SubqueryType.SUBQUERY_TYPE_SCALAR,
-      description = "DataFrame used as a scalar subquery"
-    )
+    SubqueryBuilder.build(relation, SubqueryBuilder.SubqueryKind.ScalarFromDataFrame)
 
   /** Return this DataFrame as an EXISTS subquery Column. */
   def exists(): Column =
-    SubqueryBuilder.build(
-      relation,
-      SubqueryExpression.SubqueryType.SUBQUERY_TYPE_EXISTS,
-      description = "DataFrame used as an EXISTS subquery"
-    )
+    SubqueryBuilder.build(relation, SubqueryBuilder.SubqueryKind.ExistsFromDataFrame)
 
   /** Define a watermark on an event-time column for streaming aggregations. */
   def withWatermark(eventTime: String, delayThreshold: String): DataFrame =
