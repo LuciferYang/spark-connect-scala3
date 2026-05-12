@@ -596,18 +596,13 @@ final class DataFrame private[sql] (
 
   /** Explain this plan with a mode string. */
   def explain(mode: String): Unit =
-    require(mode != null, "explain mode must not be null")
     val plan = Plan.newBuilder().setRoot(relation).build()
-    val explainMode = mode.trim.toLowerCase(java.util.Locale.ROOT) match
-      case "simple"    => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE
-      case "extended"  => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_EXTENDED
-      case "codegen"   => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_CODEGEN
-      case "cost"      => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_COST
-      case "formatted" => AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_FORMATTED
-      case other       =>
-        throw IllegalArgumentException(
-          s"Unknown explain mode: '$other'. Accepted modes: simple, extended, codegen, cost, formatted."
-        )
+    val explainMode = org.apache.spark.sql.internal.StringEnumParser.parse(
+      input = mode,
+      paramName = "explain mode",
+      mapping = DataFrame.ExplainModeMapping,
+      trim = true
+    )
     val explainStr = client.analyzeExplain(plan, explainMode)
     println(explainStr)
 
@@ -1159,24 +1154,44 @@ final class DataFrame private[sql] (
     ))
 
   private[sql] def toJoinType(s: String): Join.JoinType =
-    require(s != null, "joinType must not be null")
-    // Match upstream: trim, then strip underscores so "left_outer" == "leftouter"
-    s.trim.toLowerCase(java.util.Locale.ROOT).replace("_", "") match
-      case "inner"                        => Join.JoinType.JOIN_TYPE_INNER
-      case "left" | "leftouter"           => Join.JoinType.JOIN_TYPE_LEFT_OUTER
-      case "right" | "rightouter"         => Join.JoinType.JOIN_TYPE_RIGHT_OUTER
-      case "full" | "outer" | "fullouter" => Join.JoinType.JOIN_TYPE_FULL_OUTER
-      case "cross"                        => Join.JoinType.JOIN_TYPE_CROSS
-      case "semi" | "leftsemi"            => Join.JoinType.JOIN_TYPE_LEFT_SEMI
-      case "anti" | "leftanti"            => Join.JoinType.JOIN_TYPE_LEFT_ANTI
-      case _                              =>
-        throw IllegalArgumentException(
-          s"Unsupported join type: '$s'. Supported: " +
-            "'inner', 'cross', 'outer', 'full', 'fullouter', 'full_outer', " +
-            "'left', 'leftouter', 'left_outer', 'right', 'rightouter', 'right_outer', " +
-            "'semi', 'leftsemi', 'left_semi', 'anti', 'leftanti', 'left_anti'."
-        )
+    org.apache.spark.sql.internal.StringEnumParser.parse(
+      input = s,
+      paramName = "join type",
+      mapping = DataFrame.JoinTypeMapping,
+      trim = true,
+      stripUnderscore = true
+    )
 
 object DataFrame:
   private[sql] def apply(session: SparkSession, relation: Relation): DataFrame =
     new DataFrame(session, relation)
+
+  /** String → `ExplainMode` proto enum mapping used by `explain(mode: String)`. */
+  private val ExplainModeMapping: Map[String, AnalyzePlanRequest.Explain.ExplainMode] = Map(
+    "simple" -> AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_SIMPLE,
+    "extended" -> AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_EXTENDED,
+    "codegen" -> AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_CODEGEN,
+    "cost" -> AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_COST,
+    "formatted" -> AnalyzePlanRequest.Explain.ExplainMode.EXPLAIN_MODE_FORMATTED
+  )
+
+  /** String → `Join.JoinType` proto enum mapping used by `toJoinType`.
+    *
+    * Keys are pre-normalized (lowercase, no underscores) since `StringEnumParser` strips them.
+    * Multiple aliases (e.g. `leftouter` and `left`) map to the same proto value.
+    */
+  private val JoinTypeMapping: Map[String, Join.JoinType] = Map(
+    "inner" -> Join.JoinType.JOIN_TYPE_INNER,
+    "left" -> Join.JoinType.JOIN_TYPE_LEFT_OUTER,
+    "leftouter" -> Join.JoinType.JOIN_TYPE_LEFT_OUTER,
+    "right" -> Join.JoinType.JOIN_TYPE_RIGHT_OUTER,
+    "rightouter" -> Join.JoinType.JOIN_TYPE_RIGHT_OUTER,
+    "full" -> Join.JoinType.JOIN_TYPE_FULL_OUTER,
+    "outer" -> Join.JoinType.JOIN_TYPE_FULL_OUTER,
+    "fullouter" -> Join.JoinType.JOIN_TYPE_FULL_OUTER,
+    "cross" -> Join.JoinType.JOIN_TYPE_CROSS,
+    "semi" -> Join.JoinType.JOIN_TYPE_LEFT_SEMI,
+    "leftsemi" -> Join.JoinType.JOIN_TYPE_LEFT_SEMI,
+    "anti" -> Join.JoinType.JOIN_TYPE_LEFT_ANTI,
+    "leftanti" -> Join.JoinType.JOIN_TYPE_LEFT_ANTI
+  )

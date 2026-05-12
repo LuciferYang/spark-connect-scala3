@@ -2264,7 +2264,7 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     val unknownEx = intercept[IllegalArgumentException] {
       df.toJoinType("not-a-join-type")
     }
-    assert(unknownEx.getMessage.contains("Unsupported join type"))
+    assert(unknownEx.getMessage.contains("Unknown join type"))
   }
 
   test("toJoinType accepts underscore-separated aliases") {

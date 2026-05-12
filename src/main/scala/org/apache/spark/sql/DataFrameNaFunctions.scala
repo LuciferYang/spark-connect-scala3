@@ -18,16 +18,16 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
   def drop(how: String, cols: Array[String]): DataFrame = drop(how, cols.toSeq)
 
   def drop(how: String, cols: Seq[String]): DataFrame =
-    require(how != null, "how must not be null")
+    val parsed = org.apache.spark.sql.internal.StringEnumParser.parse(
+      input = how,
+      paramName = "drop 'how'",
+      mapping = DataFrameNaFunctions.DropHowMapping
+    )
     val naDropBuilder = NADrop.newBuilder().setInput(df.relation)
     cols.foreach(naDropBuilder.addCols)
-    how.toLowerCase(java.util.Locale.ROOT) match
-      case "all" => naDropBuilder.setMinNonNulls(1)
-      case "any" => // default — don't set minNonNulls
-      case _     =>
-        throw IllegalArgumentException(
-          s"Unknown 'how' for drop: '$how'. Accepted: 'any', 'all'."
-        )
+    parsed match
+      case DataFrameNaFunctions.DropHow.All => naDropBuilder.setMinNonNulls(1)
+      case DataFrameNaFunctions.DropHow.Any => // default — don't set minNonNulls
     df.withRelation(_.setDropNa(naDropBuilder.build()))
 
   def drop(minNonNulls: Int): DataFrame =
@@ -121,3 +121,15 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
         s"Unsupported fill value type: ${v.getClass.getName}. " +
           "Supported types: Boolean, Int, Long, Float, Double, String."
       )
+
+object DataFrameNaFunctions:
+  /** The two accepted values of `drop(how)`: "any" (drop rows with any null) vs "all" (drop rows
+    * whose specified columns are all null).
+    */
+  private enum DropHow:
+    case Any, All
+
+  private val DropHowMapping: Map[String, DropHow] = Map(
+    "any" -> DropHow.Any,
+    "all" -> DropHow.All
+  )

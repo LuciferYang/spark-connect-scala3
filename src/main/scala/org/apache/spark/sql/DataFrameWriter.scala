@@ -146,15 +146,19 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
     df.session.client.executeCommand(command)
 
   private def toProtoMode(mode: String): WriteOperation.SaveMode =
-    require(mode != null, "save mode must not be null")
-    mode.toLowerCase(java.util.Locale.ROOT) match
-      case "overwrite"                           => WriteOperation.SaveMode.SAVE_MODE_OVERWRITE
-      case "append"                              => WriteOperation.SaveMode.SAVE_MODE_APPEND
-      case "ignore"                              => WriteOperation.SaveMode.SAVE_MODE_IGNORE
-      case "error" | "errorifexists" | "default" =>
-        WriteOperation.SaveMode.SAVE_MODE_ERROR_IF_EXISTS
-      case _ =>
-        throw IllegalArgumentException(
-          s"Unknown save mode: '$mode'. Accepted: 'overwrite', 'append', 'ignore', " +
-            "'error', 'errorifexists', 'default'."
-        )
+    org.apache.spark.sql.internal.StringEnumParser.parse(
+      input = mode,
+      paramName = "save mode",
+      mapping = DataFrameWriter.SaveModeMapping
+    )
+
+object DataFrameWriter:
+  /** String → `WriteOperation.SaveMode` proto enum mapping. */
+  private val SaveModeMapping: Map[String, WriteOperation.SaveMode] = Map(
+    "overwrite" -> WriteOperation.SaveMode.SAVE_MODE_OVERWRITE,
+    "append" -> WriteOperation.SaveMode.SAVE_MODE_APPEND,
+    "ignore" -> WriteOperation.SaveMode.SAVE_MODE_IGNORE,
+    "error" -> WriteOperation.SaveMode.SAVE_MODE_ERROR_IF_EXISTS,
+    "errorifexists" -> WriteOperation.SaveMode.SAVE_MODE_ERROR_IF_EXISTS,
+    "default" -> WriteOperation.SaveMode.SAVE_MODE_ERROR_IF_EXISTS
+  )

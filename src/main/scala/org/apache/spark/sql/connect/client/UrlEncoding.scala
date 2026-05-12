@@ -7,12 +7,12 @@ import java.nio.charset.StandardCharsets
   *
   * Both `SparkConnectClientParser.buildUrl` (the CLI parser) and `SparkConnectClient.parseUrl` /
   * `buildSanitizedUrl` (the runtime URL lifecycle) must agree on the same
-  * `application/x-www-form-urlencoded` scheme so that parameter values containing `;`, `=`,
-  * spaces, `+`, `%`, or Unicode round-trip losslessly through `buildUrl` → `parseUrl` and
-  * `parseUrl` → `buildSanitizedUrl` → `parseUrl`.
+  * `application/x-www-form-urlencoded` scheme so that parameter values containing `;`, `=`, spaces,
+  * `+`, `%`, or Unicode round-trip losslessly through `buildUrl` → `parseUrl` and `parseUrl` →
+  * `buildSanitizedUrl` → `parseUrl`.
   *
-  * UTF-8 is fixed via `StandardCharsets.UTF_8` to avoid the `UnsupportedEncodingException` path
-  * on the deprecated String-charset overload.
+  * UTF-8 is fixed via `StandardCharsets.UTF_8` to avoid the `UnsupportedEncodingException` path on
+  * the deprecated String-charset overload.
   */
 private[client] object UrlEncoding:
 
