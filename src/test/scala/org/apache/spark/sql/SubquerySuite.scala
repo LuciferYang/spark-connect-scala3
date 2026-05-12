@@ -176,3 +176,87 @@ class SubquerySuite extends AnyFunSuite with Matchers:
     wr.getReferencesCount shouldBe 1
     wr.getReferences(0).getCommon.getPlanId shouldBe 88L
   }
+
+  // ---------------------------------------------------------------------------
+  // Negative tests: RelationCommon / plan_id must be present
+  // ---------------------------------------------------------------------------
+
+  /** Build a Dataset whose relation is missing the given field. */
+  private def datasetMissing[T: Encoder: scala.reflect.ClassTag](
+      omit: "common" | "planId"
+  ): Dataset[T] =
+    val session = SparkSession(null)
+    val relBuilder = Relation.newBuilder()
+      .setLocalRelation(LocalRelation.getDefaultInstance)
+    omit match
+      case "common" => () // leave setCommon out entirely
+      case "planId" =>
+        // Common present but plan_id absent — hits the hasPlanId arm of the require
+        relBuilder.setCommon(RelationCommon.getDefaultInstance)
+    Dataset(DataFrame(session, relBuilder.build()), summon[Encoder[T]])
+
+  test("Dataset.scalar() rejects relation missing RelationCommon") {
+    val ex = intercept[IllegalArgumentException] {
+      datasetMissing[Long]("common").scalar()
+    }
+    assert(ex.getMessage.contains("Dataset used as a scalar subquery"))
+  }
+
+  test("Dataset.scalar() rejects relation missing plan_id") {
+    val ex = intercept[IllegalArgumentException] {
+      datasetMissing[Long]("planId").scalar()
+    }
+    assert(ex.getMessage.contains("Dataset used as a scalar subquery"))
+    assert(ex.getMessage.contains("plan_id"))
+  }
+
+  test("Dataset.exists() rejects relation missing RelationCommon") {
+    val ex = intercept[IllegalArgumentException] {
+      datasetMissing[Long]("common").exists()
+    }
+    assert(ex.getMessage.contains("Dataset used as an EXISTS subquery"))
+  }
+
+  test("Dataset.exists() rejects relation missing plan_id") {
+    val ex = intercept[IllegalArgumentException] {
+      datasetMissing[Long]("planId").exists()
+    }
+    assert(ex.getMessage.contains("Dataset used as an EXISTS subquery"))
+    assert(ex.getMessage.contains("plan_id"))
+  }
+
+  test("Column.isin(Dataset) rejects relation missing plan_id") {
+    val ex = intercept[IllegalArgumentException] {
+      Column("x").isin(datasetMissing[Long]("planId"))
+    }
+    assert(ex.getMessage.contains("IN-subquery"))
+    assert(ex.getMessage.contains("plan_id"))
+  }
+
+  test("DataFrame.scalar() rejects relation missing plan_id") {
+    val session = SparkSession(null)
+    val rel = Relation.newBuilder()
+      .setCommon(RelationCommon.getDefaultInstance)
+      .setLocalRelation(LocalRelation.getDefaultInstance)
+      .build()
+    val df = DataFrame(session, rel)
+    val ex = intercept[IllegalArgumentException] {
+      df.scalar()
+    }
+    assert(ex.getMessage.contains("DataFrame used as a scalar subquery"))
+    assert(ex.getMessage.contains("plan_id"))
+  }
+
+  test("DataFrame.exists() rejects relation missing plan_id") {
+    val session = SparkSession(null)
+    val rel = Relation.newBuilder()
+      .setCommon(RelationCommon.getDefaultInstance)
+      .setLocalRelation(LocalRelation.getDefaultInstance)
+      .build()
+    val df = DataFrame(session, rel)
+    val ex = intercept[IllegalArgumentException] {
+      df.exists()
+    }
+    assert(ex.getMessage.contains("DataFrame used as an EXISTS subquery"))
+    assert(ex.getMessage.contains("plan_id"))
+  }
