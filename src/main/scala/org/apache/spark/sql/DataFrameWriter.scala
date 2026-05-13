@@ -1,7 +1,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
-import org.apache.spark.sql.internal.StringEnumParser
+import org.apache.spark.sql.internal.{OptionBuilder, StringEnumParser}
 
 /** Writer for saving DataFrames to external storage.
   *
@@ -10,7 +10,8 @@ import org.apache.spark.sql.internal.StringEnumParser
   *   df.write.saveAsTable("my_table")
   * }}}
   */
-final class DataFrameWriter private[sql] (private val df: DataFrame):
+final class DataFrameWriter private[sql] (private val df: DataFrame)
+    extends OptionBuilder[DataFrameWriter]:
   private var source: String = "parquet"
   private var saveMode: String = "error"
   private var opts: Map[String, String] = Map.empty
@@ -39,10 +40,6 @@ final class DataFrameWriter private[sql] (private val df: DataFrame):
   def option(key: String, value: String): DataFrameWriter =
     opts = opts + (key -> value)
     this
-
-  def option(key: String, value: Boolean): DataFrameWriter = option(key, value.toString)
-  def option(key: String, value: Long): DataFrameWriter = option(key, value.toString)
-  def option(key: String, value: Double): DataFrameWriter = option(key, value.toString)
 
   def options(m: Map[String, String]): DataFrameWriter =
     opts = opts ++ m

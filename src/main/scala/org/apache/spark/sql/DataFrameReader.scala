@@ -1,6 +1,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
+import org.apache.spark.sql.internal.OptionBuilder
 
 /** Reader for loading DataFrames from external storage.
   *
@@ -9,7 +10,8 @@ import org.apache.spark.connect.proto.*
   *   val df = spark.read.json("/data.json")
   * }}}
   */
-final class DataFrameReader private[sql] (private val session: SparkSession):
+final class DataFrameReader private[sql] (private val session: SparkSession)
+    extends OptionBuilder[DataFrameReader]:
   private var source: String = "parquet"
   private var opts: Map[String, String] = Map.empty
   private var userSchema: Option[String] = None
@@ -21,10 +23,6 @@ final class DataFrameReader private[sql] (private val session: SparkSession):
   def option(key: String, value: String): DataFrameReader =
     opts = opts + (key -> value)
     this
-
-  def option(key: String, value: Boolean): DataFrameReader = option(key, value.toString)
-  def option(key: String, value: Long): DataFrameReader = option(key, value.toString)
-  def option(key: String, value: Double): DataFrameReader = option(key, value.toString)
 
   def options(m: Map[String, String]): DataFrameReader =
     opts = opts ++ m

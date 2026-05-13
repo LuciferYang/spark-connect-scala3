@@ -2,6 +2,7 @@ package org.apache.spark.sql
 
 import scala.jdk.CollectionConverters.*
 import org.apache.spark.connect.proto.*
+import org.apache.spark.sql.internal.OptionBuilder
 
 /** Writer for saving DataFrames using the V2 data source API.
   *
@@ -11,7 +12,8 @@ import org.apache.spark.connect.proto.*
   *   df.writeTo("my_table").overwrite(col("date") === lit("2024-01-01"))
   * }}}
   */
-final class DataFrameWriterV2 private[sql] (table: String, df: DataFrame):
+final class DataFrameWriterV2 private[sql] (table: String, df: DataFrame)
+    extends OptionBuilder[DataFrameWriterV2]:
 
   private val builder = WriteOperationV2.newBuilder()
     .setInput(df.relation)
@@ -24,15 +26,6 @@ final class DataFrameWriterV2 private[sql] (table: String, df: DataFrame):
   def option(key: String, value: String): DataFrameWriterV2 =
     builder.putOptions(key, value)
     this
-
-  def option(key: String, value: Boolean): DataFrameWriterV2 =
-    option(key, value.toString)
-
-  def option(key: String, value: Long): DataFrameWriterV2 =
-    option(key, value.toString)
-
-  def option(key: String, value: Double): DataFrameWriterV2 =
-    option(key, value.toString)
 
   def options(opts: Map[String, String]): DataFrameWriterV2 =
     builder.putAllOptions(opts.asJava)

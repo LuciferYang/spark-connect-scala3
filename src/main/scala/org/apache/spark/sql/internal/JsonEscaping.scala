@@ -27,11 +27,11 @@ private[sql] object JsonEscaping:
         case '\n'         => sb.append("\\n")
         case '\r'         => sb.append("\\r")
         case '\t'         => sb.append("\\t")
-        case ' '     => sb.append("\\u2028")
-        case ' '     => sb.append("\\u2029")
+        case ' '          => sb.append("\\u2028")
+        case ' '          => sb.append("\\u2029")
         case c if c < ' ' =>
           sb.append("\\u")
           sb.append(f"${c.toInt}%04x")
-        case c            => sb.append(c)
+        case c => sb.append(c)
       i += 1
     sb.toString

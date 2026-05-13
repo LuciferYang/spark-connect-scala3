@@ -433,13 +433,7 @@ final class DataFrame private[sql] (
 
   /** Lateral join — only inner, left outer, and cross joins are supported. */
   def lateralJoin(right: DataFrame, condition: Column, joinType: String = "inner"): DataFrame =
-    val jt = toJoinType(joinType)
-    jt match
-      case Join.JoinType.JOIN_TYPE_INNER | Join.JoinType.JOIN_TYPE_LEFT_OUTER |
-          Join.JoinType.JOIN_TYPE_CROSS => // ok
-      case _ => throw IllegalArgumentException(
-          s"Unsupported lateral join type: $joinType. Only inner, left, and cross are supported."
-        )
+    val jt = validateLateralJoinType(joinType)
     val builder = LateralJoin.newBuilder()
       .setLeft(relation).setRight(right.relation)
       .setJoinCondition(condition.expr).setJoinType(jt)
@@ -453,16 +447,23 @@ final class DataFrame private[sql] (
 
   /** Lateral join without condition, with a specified join type. */
   def lateralJoin(right: DataFrame, joinType: String): DataFrame =
-    val jt = toJoinType(joinType)
-    jt match
-      case Join.JoinType.JOIN_TYPE_INNER | Join.JoinType.JOIN_TYPE_LEFT_OUTER |
-          Join.JoinType.JOIN_TYPE_CROSS => // ok
-      case _ => throw IllegalArgumentException(
-          s"Unsupported lateral join type: $joinType. Only inner, left, and cross are supported."
-        )
+    val jt = validateLateralJoinType(joinType)
     withRelation(_.setLateralJoin(LateralJoin.newBuilder()
       .setLeft(relation).setRight(right.relation)
       .setJoinType(jt).build()))
+
+  /** Validate the join-type string for lateral joins. Only INNER, LEFT_OUTER, and CROSS are
+    * accepted at the server. Shared by the two lateralJoin overloads that take a joinType.
+    */
+  private def validateLateralJoinType(joinType: String): Join.JoinType =
+    val jt = toJoinType(joinType)
+    jt match
+      case Join.JoinType.JOIN_TYPE_INNER | Join.JoinType.JOIN_TYPE_LEFT_OUTER |
+          Join.JoinType.JOIN_TYPE_CROSS => jt
+      case _ =>
+        throw IllegalArgumentException(
+          s"Unsupported lateral join type: $joinType. Only inner, left, and cross are supported."
+        )
 
   /** Group by grouping sets. */
   def groupingSets(groupingSets: Seq[Seq[Column]], cols: Column*): GroupedDataFrame =
@@ -475,18 +476,21 @@ final class DataFrame private[sql] (
 
   /** Repartition by range using the given partition expressions. */
   def repartitionByRange(numPartitions: Int, partitionExprs: Column*): DataFrame =
-    require(partitionExprs.nonEmpty, "At least one partition expression is required.")
-    val sortExprs = partitionExprs.map(c => if c.expr.hasSortOrder then c else c.asc)
-    val builder =
-      RepartitionByExpression.newBuilder().setInput(relation).setNumPartitions(numPartitions)
-    sortExprs.foreach(c => builder.addPartitionExprs(c.expr))
-    withRelation(_.setRepartitionByExpression(builder.build()))
+    buildRepartitionByRange(Some(numPartitions), partitionExprs)
 
   /** Repartition by range with default partition count. */
   def repartitionByRange(partitionExprs: Column*)(using DummyImplicit): DataFrame =
+    buildRepartitionByRange(None, partitionExprs)
+
+  /** Shared builder for the two `repartitionByRange` overloads. */
+  private def buildRepartitionByRange(
+      numPartitions: Option[Int],
+      partitionExprs: Seq[Column]
+  ): DataFrame =
     require(partitionExprs.nonEmpty, "At least one partition expression is required.")
     val sortExprs = partitionExprs.map(c => if c.expr.hasSortOrder then c else c.asc)
     val builder = RepartitionByExpression.newBuilder().setInput(relation)
+    numPartitions.foreach(builder.setNumPartitions)
     sortExprs.foreach(c => builder.addPartitionExprs(c.expr))
     withRelation(_.setRepartitionByExpression(builder.build()))
 
