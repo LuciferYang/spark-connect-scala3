@@ -131,27 +131,35 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
   def typeName = "struct"
 
   def apply(name: String): StructField =
-    // Use the lazy name→index map instead of a linear `fields.find` — cheaper on repeated lookups
-    // such as groupBy/agg chains that call apply(name) once per field per transformation.
-    fieldNameIndex.get(name) match
-      case Some(i) => fields(i)
+    // Use the lazy name→field map instead of a linear `fields.find` — O(1) regardless of the
+    // underlying Seq type (avoids O(n) `fields(i)` on List-backed schemas).
+    fieldByName.get(name) match
+      case Some(f) => f
       case None    =>
         throw java.util.NoSuchElementException(s"Field '$name' not found in $this")
 
   def fieldNames: Array[String] = fields.map(_.name).toArray
 
-  /** Name → index map; for schemas that contain duplicate field names (rare but permitted by
-    * `StructType.apply`), the FIRST occurrence wins, matching `fields.find(_.name == name)`
-    * semantics and upstream Spark behavior. `Map.apply` on a sequence of pairs retains the LAST
-    * occurrence, so we fold manually and skip duplicates.
+  /** Cache of `name -> StructField` built once lazily. First-wins on duplicate names to match the
+    * pre-cache `fields.find(_.name == name)` semantics and upstream Spark behavior. Built via
+    * iterator — O(n) for any Seq backing.
     */
+  private lazy val fieldByName: Map[String, StructField] =
+    val m = scala.collection.mutable.LinkedHashMap.empty[String, StructField]
+    val it = fields.iterator
+    while it.hasNext do
+      val f = it.next()
+      if !m.contains(f.name) then m(f.name) = f
+    m.toMap
+
+  /** Name → index map with the same first-wins / O(n)-build invariants as `fieldByName`. */
   private lazy val fieldNameIndex: Map[String, Int] =
     val m = scala.collection.mutable.LinkedHashMap.empty[String, Int]
+    val it = fields.iterator
     var i = 0
-    val n = fields.size
-    while i < n do
-      val name = fields(i).name
-      if !m.contains(name) then m(name) = i
+    while it.hasNext do
+      val f = it.next()
+      if !m.contains(f.name) then m(f.name) = i
       i += 1
     m.toMap
 
