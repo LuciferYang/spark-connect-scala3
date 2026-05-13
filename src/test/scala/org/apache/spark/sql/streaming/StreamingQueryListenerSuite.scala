@@ -779,3 +779,56 @@ class StreamingQueryListenerSuite extends AnyFunSuite with Matchers:
     val event = QueryTerminatedEvent(id, runId, Some("error"))
     event.errorClassOnException shouldBe None
   }
+
+  // ---------------------------------------------------------------------------
+  // JSON escaping (R2-13, R2-14, R2-15)
+  // ---------------------------------------------------------------------------
+
+  test("QueryStartedEvent.json escapes quotes and control chars in name") {
+    val id = UUID.randomUUID()
+    val runId = UUID.randomUUID()
+    val event = QueryStartedEvent(id, runId, "a\"b\\c\nd\te", "2026-05-13")
+    val json = event.json
+    assert(json.contains("\\\""), s"expected escaped quote in: $json")
+    assert(json.contains("\\\\"), s"expected escaped backslash in: $json")
+    assert(json.contains("\\n"), s"expected escaped newline in: $json")
+    assert(json.contains("\\t"), s"expected escaped tab in: $json")
+  }
+
+  test("QueryTerminatedEvent.json escapes quotes and newlines in exception") {
+    val id = UUID.randomUUID()
+    val runId = UUID.randomUUID()
+    val exc = "Caused by: java.lang.RuntimeException: msg with \"quote\"\n  at line"
+    val event = QueryTerminatedEvent(id, runId, Some(exc))
+    val json = event.json
+    assert(json.contains("\\\""), s"expected escaped quote in: $json")
+    assert(json.contains("\\n"), s"expected escaped newline in: $json")
+    // Verify the JSON round-trips through the parser without error
+    QueryTerminatedEvent.fromJson(json)
+  }
+
+  test("SimpleJsonParser decodes \\uXXXX escape") {
+    val id = UUID.randomUUID()
+    val runId = UUID.randomUUID()
+    val json = s"""{"id":"$id","runId":"$runId","name":"a\\u00e9b","timestamp":"2026-05-13"}"""
+    val parsed = QueryStartedEvent.fromJson(json)
+    assert(parsed.name == "aéb", s"expected 'aéb' after decode, got: ${parsed.name}")
+  }
+
+  test("SimpleJsonParser rejects truncated \\u escape") {
+    val id = UUID.randomUUID()
+    val runId = UUID.randomUUID()
+    val json = s"""{"id":"$id","runId":"$runId","name":"a\\u12","timestamp":"2026-05-13"}"""
+    assertThrows[IllegalArgumentException] {
+      QueryStartedEvent.fromJson(json)
+    }
+  }
+
+  test("SimpleJsonParser rejects non-hex \\u escape") {
+    val id = UUID.randomUUID()
+    val runId = UUID.randomUUID()
+    val json = s"""{"id":"$id","runId":"$runId","name":"a\\uZZZZb","timestamp":"2026-05-13"}"""
+    assertThrows[IllegalArgumentException] {
+      QueryStartedEvent.fromJson(json)
+    }
+  }

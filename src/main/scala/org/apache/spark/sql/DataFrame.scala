@@ -1010,6 +1010,10 @@ final class DataFrame private[sql] (
           val valuesList = om.getValuesList
           val keysList = om.getKeysList
           val n = valuesList.size
+          require(
+            keysList.size == n,
+            s"Observed metric key/value count mismatch: ${keysList.size} keys vs $n values"
+          )
           val vs = new Array[Any](n)
           val fields = new Array[StructField](n)
           var i = 0

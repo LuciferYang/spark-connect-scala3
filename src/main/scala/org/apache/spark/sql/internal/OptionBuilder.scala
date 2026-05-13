@@ -12,7 +12,7 @@ package org.apache.spark.sql.internal
   *   the concrete builder type (self-typed via F-bound) so chained calls return the correct subtype
   *   for further method access.
   */
-private[sql] trait OptionBuilder[Self]:
+private[sql] trait OptionBuilder[Self <: OptionBuilder[Self]]:
   def option(key: String, value: String): Self
 
   def option(key: String, value: Boolean): Self = option(key, value.toString)

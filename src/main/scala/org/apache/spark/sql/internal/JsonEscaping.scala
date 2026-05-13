@@ -12,9 +12,16 @@ package org.apache.spark.sql.internal
   */
 private[sql] object JsonEscaping:
 
-  /** Escape a string for safe inclusion between JSON string quotes. */
+  /** Escape a string for safe inclusion between JSON string quotes.
+    *
+    * `null` input is rejected with `NullPointerException` — callers are expected to handle null
+    * themselves (typically by emitting the JSON literal `null` without quoting, as
+    * `StreamingQueryListener` does). This avoids the ambiguity of returning the 4-char string
+    * `"null"` which, once the caller wraps it in quotes, becomes the JSON string `"null"` —
+    * silently confusable with the JSON `null` literal.
+    */
   def escape(s: String): String =
-    if s == null then return "null"
+    if s == null then throw NullPointerException("JsonEscaping.escape: input must not be null")
     val sb = new StringBuilder(s.length)
     var i = 0
     while i < s.length do

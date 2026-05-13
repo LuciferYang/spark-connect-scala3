@@ -106,8 +106,8 @@ final class Catalog private[sql] (private val session: SparkSession):
     * '''Note''': despite the historical name, this method does NOT filter by cache status — there
     * is no standard SQL to query which tables are currently cached on the server. The underlying
     * `SHOW TABLES` returns every table, cached or not. Kept for API parity with older Spark
-    * versions; callers that truly need cached-only lookup should inspect `SessionCleaner` state or
-    * track `cacheTable`/`uncacheTable` calls themselves.
+    * versions; callers that truly need cached-only lookup should track their own `cacheTable` /
+    * `uncacheTable` calls.
     */
   def listCachedTables(): DataFrame =
     session.sql("SHOW TABLES")
