@@ -158,26 +158,7 @@ final class Row private (
 object Row:
   /** Escape a string for safe inclusion in JSON output. */
   private def escapeJson(s: String): String =
-    val sb = new StringBuilder(s.length)
-    var i = 0
-    while i < s.length do
-      val ch = s.charAt(i)
-      ch match
-        case '"'          => sb.append("\\\"")
-        case '\\'         => sb.append("\\\\")
-        case '\b'         => sb.append("\\b")
-        case '\f'         => sb.append("\\f")
-        case '\n'         => sb.append("\\n")
-        case '\r'         => sb.append("\\r")
-        case '\t'         => sb.append("\\t")
-        case '\u2028'     => sb.append("\\u2028")
-        case '\u2029'     => sb.append("\\u2029")
-        case c if c < ' ' =>
-          sb.append("\\u")
-          sb.append(f"${c.toInt}%04x")
-        case c => sb.append(c)
-      i += 1
-    sb.toString
+    org.apache.spark.sql.internal.JsonEscaping.escape(s)
 
   def fromSeq(values: Seq[Any]): Row = values match
     case idx: IndexedSeq[Any @unchecked] => new Row(idx)

@@ -2,6 +2,8 @@ package org.apache.spark.sql.streaming
 
 import java.util.UUID
 
+import org.apache.spark.sql.internal.JsonEscaping
+
 /** Interface for listening to events related to streaming queries.
   *
   * The methods are not thread-safe as they may be called from different threads.
@@ -45,7 +47,7 @@ object StreamingQueryListener:
   ) extends Event:
 
     def json: String =
-      val nameStr = if name == null then "null" else s""""$name""""
+      val nameStr = if name == null then "null" else s""""${JsonEscaping.escape(name)}""""
       s"""{"id":"$id","runId":"$runId","name":$nameStr,"timestamp":"$timestamp"}"""
 
   object QueryStartedEvent:
@@ -119,8 +121,9 @@ object StreamingQueryListener:
   ) extends Event:
 
     def json: String =
-      val excStr = exception.map(e => s""""$e"""").getOrElse("null")
-      val errStr = errorClassOnException.map(e => s""""$e"""").getOrElse("null")
+      val excStr = exception.map(e => s""""${JsonEscaping.escape(e)}"""").getOrElse("null")
+      val errStr =
+        errorClassOnException.map(e => s""""${JsonEscaping.escape(e)}"""").getOrElse("null")
       s"""{"id":"$id","runId":"$runId","exception":$excStr,"errorClassOnException":$errStr}"""
 
   object QueryTerminatedEvent:
@@ -164,7 +167,23 @@ object StreamingQueryListener:
                 case 'n'  => sb.append('\n')
                 case 't'  => sb.append('\t')
                 case 'r'  => sb.append('\r')
-                case c    => sb.append('\\'); sb.append(c)
+                case 'b'  => sb.append('\b')
+                case 'f'  => sb.append('\f')
+                case 'u'  =>
+                  // \uXXXX hex-escape — read 4 hex digits
+                  if i + 4 >= inner.length then
+                    throw new IllegalArgumentException(
+                      s"Truncated \\u escape at pos $i in: $json"
+                    )
+                  val hex = inner.substring(i + 1, i + 5)
+                  try sb.append(Integer.parseInt(hex, 16).toChar)
+                  catch
+                    case _: NumberFormatException =>
+                      throw new IllegalArgumentException(
+                        s"Invalid \\u escape '\\u$hex' at pos $i in: $json"
+                      )
+                  i += 4
+                case c => sb.append('\\'); sb.append(c)
           else sb.append(inner(i))
           i += 1
         i += 1 // skip closing quote
