@@ -29,7 +29,7 @@ private[sql] object SparkConnectClientParser:
   case class Config(
       remote: Option[String] = None,
       host: String = "localhost",
-      port: Int = 15002,
+      port: Int = SparkConnectClient.DefaultPort,
       useSsl: Boolean = false,
       token: Option[String] = None,
       userId: Option[String] = None,

@@ -425,7 +425,7 @@ object SparkConnectClient:
   private val MaxInboundMessageSize: Int = 128 * 1024 * 1024
 
   /** Default Spark Connect server port, used when `sc://host` is given with no explicit `:port`. */
-  private val DefaultPort: Int = 15002
+  private[client] val DefaultPort: Int = 15002
 
   /** Client identifier sent to the server (without version). Kept stable across releases. */
   private val ClientName: String = "spark-connect-scala3"
