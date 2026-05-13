@@ -832,3 +832,11 @@ class StreamingQueryListenerSuite extends AnyFunSuite with Matchers:
       QueryStartedEvent.fromJson(json)
     }
   }
+
+  test("JsonEscaping handles U+2028 and U+2029 line separators") {
+    val u2028: Char = ' '
+    val u2029: Char = ' '
+    val input = s"a${u2028}b${u2029}c"
+    val escaped = org.apache.spark.sql.internal.JsonEscaping.escape(input)
+    assert(escaped == "a\\u2028b\\u2029c", s"expected escaped line separators, got: $escaped")
+  }
