@@ -239,6 +239,7 @@ final class DataFrame private[sql] (
     setOp(other, SetOperation.SetOpType.SET_OP_TYPE_EXCEPT, byName = false)
 
   def repartition(numPartitions: Int): DataFrame =
+    require(numPartitions > 0, s"numPartitions ($numPartitions) must be positive.")
     withRelation(_.setRepartition(
       Repartition.newBuilder()
         .setInput(relation)
@@ -248,6 +249,7 @@ final class DataFrame private[sql] (
     ))
 
   def coalesce(numPartitions: Int): DataFrame =
+    require(numPartitions > 0, s"numPartitions ($numPartitions) must be positive.")
     withRelation(_.setRepartition(
       Repartition.newBuilder()
         .setInput(relation)
@@ -351,6 +353,7 @@ final class DataFrame private[sql] (
 
   /** Repartition by columns. */
   def repartition(numPartitions: Int, cols: Column*): DataFrame =
+    require(numPartitions > 0, s"numPartitions ($numPartitions) must be positive.")
     if cols.isEmpty then
       repartition(numPartitions)
     else
@@ -488,6 +491,9 @@ final class DataFrame private[sql] (
       partitionExprs: Seq[Column]
   ): DataFrame =
     require(partitionExprs.nonEmpty, "At least one partition expression is required.")
+    numPartitions.foreach(n =>
+      require(n > 0, s"numPartitions ($n) must be positive.")
+    )
     val sortExprs = partitionExprs.map(c => if c.expr.hasSortOrder then c else c.asc)
     val builder = RepartitionByExpression.newBuilder().setInput(relation)
     numPartitions.foreach(builder.setNumPartitions)
@@ -1003,30 +1009,32 @@ final class DataFrame private[sql] (
           val (batchRows, _) =
             ArrowDeserializer.fromArrowBatchWithSchema(resp.getArrowBatch.getData.toByteArray)
           rows ++= batchRows
-        resp.getObservedMetricsList.asScala.foreach { om =>
-          // Iterate the Java lists directly once each — the previous `.asScala.map.toSeq` chain
-          // allocated three intermediate collections (Scala iterator view, map result, immutable
-          // copy) for each metric row.
-          val valuesList = om.getValuesList
-          val keysList = om.getKeysList
-          val n = valuesList.size
-          require(
-            keysList.size == n,
-            s"Observed metric key/value count mismatch: ${keysList.size} keys vs $n values"
-          )
-          val vs = new Array[Any](n)
-          val fields = new Array[StructField](n)
-          var i = 0
-          while i < n do
-            val lit = valuesList.get(i)
-            vs(i) = LiteralValueProtoConverter.toScalaValue(lit)
-            fields(i) =
-              StructField(keysList.get(i), LiteralValueProtoConverter.toDataType(lit))
-            i += 1
-          val schema = StructType(ArraySeq.unsafeWrapArray(fields))
-          val row = Row.fromSeqWithSchema(ArraySeq.unsafeWrapArray(vs), schema)
-          observedMetrics += ((om.getPlanId, row))
-        }
+        val omList = resp.getObservedMetricsList
+        if !omList.isEmpty then
+          omList.asScala.foreach { om =>
+            // Iterate the Java lists directly once each — the previous `.asScala.map.toSeq` chain
+            // allocated three intermediate collections (Scala iterator view, map result, immutable
+            // copy) for each metric row.
+            val valuesList = om.getValuesList
+            val keysList = om.getKeysList
+            val n = valuesList.size
+            require(
+              keysList.size == n,
+              s"Observed metric key/value count mismatch: ${keysList.size} keys vs $n values"
+            )
+            val vs = new Array[Any](n)
+            val fields = new Array[StructField](n)
+            var i = 0
+            while i < n do
+              val lit = valuesList.get(i)
+              vs(i) = LiteralValueProtoConverter.toScalaValue(lit)
+              fields(i) =
+                StructField(keysList.get(i), LiteralValueProtoConverter.toDataType(lit))
+              i += 1
+            val schema = StructType(ArraySeq.unsafeWrapArray(fields))
+            val row = Row.fromSeqWithSchema(ArraySeq.unsafeWrapArray(vs), schema)
+            observedMetrics += ((om.getPlanId, row))
+          }
       }
       // Rows already carry schema from ArrowDeserializer; no re-wrapping needed.
       val result = rows.toArray

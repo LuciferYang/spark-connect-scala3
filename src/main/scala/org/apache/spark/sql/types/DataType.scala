@@ -140,8 +140,20 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
 
   def fieldNames: Array[String] = fields.map(_.name).toArray
 
+  /** Name → index map; for schemas that contain duplicate field names (rare but permitted by
+    * `StructType.apply`), the FIRST occurrence wins, matching `fields.find(_.name == name)`
+    * semantics and upstream Spark behavior. `Map.apply` on a sequence of pairs retains the LAST
+    * occurrence, so we fold manually and skip duplicates.
+    */
   private lazy val fieldNameIndex: Map[String, Int] =
-    fields.iterator.zipWithIndex.map((f, i) => f.name -> i).toMap
+    val m = scala.collection.mutable.LinkedHashMap.empty[String, Int]
+    var i = 0
+    val n = fields.size
+    while i < n do
+      val name = fields(i).name
+      if !m.contains(name) then m(name) = i
+      i += 1
+    m.toMap
 
   def fieldIndex(name: String): Int =
     fieldNameIndex.getOrElse(
