@@ -299,6 +299,19 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
       df.repartitionByRange(4)
   }
 
+  test("repartition rejects non-positive numPartitions") {
+    val df = testDf()
+    for np <- Seq(0, -1, Int.MinValue) do
+      val ex1 = intercept[IllegalArgumentException](df.repartition(np))
+      assert(ex1.getMessage.contains("must be positive"))
+      val ex2 = intercept[IllegalArgumentException](df.coalesce(np))
+      assert(ex2.getMessage.contains("must be positive"))
+      val ex3 = intercept[IllegalArgumentException](df.repartition(np, Column("id")))
+      assert(ex3.getMessage.contains("must be positive"))
+      val ex4 = intercept[IllegalArgumentException](df.repartitionByRange(np, Column("id")))
+      assert(ex4.getMessage.contains("must be positive"))
+  }
+
   // ---------- range(4-param) ----------
 
   test("range with numPartitions builds Range proto with num_partitions") {

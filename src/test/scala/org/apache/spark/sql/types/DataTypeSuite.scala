@@ -99,6 +99,20 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
     an[IllegalArgumentException] should be thrownBy st.fieldIndex("y")
   }
 
+  test("StructType duplicate field names resolve to FIRST occurrence (matches upstream)") {
+    // Round 4/6 fix: fieldByName / fieldNameIndex must preserve first-wins semantics
+    // (the pre-cache fields.find behavior and upstream Spark's contract). `Map.toMap`
+    // on a sequence of pairs retains LAST — the fold-based build must override that.
+    val st = StructType(Seq(
+      StructField("a", IntegerType),
+      StructField("b", LongType),
+      StructField("a", StringType) // intentional duplicate
+    ))
+    st.fieldIndex("a") shouldBe 0
+    st("a").dataType shouldBe IntegerType
+    st.fieldIndex("b") shouldBe 1
+  }
+
   // ---------------------------------------------------------------------------
   // SQL representations
   // ---------------------------------------------------------------------------
