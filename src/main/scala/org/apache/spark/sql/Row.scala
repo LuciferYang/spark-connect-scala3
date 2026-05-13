@@ -79,7 +79,15 @@ final class Row private (
       case None    =>
         throw UnsupportedOperationException("fieldIndex requires a Row with schema")
 
-  def anyNull: Boolean = (0 until size).exists(isNullAt)
+  def anyNull: Boolean =
+    // while loop avoids the Int boxing that `(0 until size).exists(isNullAt)` incurs
+    // (Range.exists lifts the index into a boxed Integer via the Function1 adapter).
+    val n = size
+    var i = 0
+    while i < n do
+      if isNullAt(i) then return true
+      i += 1
+    false
 
   def json: String =
     schema match

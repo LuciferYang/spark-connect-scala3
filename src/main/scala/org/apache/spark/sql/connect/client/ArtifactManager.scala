@@ -110,7 +110,10 @@ final class ArtifactManager private[client] (
     * every plan execution.
     */
   private[client] def uploadAllClassFileArtifacts(): Unit =
-    addArtifacts(classFinders.asScala.flatMap(_.findClasses()))
+    // classFinders is empty in the common case (no Ammonite/REPL registered). Skip the
+    // iterator/flatMap allocation on the happy path, since this is invoked on every plan exec.
+    if !classFinders.isEmpty then
+      addArtifacts(classFinders.asScala.flatMap(_.findClasses()))
 
   /** Upload a collection of artifacts via the `AddArtifacts` client-streaming gRPC. */
   private[sql] def addArtifacts(artifacts: Iterable[Artifact]): Unit =

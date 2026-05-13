@@ -50,7 +50,12 @@ class Column private[sql] (
   /** Create a new Column with the given expression, merging subqueryRelations from this and other.
     */
   private def withExprMerge(newExpr: Expression, other: Column): Column =
-    Column(newExpr, this.subqueryRelations ++ other.subqueryRelations)
+    // Most Columns carry no subqueryRelations; skip the O(n) copy when either side is empty.
+    val merged =
+      if this.subqueryRelations.isEmpty then other.subqueryRelations
+      else if other.subqueryRelations.isEmpty then this.subqueryRelations
+      else this.subqueryRelations ++ other.subqueryRelations
+    Column(newExpr, merged)
 
   // ---------------------------------------------------------------------------
   // Comparison operators

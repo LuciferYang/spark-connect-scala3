@@ -1000,15 +1000,23 @@ final class DataFrame private[sql] (
             ArrowDeserializer.fromArrowBatchWithSchema(resp.getArrowBatch.getData.toByteArray)
           rows ++= batchRows
         resp.getObservedMetricsList.asScala.foreach { om =>
-          val keys = om.getKeysList.asScala.toSeq
-          val values =
-            om.getValuesList.asScala.map(LiteralValueProtoConverter.toScalaValue).toSeq
-          val schema = StructType(
-            keys.zip(om.getValuesList.asScala).map { (key, lit) =>
-              StructField(key, LiteralValueProtoConverter.toDataType(lit))
-            }.toSeq
-          )
-          val row = Row.fromSeqWithSchema(values, schema)
+          // Iterate the Java lists directly once each — the previous `.asScala.map.toSeq` chain
+          // allocated three intermediate collections (Scala iterator view, map result, immutable
+          // copy) for each metric row.
+          val valuesList = om.getValuesList
+          val keysList = om.getKeysList
+          val n = valuesList.size
+          val vs = new Array[Any](n)
+          val fields = new Array[StructField](n)
+          var i = 0
+          while i < n do
+            val lit = valuesList.get(i)
+            vs(i) = LiteralValueProtoConverter.toScalaValue(lit)
+            fields(i) =
+              StructField(keysList.get(i), LiteralValueProtoConverter.toDataType(lit))
+            i += 1
+          val schema = StructType(ArraySeq.unsafeWrapArray(fields))
+          val row = Row.fromSeqWithSchema(ArraySeq.unsafeWrapArray(vs), schema)
           observedMetrics += ((om.getPlanId, row))
         }
       }

@@ -131,9 +131,12 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
   def typeName = "struct"
 
   def apply(name: String): StructField =
-    fields.find(_.name == name).getOrElse(
-      throw java.util.NoSuchElementException(s"Field '$name' not found in $this")
-    )
+    // Use the lazy name→index map instead of a linear `fields.find` — cheaper on repeated lookups
+    // such as groupBy/agg chains that call apply(name) once per field per transformation.
+    fieldNameIndex.get(name) match
+      case Some(i) => fields(i)
+      case None    =>
+        throw java.util.NoSuchElementException(s"Field '$name' not found in $this")
 
   def fieldNames: Array[String] = fields.map(_.name).toArray
 

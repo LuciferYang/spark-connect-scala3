@@ -54,7 +54,9 @@ object ArrowDeserializer:
               col += 1
             rows += Row.fromSeqDirectWithSchema(ArraySeq.unsafeWrapArray(values), schema)
             i += 1
-        (rows.toSeq, Some(schema))
+        // Return an indexed view over the mutable array so callers get O(1) random access
+        // without a List-rebuild (ArrayBuffer.toSeq goes through an immutable.List factory).
+        (ArraySeq.unsafeWrapArray(rows.toArray), Some(schema))
       finally
         reader.close()
     finally
@@ -156,9 +158,18 @@ object ArrowDeserializer:
 
   /** Convert an Arrow Schema to a Spark StructType. */
   private def arrowSchemaToStructType(arrowSchema: ArrowSchema): StructType =
-    StructType(arrowSchema.getFields.asScala.map { field =>
-      StructField(field.getName, arrowTypeToSparkType(field), field.isNullable)
-    }.toSeq)
+    // Iterate directly over the Java list — `.asScala.map(...).toSeq` goes through the Scala
+    // Iterator adapter and then an immutable copy; a single Array pass is cheaper and produces
+    // the same `Seq[StructField]` result.
+    val fieldsList = arrowSchema.getFields
+    val n = fieldsList.size
+    val arr = new Array[StructField](n)
+    var i = 0
+    while i < n do
+      val field = fieldsList.get(i)
+      arr(i) = StructField(field.getName, arrowTypeToSparkType(field), field.isNullable)
+      i += 1
+    StructType(ArraySeq.unsafeWrapArray(arr))
 
   private def arrowTypeToSparkType(field: ArrowField): DataType =
     field.getType match
