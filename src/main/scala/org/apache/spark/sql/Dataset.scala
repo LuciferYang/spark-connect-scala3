@@ -110,7 +110,14 @@ final class Dataset[T: ClassTag] private[sql] (
   def foreach(func: T => Unit): Unit =
     collect().foreach(func)
 
-  /** Apply a function to each partition. */
+  /** Apply a function to each partition.
+    *
+    * '''Warning''': This Connect client implements `foreachPartition` by first collecting the
+    * entire Dataset to the driver via `.collect()`, then invoking `func` on the resulting iterator.
+    * For large Datasets this can OOM the client JVM. Prefer filtering/aggregating server-side
+    * before applying `foreachPartition`, or use the streaming path if you need genuine
+    * per-partition iteration on the server.
+    */
   def foreachPartition(func: Iterator[T] => Unit): Unit =
     func(collect().iterator)
 

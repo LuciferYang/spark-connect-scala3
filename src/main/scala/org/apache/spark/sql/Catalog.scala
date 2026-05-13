@@ -101,8 +101,13 @@ final class Catalog private[sql] (private val session: SparkSession):
       ListCatalogs.newBuilder().setPattern(pattern).build()
     ))
 
-  /** List cached tables. Note: there is no standard SQL for this; we list all tables and filter by
-    * cache status. This is a best-effort convenience method.
+  /** List all tables in the current database.
+    *
+    * '''Note''': despite the historical name, this method does NOT filter by cache status — there
+    * is no standard SQL to query which tables are currently cached on the server. The underlying
+    * `SHOW TABLES` returns every table, cached or not. Kept for API parity with older Spark
+    * versions; callers that truly need cached-only lookup should inspect `SessionCleaner` state or
+    * track `cacheTable`/`uncacheTable` calls themselves.
     */
   def listCachedTables(): DataFrame =
     session.sql("SHOW TABLES")

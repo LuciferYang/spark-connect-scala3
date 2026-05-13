@@ -108,11 +108,22 @@ final class DataFrameWriter private[sql] (private val df: DataFrame)
         .build()
     )
 
+  /** Write the DataFrame as JSON. Equivalent to `format("json").save(path)`. */
   def json(path: String): Unit = format("json").save(path)
+
+  /** Write the DataFrame as Parquet. Equivalent to `format("parquet").save(path)`. */
   def parquet(path: String): Unit = format("parquet").save(path)
+
+  /** Write the DataFrame as ORC. Equivalent to `format("orc").save(path)`. */
   def orc(path: String): Unit = format("orc").save(path)
+
+  /** Write the DataFrame as CSV. Equivalent to `format("csv").save(path)`. */
   def csv(path: String): Unit = format("csv").save(path)
+
+  /** Write the DataFrame as plain text. Only works on single-column String DataFrames. */
   def text(path: String): Unit = format("text").save(path)
+
+  /** Write the DataFrame as XML. Equivalent to `format("xml").save(path)`. */
   def xml(path: String): Unit = format("xml").save(path)
 
   def jdbc(url: String, table: String, connectionProperties: java.util.Properties): Unit =

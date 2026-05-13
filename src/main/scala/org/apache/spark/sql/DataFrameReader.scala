@@ -58,13 +58,32 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
 
   def table(tableName: String): DataFrame = session.table(tableName)
 
+  /** Load JSON files. Equivalent to `format("json").load(paths)`. */
   def json(paths: String*): DataFrame = format("json").load(paths)
+
+  /** Load Parquet files. Equivalent to `format("parquet").load(paths)`. */
   def parquet(paths: String*): DataFrame = format("parquet").load(paths)
+
+  /** Load ORC files. Equivalent to `format("orc").load(paths)`. */
   def orc(paths: String*): DataFrame = format("orc").load(paths)
+
+  /** Load CSV files. Equivalent to `format("csv").load(paths)`. */
   def csv(paths: String*): DataFrame = format("csv").load(paths)
+
+  /** Load text files. Each line becomes a row with a single `value` column. Equivalent to
+    * `format("text").load(paths)`.
+    */
   def text(paths: String*): DataFrame = format("text").load(paths)
+
+  /** Load XML files. Equivalent to `format("xml").load(paths)`. */
   def xml(paths: String*): DataFrame = format("xml").load(paths)
+
+  /** Load a text file and return its `value` column as a single-column DataFrame — a convenience
+    * for the common "treat file as list of strings" pattern.
+    */
   def textFile(path: String): DataFrame = format("text").load(path).select(Column("value"))
+
+  /** Varargs variant of `textFile(path)`. */
   def textFile(paths: String*)(using DummyImplicit): DataFrame =
     format("text").load(paths).select(Column("value"))
 
