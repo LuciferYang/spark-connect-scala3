@@ -24,6 +24,13 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
     opts = opts + (key -> value)
     this
 
+  // Concrete overrides generate bridge methods with the concrete class as the return type,
+  // so Java callers can chain reader.option("k", true).schema(...) without being stuck on the
+  // OptionBuilder trait return type (which lacks schema() etc.).
+  override def option(key: String, value: Boolean): DataFrameReader = super.option(key, value)
+  override def option(key: String, value: Long): DataFrameReader = super.option(key, value)
+  override def option(key: String, value: Double): DataFrameReader = super.option(key, value)
+
   def options(m: Map[String, String]): DataFrameReader =
     opts = opts ++ m
     this

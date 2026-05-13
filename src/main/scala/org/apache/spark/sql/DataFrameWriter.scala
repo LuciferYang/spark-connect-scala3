@@ -41,6 +41,11 @@ final class DataFrameWriter private[sql] (private val df: DataFrame)
     opts = opts + (key -> value)
     this
 
+  // Concrete overrides for Java-interop-friendly return type.
+  override def option(key: String, value: Boolean): DataFrameWriter = super.option(key, value)
+  override def option(key: String, value: Long): DataFrameWriter = super.option(key, value)
+  override def option(key: String, value: Double): DataFrameWriter = super.option(key, value)
+
   def options(m: Map[String, String]): DataFrameWriter =
     opts = opts ++ m
     this

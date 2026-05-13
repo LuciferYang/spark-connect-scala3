@@ -27,6 +27,11 @@ final class DataFrameWriterV2 private[sql] (table: String, df: DataFrame)
     builder.putOptions(key, value)
     this
 
+  // Concrete overrides for Java-interop-friendly return type.
+  override def option(key: String, value: Boolean): DataFrameWriterV2 = super.option(key, value)
+  override def option(key: String, value: Long): DataFrameWriterV2 = super.option(key, value)
+  override def option(key: String, value: Double): DataFrameWriterV2 = super.option(key, value)
+
   def options(opts: Map[String, String]): DataFrameWriterV2 =
     builder.putAllOptions(opts.asJava)
     this
