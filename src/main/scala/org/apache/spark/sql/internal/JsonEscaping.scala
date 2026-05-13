@@ -38,7 +38,12 @@ private[sql] object JsonEscaping:
         case ' '          => sb.append("\\u2029")
         case c if c < ' ' =>
           sb.append("\\u")
-          sb.append(f"${c.toInt}%04x")
+          // Pad to 4 hex digits without the Formatter overhead of f"%04x" (which would allocate
+          // a fresh Formatter per control char — noticeable on strings with many of them).
+          val hex = Integer.toHexString(c.toInt)
+          var pad = 4 - hex.length
+          while pad > 0 do { sb.append('0'); pad -= 1 }
+          sb.append(hex)
         case c => sb.append(c)
       i += 1
     sb.toString
