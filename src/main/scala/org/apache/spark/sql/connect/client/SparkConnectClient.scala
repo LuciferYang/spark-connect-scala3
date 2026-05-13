@@ -498,11 +498,15 @@ object SparkConnectClient:
                     s"${e.getMessage}",
                   e
                 )
+          val trimmedKey = decodedKey.trim
           require(
-            decodedKey.trim.nonEmpty,
+            trimmedKey.nonEmpty,
             s"Invalid Spark Connect URL parameter '$p': key must be non-empty"
           )
-          Some(decodedKey -> decodedValue)
+          // Store the trimmed key so e.g. ` user_id =bob` matches paramMap.get("user_id")
+          // later in `create()`. Values are kept verbatim — users may legitimately need
+          // trailing space in an option value.
+          Some(trimmedKey -> decodedValue)
         case _ =>
           throw IllegalArgumentException(
             s"Invalid Spark Connect URL parameter '$p': expected 'key=value' format"

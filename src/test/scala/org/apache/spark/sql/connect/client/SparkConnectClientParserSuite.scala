@@ -280,6 +280,14 @@ class SparkConnectClientParserSuite extends AnyFunSuite:
     assert(ex.getMessage.contains("expected 'key=value' format"))
   }
 
+  test("parseUrl trims surrounding whitespace from keys") {
+    val (_, _, params) = SparkConnectClient.parseUrl("sc://h:15002; user_id =bob")
+    val m = params.toMap
+    // Key stored trimmed so later .get("user_id") lookups in create() match
+    assert(m.contains("user_id"))
+    assert(m("user_id") == "bob")
+  }
+
   test("parseUrl rejects segments with empty key") {
     val ex = intercept[IllegalArgumentException] {
       SparkConnectClient.parseUrl("sc://h:15002;=value")
