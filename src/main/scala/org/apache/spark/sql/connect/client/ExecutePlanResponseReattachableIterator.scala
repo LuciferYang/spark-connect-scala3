@@ -76,7 +76,18 @@ class ExecutePlanResponseReattachableIterator private[client] (
     retryHandler.retry {
       var hasNextVal = callIter(_.hasNext)
       // If stream ended but no ResultComplete, reattach.
+      // Guard against infinite spin: limit reattach attempts. The retry handler already
+      // bounds individual RPC retries; this caps the outer reattach loop for the case where
+      // the server repeatedly returns empty streams without ResultComplete.
+      var reattachAttempts = 0
+      val maxReattach = 15 // matches default RetryPolicy.maxRetries
       while !hasNextVal && !resultComplete do
+        reattachAttempts += 1
+        if reattachAttempts > maxReattach then
+          throw IllegalStateException(
+            s"Reattach loop exceeded $maxReattach attempts without receiving data or " +
+              "ResultComplete — the server may have lost the operation."
+          )
         iter = rawReattachExecute()
         hasNextVal = callIter(_.hasNext)
       hasNextVal

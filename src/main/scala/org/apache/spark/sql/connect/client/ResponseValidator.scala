@@ -4,6 +4,7 @@ import com.google.protobuf.{Descriptors, GeneratedMessage}
 import io.grpc.StatusRuntimeException
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 /** Validates server-side session ID consistency across all responses.
   *
@@ -12,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap
   */
 class ResponseValidator:
 
-  @volatile private var serverSideSessionId: Option[String] = None
+  private val serverSideSessionIdRef: AtomicReference[Option[String]] = AtomicReference(None)
   @volatile private var sessionValid: Boolean = true
 
   /** Verify a single (unary) response. Extracts `server_side_session_id` via protobuf reflection.
@@ -39,7 +40,7 @@ class ResponseValidator:
         resp
       def close(): Unit = iter.close()
 
-  def getServerSideSessionId: Option[String] = serverSideSessionId
+  def getServerSideSessionId: Option[String] = serverSideSessionIdRef.get()
 
   def isSessionValid: Boolean = sessionValid
 
@@ -48,9 +49,13 @@ class ResponseValidator:
   // ---------------------------------------------------------------------------
 
   private def trackSessionId(id: String): Unit =
-    serverSideSessionId match
+    // CAS loop: atomically set the first observed session ID, or verify subsequent ones match.
+    val current = serverSideSessionIdRef.get()
+    current match
       case None =>
-        serverSideSessionId = Some(id)
+        // First response — try to set. If another thread beat us, verify their value matches.
+        if !serverSideSessionIdRef.compareAndSet(None, Some(id)) then
+          trackSessionId(id) // retry with the now-set value
       case Some(existing) if existing != id =>
         sessionValid = false
         throw IllegalStateException(

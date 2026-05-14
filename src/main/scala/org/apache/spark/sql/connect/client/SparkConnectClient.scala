@@ -369,7 +369,9 @@ final class SparkConnectClient private (
       .setSessionId(sessionId)
       .setUserContext(userContext)
     serverSideSessionId.foreach(rb.setClientObservedServerSideSessionId)
-    val resp = GrpcExceptionConverter.convert(retryHandler.retry(bstub.cloneSession(rb.build())))
+    val resp = responseValidator.verifyResponse(
+      GrpcExceptionConverter.convert(retryHandler.retry(bstub.cloneSession(rb.build())))
+    )
     val clonedSessionId = resp.getSessionId
     // Retain after RPC success to avoid leaking a ref count on failure
     val retained = sharedChannel.retain()
@@ -399,7 +401,7 @@ final class SparkConnectClient private (
         .setUserContext(userContext)
         .setErrorId(errorId)
       serverSideSessionId.foreach(rb.setClientObservedServerSideSessionId)
-      Some(bstub.fetchErrorDetails(rb.build()))
+      Some(retryHandler.retry(bstub.fetchErrorDetails(rb.build())))
     catch case NonFatal(_) => None
 
   // ---------------------------------------------------------------------------
