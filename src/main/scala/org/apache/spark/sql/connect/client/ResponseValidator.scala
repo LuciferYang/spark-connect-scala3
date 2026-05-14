@@ -54,7 +54,8 @@ class ResponseValidator:
       case Some(existing) if existing != id =>
         sessionValid = false
         throw IllegalStateException(
-          s"Server-side session ID changed from $existing to $id"
+          s"Server-side session ID changed unexpectedly (expected ${existing.take(8)}..., " +
+            s"got ${id.take(8)}...)"
         )
       case _ => // matches — ok
 

@@ -46,10 +46,24 @@ final class DataFrameStatFunctions private[sql] (df: DataFrame):
     val result = df.withRelation(_.setApproxQuantile(aqBuilder.build()))
     val row = result.collect().head
     // Server returns a single row with one column of type array<array<double>>
-    row.get(0).asInstanceOf[Seq[Seq[Any]]].map(_.map {
-      case n: Number => n.doubleValue()
-      case other     => other.asInstanceOf[Double]
-    }.toArray).toArray
+    row.get(0) match
+      case outer: Seq[?] =>
+        outer.map {
+          case inner: Seq[?] =>
+            inner.map {
+              case n: Number => n.doubleValue()
+              case other     => other.asInstanceOf[Double]
+            }.toArray
+          case other =>
+            throw IllegalStateException(
+              s"Expected inner Seq in approxQuantile result, got: ${other.getClass.getName}"
+            )
+        }.toArray
+      case other =>
+        throw IllegalStateException(
+          s"Expected Seq[Seq[...]] in approxQuantile result, got: " +
+            s"${if other == null then "null" else other.getClass.getName}"
+        )
 
   /** Computes approximate quantiles for a single numeric column. */
   def approxQuantile(

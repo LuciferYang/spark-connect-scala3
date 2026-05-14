@@ -1,6 +1,6 @@
 package org.apache.spark.sql.connect.client
 
-import scala.util.Random
+import java.util.concurrent.ThreadLocalRandom
 
 /** Executes a block with retry logic according to a [[RetryPolicy]].
   *
@@ -31,7 +31,9 @@ class GrpcRetryHandler(
             policy.initialBackoffMs * math.pow(policy.backoffMultiplier, attempt.toDouble).toLong,
             policy.maxBackoffMs
           )
-          val jitter = if policy.jitterMs > 0 then Random.nextLong(policy.jitterMs) else 0L
+          val jitter =
+            if policy.jitterMs > 0 then ThreadLocalRandom.current().nextLong(policy.jitterMs)
+            else 0L
           sleep(backoff + jitter)
           attempt += 1
         case e: Throwable =>

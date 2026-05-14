@@ -68,7 +68,15 @@ private[sql] object SparkConnectClientParser:
         parseImpl(remainder, config.copy(host = value))
       case "--port" :: tail =>
         val (value, remainder) = extract("--port", tail)
-        parseImpl(remainder, config.copy(port = value.toInt))
+        val port =
+          try value.toInt
+          catch
+            case _: NumberFormatException =>
+              throw IllegalArgumentException(
+                s"--port must be a valid integer, got '$value'"
+              )
+        require(port >= 1 && port <= 65535, s"--port must be in [1, 65535], got $port")
+        parseImpl(remainder, config.copy(port = port))
       case "--token" :: tail =>
         val (value, remainder) = extract("--token", tail)
         parseImpl(remainder, config.copy(token = Some(value)))

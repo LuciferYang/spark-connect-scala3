@@ -86,8 +86,13 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
 
   def fill(valueMap: Map[String, Any]): DataFrame =
     val naFillBuilder = NAFill.newBuilder().setInput(df.relation)
-    valueMap.keys.foreach(naFillBuilder.addCols)
-    valueMap.values.foreach(v => naFillBuilder.addValues(toLiteral(v)))
+    // Iterate entries together to guarantee key/value ordering consistency
+    // (previously iterated .keys and .values separately, which is safe for immutable Map
+    // but fragile if the Map implementation doesn't guarantee paired iteration order).
+    valueMap.foreach { (col, v) =>
+      naFillBuilder.addCols(col)
+      naFillBuilder.addValues(toLiteral(v))
+    }
     df.withRelation(_.setFillNa(naFillBuilder.build()))
 
   def replace[T](col: String, replacement: Map[T, T]): DataFrame =
