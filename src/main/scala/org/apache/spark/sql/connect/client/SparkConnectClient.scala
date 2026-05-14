@@ -421,7 +421,13 @@ final class SparkConnectClient private (
 
 object SparkConnectClient:
 
-  /** Maximum inbound gRPC message size (128 MB). */
+  /** Maximum inbound gRPC message size (128 MB).
+    *
+    * S-13: This is a client-side cap on the largest single gRPC response frame. Combined with the
+    * per-batch Arrow allocator (capped at 256 GB), a malicious server could still push large
+    * payloads — but the 128 MB frame limit bounds the per-message memory spike. Override via a
+    * custom `ManagedChannelBuilder` if a tighter limit is needed.
+    */
   private val MaxInboundMessageSize: Int = 128 * 1024 * 1024
 
   /** Default Spark Connect server port, used when `sc://host` is given with no explicit `:port`. */
@@ -522,6 +528,9 @@ object SparkConnectClient:
   ): SparkConnectClient =
     val (host, port, params) = parseUrl(url)
     val paramMap = params.toMap
+    // S-12: userId defaults to the OS `user.name` system property. This is the same behavior as
+    // upstream Spark Connect. Override via `sc://host:port;user_id=<explicit>` if the default
+    // is undesirable (e.g., in shared environments where the OS user is a service account).
     val userId = paramMap.getOrElse("user_id", System.getProperty("user.name", "anonymous"))
     val token =
       paramMap.get("token").orElse(Option(System.getenv("SPARK_CONNECT_AUTHENTICATE_TOKEN")))

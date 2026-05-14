@@ -31,13 +31,15 @@ class AmmoniteClassFinder(session: Session) extends ClassFinder:
 
   override def findClasses(): Iterator[Artifact] =
     session.frames.iterator.flatMap { frame =>
-      val classloader = frame.classloader.asInstanceOf[SpecialClassLoader]
-      val signatures: Seq[(Either[String, URL], Long)] = classloader.classpathSignature
-      signatures.iterator.collect { case (Left(name), _) =>
-        val parts = name.split('.')
-        parts(parts.length - 1) += ".class"
-        val path = Paths.get(parts.head, parts.tail*)
-        val bytes = classloader.newFileDict(name)
-        Artifact.newClassArtifact(path, Artifact.InMemory(bytes))
-      }
+      frame.classloader match
+        case classloader: SpecialClassLoader =>
+          val signatures: Seq[(Either[String, URL], Long)] = classloader.classpathSignature
+          signatures.iterator.collect { case (Left(name), _) =>
+            val parts = name.split('.')
+            parts(parts.length - 1) += ".class"
+            val path = Paths.get(parts.head, parts.tail*)
+            val bytes = classloader.newFileDict(name)
+            Artifact.newClassArtifact(path, Artifact.InMemory(bytes))
+          }
+        case _ => Iterator.empty // non-Ammonite classloader — skip
     }

@@ -109,3 +109,6 @@ Spark session available as 'spark'.
     )
 
     main.run(ammonite.util.Bind("spark", spark))
+
+    // Close the SparkSession on REPL exit to release the gRPC channel and server-side resources.
+    spark.close()

@@ -9,6 +9,10 @@ package org.apache.spark.sql.connect.common
   *
   * Diagnostic output is gated on the `spark.connect.scala3.closureCleaner.debug` system property —
   * set to `true` to print to stderr. Default is silent so production usage has zero overhead.
+  *
+  * '''Security note (S-18)''': when debug is enabled, log output may include closure class names,
+  * captured field names, and serialization details. Do not enable in production environments where
+  * stderr is aggregated into shared log systems accessible to untrusted parties.
   */
 trait Logging:
   protected val log: Log = Log.instance
