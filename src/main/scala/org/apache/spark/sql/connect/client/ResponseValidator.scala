@@ -49,20 +49,22 @@ class ResponseValidator:
   // ---------------------------------------------------------------------------
 
   private def trackSessionId(id: String): Unit =
-    // CAS loop: atomically set the first observed session ID, or verify subsequent ones match.
-    val current = serverSideSessionIdRef.get()
-    current match
-      case None =>
-        // First response — try to set. If another thread beat us, verify their value matches.
-        if !serverSideSessionIdRef.compareAndSet(None, Some(id)) then
-          trackSessionId(id) // retry with the now-set value
-      case Some(existing) if existing != id =>
-        sessionValid = false
-        throw IllegalStateException(
-          s"Server-side session ID changed unexpectedly (expected ${existing.take(8)}..., " +
-            s"got ${id.take(8)}...)"
-        )
-      case _ => // matches — ok
+    // CAS: atomically set the first observed session ID, or verify subsequent ones match.
+    // Max recursion depth is 1 (None→Some transition happens exactly once).
+    @scala.annotation.tailrec
+    def loop(): Unit =
+      val current = serverSideSessionIdRef.get()
+      current match
+        case None =>
+          if !serverSideSessionIdRef.compareAndSet(None, Some(id)) then loop()
+        case Some(existing) if existing != id =>
+          sessionValid = false
+          throw IllegalStateException(
+            s"Server-side session ID changed unexpectedly (expected ${existing.take(8)}..., " +
+              s"got ${id.take(8)}...)"
+          )
+        case _ => () // matches — ok
+    loop()
 
   /** Cache of field descriptors keyed by message Descriptor to avoid repeated reflection. Uses
     * Optional to handle the case where findFieldByName returns null (field absent), since

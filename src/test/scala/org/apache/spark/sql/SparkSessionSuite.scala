@@ -214,6 +214,14 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
     range.getNumPartitions shouldBe 4
   }
 
+  test("range rejects step=0") {
+    val session = stubSession
+    val ex1 = intercept[IllegalArgumentException](session.range(0, 10, 0))
+    assert(ex1.getMessage.contains("step must not be zero"))
+    val ex2 = intercept[IllegalArgumentException](session.range(0, 10, 0, 4))
+    assert(ex2.getMessage.contains("step must not be zero"))
+  }
+
   // ---------- emptyDataFrame ----------
 
   test("emptyDataFrame builds LocalRelation") {
