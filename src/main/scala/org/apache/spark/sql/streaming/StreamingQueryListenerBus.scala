@@ -63,9 +63,7 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
     listeners.remove(listener)
   }
 
-  def list(): Array[StreamingQueryListener] = lock.synchronized {
-    listeners.asScala.toArray
-  }
+  def list(): Array[StreamingQueryListener] = listeners.asScala.toArray
 
   private[sql] def registerServerSideListener(): Iterator[ExecutePlanResponse] =
     val cmdBuilder = Command.newBuilder()
@@ -134,7 +132,14 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
             case NonFatal(_) => ()
             case _           => ()
 
-  private[sql] def postToAll(event: Event): Unit = lock.synchronized {
+  /** Dispatch an event to all registered listeners.
+    *
+    * Does NOT hold `lock` — `CopyOnWriteArrayList.forEach` iterates a snapshot, so concurrent
+    * `append`/`remove` calls are safe. This avoids blocking the handler thread (which calls
+    * `postToAll`) when a slow listener is executing, and prevents re-entrant deadlock if a listener
+    * callback calls `append`/`remove`.
+    */
+  private[sql] def postToAll(event: Event): Unit =
     listeners.forEach { listener =>
       try
         event match
@@ -144,4 +149,3 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
           case e: QueryTerminatedEvent => listener.onQueryTerminated(e)
       catch case NonFatal(_) => () // one listener failure should not affect others
     }
-  }
