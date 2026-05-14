@@ -193,8 +193,18 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
           val nullStr = if f.nullable then "nullable = true" else "nullable = false"
           sb.append(s"$prefix${f.name}: ${f.dataType.simpleString} ($nullStr)\n")
           f.dataType match
-            case st: StructType => buildTree(st.fields, indent + 1)
-            case _              => ()
+            case st: StructType =>
+              buildTree(st.fields, indent + 1)
+            case ArrayType(st: StructType, _) =>
+              buildTree(st.fields, indent + 1)
+            case MapType(kt, vt, _) =>
+              kt match
+                case st: StructType => buildTree(st.fields, indent + 1)
+                case _              => ()
+              vt match
+                case st: StructType => buildTree(st.fields, indent + 1)
+                case _              => ()
+            case _ => ()
         }
     buildTree(fields, 1)
     sb.toString

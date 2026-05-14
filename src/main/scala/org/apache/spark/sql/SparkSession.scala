@@ -50,6 +50,11 @@ final class SparkSession private[sql] (
     * {{{
     *   spark.sql("SELECT :name AS name", Map("name" -> "hello")).show()
     * }}}
+    *
+    * '''Note''': argument values are converted via `Column.lit(value)`. Supported types are:
+    * Boolean, Byte, Short, Int, Long, Float, Double, String, and Column. Unsupported types are
+    * silently converted via `.toString` — this matches upstream Spark behavior but may produce
+    * unexpected results for complex objects.
     */
   def sql(query: String, args: Map[String, Any]): DataFrame =
     val sqlBuilder = SQL.newBuilder().setQuery(query)
@@ -117,6 +122,7 @@ final class SparkSession private[sql] (
   def range(end: Long): DataFrame = range(0, end, 1)
 
   def range(start: Long, end: Long, step: Long = 1): DataFrame =
+    require(step != 0, "step must not be zero")
     DataFrame(
       this,
       Relation.newBuilder()
@@ -127,6 +133,7 @@ final class SparkSession private[sql] (
     )
 
   def range(start: Long, end: Long, step: Long, numPartitions: Int): DataFrame =
+    require(step != 0, "step must not be zero")
     DataFrame(
       this,
       Relation.newBuilder()
@@ -470,12 +477,19 @@ object SparkSession:
       val client = SparkConnectClient.create(url, configs = configs)
       val session = SparkSession(client)
       if defaultSession.get() == null then defaultSession.compareAndSet(null, session)
+      activeSession.set(session)
       session
 
     /** Create a new session — alias for `build()`, matching the official API. */
     def create(): SparkSession = build()
 
-    /** Return an existing active/default session, or create a new one. */
+    /** Return an existing active/default session, or create a new one.
+      *
+      * '''Note''': if an existing session is returned, any `.config(k, v)` calls accumulated on
+      * this Builder are silently discarded — they are NOT applied to the returned session. This
+      * matches upstream Spark Connect behavior. If you need to ensure configs are applied, use
+      * `build()` to always create a fresh session.
+      */
     def getOrCreate(): SparkSession =
       val existing = SparkSession.getActiveSession.orElse(SparkSession.getDefaultSession)
       existing.getOrElse(build())

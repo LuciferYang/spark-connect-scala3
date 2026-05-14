@@ -670,6 +670,13 @@ final class DataFrame private[sql] (
 
   def takeAsList(n: Int): java.util.List[Row] = java.util.Arrays.asList(take(n)*)
 
+  /** Return the number of rows in this DataFrame.
+    *
+    * '''Implementation note''': Spark Connect has no dedicated "count" RPC; this method builds a
+    * `groupBy().agg(count(1))` plan and collects the single-row result. The overhead is minimal
+    * (server optimizes the plan), but callers doing repeated counts in a tight loop should cache
+    * the result.
+    */
   def count(): Long =
     import functions.{count as countFn, lit}
     groupBy(Seq.empty[Column]*).agg(countFn(lit(1)).as("count")).collect().head.getLong(0)

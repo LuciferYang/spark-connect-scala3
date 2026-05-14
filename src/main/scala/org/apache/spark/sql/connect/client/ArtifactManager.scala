@@ -177,7 +177,7 @@ final class ArtifactManager private[client] (
           .setCrc(in.getChecksum.getValue)
         builder.getBatchBuilder
           .addArtifactsBuilder()
-          .setName(artifact.path.toString)
+          .setName(artifact.path.toString.replace('\\', '/'))
           .setData(data)
           .build()
       finally in.close()
@@ -202,7 +202,7 @@ final class ArtifactManager private[client] (
 
       // First message: BeginChunkedArtifact
       builder.getBeginChunkBuilder
-        .setName(artifact.path.toString)
+        .setName(artifact.path.toString.replace('\\', '/'))
         .setTotalBytes(artifact.size)
         .setNumChunks(numChunks)
         .setInitialChunk(chunkBuilder.setData(dataChunk).setCrc(in.getChecksum.getValue))
