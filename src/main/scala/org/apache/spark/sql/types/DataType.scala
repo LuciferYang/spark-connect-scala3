@@ -187,7 +187,7 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
     val sb = StringBuilder()
     sb.append("root\n")
     def buildTree(fields: Seq[StructField], indent: Int): Unit =
-      if indent < maxLevel then
+      if indent <= maxLevel then
         fields.foreach { f =>
           val prefix = " |" * indent + "-- "
           val nullStr = if f.nullable then "nullable = true" else "nullable = false"
@@ -196,7 +196,7 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
         }
 
     def recurseType(dt: DataType, indent: Int): Unit =
-      if indent <= maxLevel then
+      if indent < maxLevel then
         dt match
           case st: StructType     => buildTree(st.fields, indent)
           case ArrayType(et, _)   => recurseType(et, indent)
