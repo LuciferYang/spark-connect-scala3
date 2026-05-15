@@ -15,10 +15,15 @@ class GrpcRetryHandler(
     sleep: Long => Unit = Thread.sleep
 ):
 
-  /** Execute `fn`, retrying up to `policy.maxRetries` times on retryable errors. */
+  /** Execute `fn`, retrying up to `policy.maxRetries` times on retryable errors.
+    *
+    * Also enforces `policy.maxTotalDurationMs` — if the cumulative time spent retrying exceeds this
+    * budget, the last exception is rethrown even if maxRetries has not been exhausted.
+    */
   def retry[T](fn: => T): T =
     var lastException: Throwable = null
     var attempt = 0
+    val deadline = System.nanoTime() + policy.maxTotalDurationMs * 1_000_000L
     while attempt <= policy.maxRetries do
       try return fn
       catch
@@ -27,6 +32,7 @@ class GrpcRetryHandler(
           attempt += 1 // immediate retry, no backoff
         case e: Throwable if policy.canRetry(e) && attempt < policy.maxRetries =>
           lastException = e
+          if System.nanoTime() >= deadline then throw e // total duration budget exhausted
           val backoff = math.min(
             policy.initialBackoffMs * math.pow(policy.backoffMultiplier, attempt.toDouble).toLong,
             policy.maxBackoffMs

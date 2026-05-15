@@ -13,6 +13,7 @@ case class RetryPolicy(
     maxBackoffMs: Long = 60000,
     backoffMultiplier: Double = 4.0,
     jitterMs: Long = 500,
+    maxTotalDurationMs: Long = 10 * 60 * 1000, // 10 minutes total retry budget
     canRetry: Throwable => Boolean = RetryPolicy.defaultCanRetry
 )
 
