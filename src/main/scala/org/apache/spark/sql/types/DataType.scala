@@ -192,20 +192,16 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
           val prefix = " |" * indent + "-- "
           val nullStr = if f.nullable then "nullable = true" else "nullable = false"
           sb.append(s"$prefix${f.name}: ${f.dataType.simpleString} ($nullStr)\n")
-          f.dataType match
-            case st: StructType =>
-              buildTree(st.fields, indent + 1)
-            case ArrayType(st: StructType, _) =>
-              buildTree(st.fields, indent + 1)
-            case MapType(kt, vt, _) =>
-              kt match
-                case st: StructType => buildTree(st.fields, indent + 1)
-                case _              => ()
-              vt match
-                case st: StructType => buildTree(st.fields, indent + 1)
-                case _              => ()
-            case _ => ()
+          recurseType(f.dataType, indent + 1)
         }
+
+    def recurseType(dt: DataType, indent: Int): Unit =
+      if indent <= maxLevel then
+        dt match
+          case st: StructType     => buildTree(st.fields, indent)
+          case ArrayType(et, _)   => recurseType(et, indent)
+          case MapType(kt, vt, _) => recurseType(kt, indent); recurseType(vt, indent)
+          case _                  => ()
     buildTree(fields, 1)
     sb.toString
 

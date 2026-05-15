@@ -70,26 +70,28 @@ class ExecutePlanResponseReattachableIterator private[client] (
   // Iterator interface
   // ---------------------------------------------------------------------------
 
+  // Reattach attempt counter — lives outside the retry block so it is NOT reset when the
+  // retry handler re-invokes the lambda after a transient gRPC error.
+  private var reattachAttempts: Int = 0
+  private val MaxReattach: Int = 15 // matches default RetryPolicy.maxRetries
+
   override def hasNext: Boolean =
     if closed then return false
     if resultComplete then return false
     retryHandler.retry {
       var hasNextVal = callIter(_.hasNext)
       // If stream ended but no ResultComplete, reattach.
-      // Guard against infinite spin: limit reattach attempts. The retry handler already
-      // bounds individual RPC retries; this caps the outer reattach loop for the case where
-      // the server repeatedly returns empty streams without ResultComplete.
-      var reattachAttempts = 0
-      val maxReattach = 15 // matches default RetryPolicy.maxRetries
       while !hasNextVal && !resultComplete do
         reattachAttempts += 1
-        if reattachAttempts > maxReattach then
+        if reattachAttempts > MaxReattach then
           throw IllegalStateException(
-            s"Reattach loop exceeded $maxReattach attempts without receiving data or " +
+            s"Reattach loop exceeded $MaxReattach attempts without receiving data or " +
               "ResultComplete — the server may have lost the operation."
           )
         iter = rawReattachExecute()
         hasNextVal = callIter(_.hasNext)
+      // Reset on success — the cap is per-stall, not per-lifetime.
+      if hasNextVal then reattachAttempts = 0
       hasNextVal
     }
 
