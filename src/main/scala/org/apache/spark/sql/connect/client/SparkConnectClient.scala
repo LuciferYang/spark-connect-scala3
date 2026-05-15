@@ -536,7 +536,8 @@ object SparkConnectClient:
     val userId = paramMap.getOrElse("user_id", System.getProperty("user.name", "anonymous"))
     val token =
       paramMap.get("token").orElse(Option(System.getenv("SPARK_CONNECT_AUTHENTICATE_TOKEN")))
-    val useSsl = paramMap.get("use_ssl").exists(_.equalsIgnoreCase("true"))
+    val useSsl = paramMap.get("use_ssl").exists(_.equalsIgnoreCase("true")) ||
+      token.isDefined // upstream: setting a token implicitly enables TLS
 
     // Build a sanitized URL without the token for storage (preserving original param order)
     val sanitizedParams = params.filterNot(_._1 == "token")
