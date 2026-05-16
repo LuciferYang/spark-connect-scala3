@@ -4,7 +4,7 @@ ThisBuild / organization := "io.github.luciferyang"
 // ---------------------------------------------------------------------------
 // Publishing metadata (required by Maven Central)
 // ---------------------------------------------------------------------------
-ThisBuild / description := "A lightweight Apache Spark Connect client for Scala 3"
+ThisBuild / description := s"A lightweight Apache Spark Connect client for Scala 3 (targeting Spark $sparkVersion)"
 ThisBuild / homepage := Some(url("https://github.com/LuciferYang/spark-connect-scala3"))
 ThisBuild / licenses := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0"))
 ThisBuild / developers := List(
@@ -34,6 +34,10 @@ val zstdVersion = "1.5.7-8"
 val asmVersion = "9.9.1"
 val scalatestVersion = "3.2.19"
 
+// The Spark Connect server version this client is built and tested against.
+// Encoded in the artifactId so users know which server version to target.
+val sparkVersion = "4.1"
+
 // Google Mirror of Maven Central, placed first so that it's used instead of flaky Maven Central.
 // See https://storage-download.googleapis.com/maven-central/index.html
 ThisBuild / resolvers += "gcs-maven-central-mirror" at
@@ -42,7 +46,7 @@ ThisBuild / resolvers += "gcs-maven-central-mirror" at
 lazy val root = (project in file("."))
   .enablePlugins(JmhPlugin)
   .settings(
-    name := "spark-connect-scala3",
+    name := s"spark-connect-scala3-spark${sparkVersion.replace(".", "")}",
 
     scalacOptions ++= Seq(
       "-encoding", "utf8",
