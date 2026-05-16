@@ -28,7 +28,11 @@ ThisBuild / publishTo := sonatypePublishToBundle.value
 
 val grpcVersion = "1.80.0"
 val protobufVersion = "4.34.1"
+val arrowVersion = "19.0.0"
 val ammoniteVersion = "3.0.9"
+val zstdVersion = "1.5.6-8"
+val asmVersion = "9.9.1"
+val scalatestVersion = "3.2.19"
 
 // Google Mirror of Maven Central, placed first so that it's used instead of flaky Maven Central.
 // See https://storage-download.googleapis.com/maven-central/index.html
@@ -61,7 +65,6 @@ lazy val root = (project in file("."))
     Compile / mainClass := Some("org.apache.spark.sql.application.ConnectRepl"),
 
     libraryDependencies ++= {
-      val arrowVersion = "19.0.0"
       val scalaFullVersion = scalaVersion.value // e.g. "3.3.7"
 
       Seq(
@@ -77,19 +80,17 @@ lazy val root = (project in file("."))
         "org.apache.arrow" % "arrow-memory-netty" % arrowVersion,
 
         // Zstandard for plan compression
-        "com.github.luben" % "zstd-jni" % "1.5.6-8",
+        "com.github.luben" % "zstd-jni" % zstdVersion,
 
-        // ASM for closure-cleaning bytecode analysis (mirrors upstream Spark's
-        // ClosureCleaner approach for stripping unused outer references from
-        // Scala lambdas before sending them over the wire).
-        "org.ow2.asm" % "asm" % "9.9.1",
-        "org.ow2.asm" % "asm-tree" % "9.9.1",
+        // ASM for closure-cleaning bytecode analysis
+        "org.ow2.asm" % "asm" % asmVersion,
+        "org.ow2.asm" % "asm-tree" % asmVersion,
 
         // Ammonite REPL (published per full Scala version, not binary)
         "com.lihaoyi" % s"ammonite_$scalaFullVersion" % ammoniteVersion cross CrossVersion.disabled,
 
         // Testing
-        "org.scalatest" %% "scalatest" % "3.2.19" % Test
+        "org.scalatest" %% "scalatest" % scalatestVersion % Test
       )
     },
 
