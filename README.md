@@ -10,34 +10,15 @@ This project provides that Scala 3 client.
 
 ## Features
 
-- **SparkSession** — `builder().remote("sc://host:port").build()`, `time[T]`, static session management (`getActiveSession`, `getDefaultSession`, `active`), `cloneSession()`, `executeCommand` (DeveloperApi), `Builder.config(Boolean/Long/Double)` overloads
-- **DataFrame** — select, filter, groupBy, join, union, distinct, sort, limit, sample, and more
-- **Dataset[T]** — typed operations with compile-time `Encoder` derivation via `derives Encoder`, `joinWith` (type-safe join), typed `select(TypedColumn)` (1-5 arity), `toLocalIterator`, `toJSON`, `scalar()`, `exists()`
-- **Column** — arithmetic, comparison, logical, string, cast, alias, window, sort operators
-- **functions** — 542 built-in SQL functions (aggregates, math, string, date/time, window, collection, JSON, XML, URL, variant, datasketch, geospatial, and more) — **100% coverage** of the official API
-- **GroupedDataFrame** — groupBy / rollup / cube / pivot / groupingSets with agg, count, sum, avg, min, max
-- **DataFrameReader / Writer** — read and write Parquet, JSON, CSV, ORC, text, and tables
-- **DataFrameWriterV2 / MergeIntoWriter** — V2 table writes (create, append, overwrite, overwritePartitions) and MERGE INTO support
-- **DataStreamReader / Writer** — structured streaming read / write with trigger, `foreachBatch`, and `foreach` support
-- **Stateful Streaming** — `mapGroupsWithState`, `flatMapGroupsWithState`, `transformWithState` on `KeyValueGroupedDataset`
-- **StreamingQuery / Manager** — streaming query lifecycle management
-- **Catalog** — full Catalog API: list/get/create/drop databases, tables, views, functions; `catalogExists`; cache management; table properties; partitions; analyze/truncate
-- **UDF** — register and use JVM lambda UDFs (0–10 arguments), `UDFRegistration.register` inline overloads for Function0–10
-- **UDAF** — user-defined aggregate functions via `Aggregator[IN, BUF, OUT]` with `Encoders` factory (including `Encoders.row`)
-- **TypedColumn / Aggregator.toColumn** — type-safe aggregation via `TypedColumn[-T, U]` and `Aggregator.toColumn`
-- **ReduceAggregator** — server-side reduce aggregator for `reduceGroups`
-- **typed object** — typed aggregation functions: `typed.avg`, `typed.count`, `typed.sum`, `typed.sumLong`
-- **TableValuedFunction** — `SparkSession.tvf` for explode, inline, posexplode, json_tuple, stack, collations, sql_keywords, variant_explode, and more
-- **KeyValueGroupedDataset.agg(TypedColumn)** — typed aggregation with 1–4 TypedColumn arguments via `Aggregate` proto
-- **DataFrameNaFunctions** — drop / fill / replace null values
-- **DataFrameStatFunctions** — statistical functions (crosstab, freqItems, approxQuantile, etc.)
-- **Window** — window specifications with partitionBy, orderBy, rowsBetween, rangeBetween
-- **Row / StructType** — full typed accessors (`getDecimal`, `getDate`, `getTimestamp`, `getInstant`, `getLocalDate`, `getSeq`, `getList`, `getMap`, `getJavaMap`, `getStruct`, `getAs(fieldName)`, `fieldIndex`, `anyNull`, `json`, `prettyJson`, `copy`) and schema support
-- **Arrow IPC** — createDataFrame with client-side Arrow serialization; server responses deserialized via Arrow
-- **RuntimeConfig** — get / set Spark configuration at runtime
-- **Operation Tags** — `addTag`/`removeTag`/`getTags`/`clearTags` with fine-grained interruption (`interruptAll`/`interruptTag`/`interruptOperation`)
-- **Scalar / Exists / IN Subqueries** — `Dataset.scalar()`, `Dataset.exists()`, `Column.isin(Dataset)` via `SubqueryExpression` + `WithRelations` proto
-- **Plan Compression** — ZSTD compression for large plans, with server-config-driven threshold
+Full Spark Connect client API for Scala 3, including:
+
+- **Core** — SparkSession, DataFrame, Dataset[T], Column, Row with compile-time Encoder derivation
+- **SQL Functions** — 542 built-in functions (100% coverage of the official Spark 4.1 API)
+- **I/O** — Reader/Writer for Parquet, JSON, CSV, ORC, JDBC; V2 writes; MergeInto; streaming
+- **Typed Operations** — TypedColumn, Aggregator, UDF/UDAF (0–10 args), KeyValueGroupedDataset
+- **Streaming** — Structured Streaming with stateful operations (`transformWithState`, `flatMapGroupsWithState`), listener bus
+- **Advanced** — Catalog, Window, Subqueries, TableValuedFunction, Plan Compression (ZSTD), Operation Tags
+- **Interactive** — Ammonite-based REPL with `spark` session pre-bound
 
 ## Compatibility
 
@@ -215,7 +196,16 @@ build/sbt 'set Test / testOptions := Seq()' 'testOnly *IntegrationSuite'
 
 ```scala
 // build.sbt
-libraryDependencies += "io.github.spark-connect" %% "spark-connect-scala3" % "0.1.0-SNAPSHOT"
+libraryDependencies += "io.github.luciferyang" %% "spark-connect-spark41" % "0.7.0"
+```
+
+```xml
+<!-- Maven -->
+<dependency>
+  <groupId>io.github.luciferyang</groupId>
+  <artifactId>spark-connect-spark41_3</artifactId>
+  <version>0.7.0</version>
+</dependency>
 ```
 
 ```scala
