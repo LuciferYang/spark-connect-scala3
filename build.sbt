@@ -46,7 +46,7 @@ ThisBuild / resolvers += "gcs-maven-central-mirror" at
 lazy val root = (project in file("."))
   .enablePlugins(JmhPlugin)
   .settings(
-    name := s"spark-connect-scala3-spark${sparkVersion.replace(".", "")}",
+    name := s"spark-connect-spark${sparkVersion.replace(".", "")}",
 
     scalacOptions ++= Seq(
       "-encoding", "utf8",
