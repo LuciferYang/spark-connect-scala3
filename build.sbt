@@ -30,7 +30,7 @@ val grpcVersion = "1.81.0"
 val protobufVersion = "4.34.1"
 val arrowVersion = "19.0.0"
 val ammoniteVersion = "3.0.9"
-val zstdVersion = "1.5.6-8"
+val zstdVersion = "1.5.7-8"
 val asmVersion = "9.9.1"
 val scalatestVersion = "3.2.19"
 
