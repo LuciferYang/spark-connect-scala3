@@ -41,13 +41,14 @@ jobs:
           path: |
             ~/.sbt
             ~/.cache/coursier
-          key: ${{ runner.os }}-sbt-jmh-${{ hashFiles('build.sbt', 'project/plugins.sbt') }}
+            build/sbt-launch-*.jar
+          key: ${{ runner.os }}-sbt-jmh-${{ hashFiles('build.sbt', 'project/plugins.sbt', 'project/build.properties') }}
           restore-keys: |
             ${{ runner.os }}-sbt-jmh-
             ${{ runner.os }}-sbt-
 
       - name: Compile benchmark code
-        run: sbt 'Jmh/compile'
+        run: build/sbt 'Jmh/compile'
 
       - name: Run benchmarks
         id: run_bench
@@ -58,7 +59,7 @@ jobs:
           else
             JMH_ARGS="$JMH_ARGS -rf json -rff benchmark-results.json"
           fi
-          sbt "Jmh/run $JMH_ARGS"
+          build/sbt "Jmh/run $JMH_ARGS"
 
       - name: Generate summary
         if: always() && steps.run_bench.outcome == 'success'
