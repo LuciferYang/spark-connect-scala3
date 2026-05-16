@@ -26,7 +26,7 @@ ThisBuild / scmInfo := Some(
 ThisBuild / sonatypeCredentialHost := "central.sonatype.com"
 ThisBuild / publishTo := sonatypePublishToBundle.value
 
-val grpcVersion = "1.80.0"
+val grpcVersion = "1.81.0"
 val protobufVersion = "4.34.1"
 val arrowVersion = "19.0.0"
 val ammoniteVersion = "3.0.9"
