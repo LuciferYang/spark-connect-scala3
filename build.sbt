@@ -134,15 +134,18 @@ lazy val root = (project in file("."))
       "org\\.apache\\.spark\\.sql\\.application\\..*",            // ConnectRepl
       "org\\.apache\\.spark\\.sql\\.connect\\.client\\..*",       // gRPC client internals
       "org\\.apache\\.spark\\.sql\\.connect\\.common\\..*",       // ClosureCleaner (vendored upstream)
+      "org\\.apache\\.spark\\.sql\\.connect\\..*",                // any remaining connect internals
       "org\\.apache\\.spark\\.sql\\.catalyst\\.encoders\\..*",    // AgnosticEncoder serialization proxies
       "org\\.apache\\.spark\\.sql\\.StreamingQuery",              // requires live server
       "org\\.apache\\.spark\\.sql\\.StreamingQueryManager",       // requires live server
-      "org\\.apache\\.spark\\.sql\\.streaming\\.StreamingQueryListenerBus"  // requires live server
+      "org\\.apache\\.spark\\.sql\\.streaming\\.StreamingQueryListenerBus",  // requires live server
+      "org\\.apache\\.spark\\.sql\\.KeyValueGroupedDataset",      // cogroup/flatMapGroups need server
+      "org\\.apache\\.spark\\.sql\\.Observation",                 // get() needs server metrics
+      "org\\.apache\\.spark\\.sql\\.UDFRegistration"              // register() needs server
     ).mkString(";"),
 
-    // Fail build if statement coverage drops below 79% (excludes packages above).
-    // Current baseline: ~79.4% after excluding server-dependent and vendored code.
-    coverageMinimumStmtTotal := 79,
+    // Fail build if statement coverage drops below 80%.
+    coverageMinimumStmtTotal := 80,
     coverageFailOnMinimum := true,
 
     // JVM options for Apache Arrow + spark-sketch (sun.misc.Unsafe)
