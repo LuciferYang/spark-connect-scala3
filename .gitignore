@@ -27,3 +27,4 @@ API-GAP-*.md
 # Local-only API signature dumps (not source of truth)
 docs/SC3-COMPLETE-API.md
 spark-official-api-signatures.txt
+code-review-todo.md

@@ -137,6 +137,11 @@ lazy val root = (project in file("."))
       "org\\.apache\\.spark\\.sql\\.streaming\\.StreamingQueryListenerBus"  // requires live server
     ).mkString(";"),
 
+    // Fail build if statement coverage drops below 70% (excludes packages above).
+    // Current baseline: ~73%. Target: raise to 80% as coverage improves.
+    coverageMinimumStmtTotal := 70,
+    coverageFailOnMinimum := true,
+
     // JVM options for Apache Arrow + spark-sketch (sun.misc.Unsafe)
     Test / javaOptions ++= Seq(
       "--add-opens=java.base/java.nio=ALL-UNNAMED",

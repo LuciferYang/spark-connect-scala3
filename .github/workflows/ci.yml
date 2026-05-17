@@ -47,6 +47,9 @@ jobs:
       - name: Run unit tests
         run: build/sbt test
 
+      - name: Check coverage (minimum 80%)
+        run: build/sbt coverage test coverageReport
+
   integration-tests:
     name: Integration Tests (Spark 4.1.1)
     runs-on: ubuntu-latest
