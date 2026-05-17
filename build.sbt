@@ -129,17 +129,20 @@ lazy val root = (project in file("."))
       "-l", "org.apache.spark.sql.tags.IntegrationTest"),
 
     // Exclude code that requires a live Spark Connect server (not unit-testable)
+    // or is vendored upstream code with deep reflection (ClosureCleaner)
     coverageExcludedPackages := Seq(
       "org\\.apache\\.spark\\.sql\\.application\\..*",            // ConnectRepl
       "org\\.apache\\.spark\\.sql\\.connect\\.client\\..*",       // gRPC client internals
+      "org\\.apache\\.spark\\.sql\\.connect\\.common\\..*",       // ClosureCleaner (vendored upstream)
+      "org\\.apache\\.spark\\.sql\\.catalyst\\.encoders\\..*",    // AgnosticEncoder serialization proxies
       "org\\.apache\\.spark\\.sql\\.StreamingQuery",              // requires live server
       "org\\.apache\\.spark\\.sql\\.StreamingQueryManager",       // requires live server
       "org\\.apache\\.spark\\.sql\\.streaming\\.StreamingQueryListenerBus"  // requires live server
     ).mkString(";"),
 
-    // Fail build if statement coverage drops below 70% (excludes packages above).
-    // Current baseline: ~73%. Target: raise to 80% as coverage improves.
-    coverageMinimumStmtTotal := 70,
+    // Fail build if statement coverage drops below 79% (excludes packages above).
+    // Current baseline: ~79.4% after excluding server-dependent and vendored code.
+    coverageMinimumStmtTotal := 79,
     coverageFailOnMinimum := true,
 
     // JVM options for Apache Arrow + spark-sketch (sun.misc.Unsafe)
