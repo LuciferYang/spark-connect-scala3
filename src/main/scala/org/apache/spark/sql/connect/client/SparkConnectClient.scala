@@ -89,53 +89,60 @@ final class SparkConnectClient private (
 
   private[client] case class PlanCompressionOptions(thresholdBytes: Int, algorithm: String)
 
-  /** Cached compression options. None = not yet fetched; Some(None) = disabled. */
-  @volatile private var _planCompressionOptions: Option[Option[PlanCompressionOptions]] = None
+  /** Lifecycle of the cached plan-compression configuration. Modeled as an explicit three-state
+    * enum so the cases (not yet fetched / known-unavailable / available with options) are
+    * self-describing rather than encoded as `Option[Option[_]]`.
+    */
+  private[client] enum CompressionState:
+    case Uninitialized
+    case Disabled
+    case Enabled(opts: PlanCompressionOptions)
+
+  @volatile private var _planCompressionOptions: CompressionState = CompressionState.Uninitialized
 
   /** Lazily fetch compression options from server config (cached after first call).
     *
     * Only permanently disables compression on ClassNotFoundException or
     * UnsupportedOperationException (indicating the feature is truly unavailable). Transient errors
-    * (e.g., network issues) are rethrown so callers can retry.
+    * (e.g., network issues) leave the cache `Uninitialized` so callers can retry.
     */
-  private def getPlanCompressionOptions: Option[PlanCompressionOptions] =
+  private def getPlanCompressionOptions: CompressionState =
     _planCompressionOptions match
-      case Some(opts) => opts
-      case None       =>
+      case CompressionState.Uninitialized =>
         synchronized {
           _planCompressionOptions match
-            case Some(opts) => opts // double-check
-            case None       =>
+            case CompressionState.Uninitialized =>
               try
-                val opts = Some(PlanCompressionOptions(
+                val state = CompressionState.Enabled(PlanCompressionOptions(
                   thresholdBytes =
                     getConfig("spark.connect.session.planCompression.threshold").toInt,
                   algorithm =
                     getConfig("spark.connect.session.planCompression.defaultAlgorithm")
                 ))
-                _planCompressionOptions = Some(opts)
-                opts
+                _planCompressionOptions = state
+                state
               catch
                 case _: ClassNotFoundException | _: UnsupportedOperationException =>
-                  _planCompressionOptions = Some(None)
-                  None
+                  _planCompressionOptions = CompressionState.Disabled
+                  CompressionState.Disabled
                 case e if NonFatal(e) =>
-                  // Transient error — do NOT cache None; let caller retry later
-                  None
+                  // Transient error — do NOT cache; let caller retry later
+                  CompressionState.Uninitialized
+            case cached => cached // double-check
         }
+      case cached => cached
 
-  /** For testing: override the compression options. */
-  private[client] def setPlanCompressionOptions(
-      opts: Option[PlanCompressionOptions]
-  ): Unit =
-    _planCompressionOptions = Some(opts)
+  /** For testing: override the compression state. */
+  private[client] def setPlanCompressionOptions(state: CompressionState): Unit =
+    _planCompressionOptions = state
 
   /** Try to compress the plan if it exceeds the threshold. Returns the original plan if compression
     * is disabled, not needed, or not effective.
     */
   private[client] def tryCompressPlan(plan: Plan): Plan =
     getPlanCompressionOptions match
-      case Some(opts) if opts.algorithm == "ZSTD" && opts.thresholdBytes >= 0 =>
+      case CompressionState.Enabled(opts)
+          if opts.algorithm == "ZSTD" && opts.thresholdBytes >= 0 =>
         val opTypeCase = plan.getOpTypeCase
         val (innerBytes, opType) = opTypeCase match
           case Plan.OpTypeCase.ROOT =>
@@ -160,9 +167,9 @@ final class SparkConnectClient private (
           // permanently disable compression for this session. This is expected in
           // environments where the optional zstd dependency is not provided.
           case _: NoClassDefFoundError | _: ClassNotFoundException =>
-            _planCompressionOptions = Some(None); plan
+            _planCompressionOptions = CompressionState.Disabled; plan
           case NonFatal(_) =>
-            _planCompressionOptions = Some(None); plan
+            _planCompressionOptions = CompressionState.Disabled; plan
       case _ => plan
 
   // ---------------------------------------------------------------------------
