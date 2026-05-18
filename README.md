@@ -376,6 +376,14 @@ src/
 3. The server optimizes and executes the plan, streaming results back as **Arrow IPC** batches.
 4. The client deserializes Arrow batches into `Row` objects.
 
+## Memory & Resource Limits
+
+The Arrow allocators in [`ArrowSerializer`](src/main/scala/org/apache/spark/sql/ArrowSerializer.scala) and [`ArrowDeserializer`](src/main/scala/org/apache/spark/sql/connect/client/ArrowDeserializer.scala) share a 256 GB reservation cap (`MaxAllocatorBytes`). The cap is a ceiling on what the allocator may request, not a commitment — actual off-heap usage scales with in-flight batch size.
+
+- **Cap ≠ heap.** Arrow buffers are off-heap; `-Xmx` and the container memory limit still gate real usage.
+- **Small containers (<2 GB).** A large or malformed batch can OOM the process well before the 256 GB cap; the cap is not a safety net.
+- **Customizing.** The constant is `private` — fork it or file an issue to make it configurable.
+
 ## Key Dependencies
 
 | Library | Purpose |
