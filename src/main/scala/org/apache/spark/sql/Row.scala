@@ -2,18 +2,28 @@ package org.apache.spark.sql
 
 import org.apache.spark.sql.types.StructType
 
-/** A single row of output from a relational operator. */
+/** A single row of output from a relational operator.
+  *
+  * Rows produced by `collect()` carry an inferred [[StructType]] schema; rows constructed via
+  * [[Row.apply]] / [[Row.fromSeq]] do not. Methods that look up fields by name (`getAs(fieldName)`,
+  * `fieldIndex`, `getValuesMap`, `json`, `prettyJson`) require a schema and throw
+  * [[UnsupportedOperationException]] otherwise.
+  */
 final class Row private (
     private val values: IndexedSeq[Any],
     val schema: Option[StructType] = None
 ):
 
+  /** Number of fields in this row. */
   def size: Int = values.size
 
+  /** Alias for [[size]]. */
   def length: Int = size
 
+  /** Return the raw value at position `i`. May be `null`. */
   def get(i: Int): Any = values(i)
 
+  /** True iff the value at position `i` is `null`. */
   def isNullAt(i: Int): Boolean = get(i) == null
 
   def getBoolean(i: Int): Boolean = get(i).asInstanceOf[Boolean]
@@ -32,39 +42,55 @@ final class Row private (
 
   def getString(i: Int): String = get(i).asInstanceOf[String]
 
+  /** Get the value at position `i` as type `T` (unchecked cast). */
   def getAs[T](i: Int): T = get(i).asInstanceOf[T]
 
+  /** Get the value of the field named `fieldName` as type `T`. Requires a schema. */
   def getAs[T](fieldName: String): T =
     schema match
       case Some(s) => get(s.fieldIndex(fieldName)).asInstanceOf[T]
       case None    =>
         throw UnsupportedOperationException("getAs by field name requires a Row with schema")
 
+  /** Get the value at position `i` as a `java.math.BigDecimal`. Accepts either Java/Scala
+    * `BigDecimal` or any `Number` (lossy via `doubleValue` for non-decimal numerics).
+    */
   def getDecimal(i: Int): java.math.BigDecimal = get(i) match
     case d: java.math.BigDecimal => d
     case d: BigDecimal           => d.underlying
     case n: Number               => java.math.BigDecimal.valueOf(n.doubleValue())
 
+  /** Get a `DateType` field as `java.sql.Date`. Use [[getLocalDate]] for `java.time.LocalDate`. */
   def getDate(i: Int): java.sql.Date = get(i).asInstanceOf[java.sql.Date]
 
+  /** Get a `TimestampType` field as `java.sql.Timestamp`. Use [[getInstant]] for
+    * `java.time.Instant`.
+    */
   def getTimestamp(i: Int): java.sql.Timestamp = get(i).asInstanceOf[java.sql.Timestamp]
 
+  /** Get a `TimestampType` field as `java.time.Instant`. */
   def getInstant(i: Int): java.time.Instant = get(i).asInstanceOf[java.time.Instant]
 
+  /** Get a `DateType` field as `java.time.LocalDate`. */
   def getLocalDate(i: Int): java.time.LocalDate = get(i).asInstanceOf[java.time.LocalDate]
 
+  /** Get an `ArrayType` field as a Scala `Seq`. Use [[getList]] for `java.util.List`. */
   def getSeq[T](i: Int): Seq[T] = get(i).asInstanceOf[Seq[T]]
 
+  /** Get an `ArrayType` field as a `java.util.List`. */
   def getList[T](i: Int): java.util.List[T] =
     import scala.jdk.CollectionConverters.*
     getSeq[T](i).asJava
 
+  /** Get a `MapType` field as a Scala `Map`. Use [[getJavaMap]] for `java.util.Map`. */
   def getMap[K, V](i: Int): Map[K, V] = get(i).asInstanceOf[Map[K, V]]
 
+  /** Get a `MapType` field as a `java.util.Map`. */
   def getJavaMap[K, V](i: Int): java.util.Map[K, V] =
     import scala.jdk.CollectionConverters.*
     getMap[K, V](i).asJava
 
+  /** Get a nested `StructType` field as a [[Row]]. */
   def getStruct(i: Int): Row = get(i).asInstanceOf[Row]
 
   def getGeometry(i: Int): org.apache.spark.sql.types.Geometry =
@@ -73,12 +99,14 @@ final class Row private (
   def getGeography(i: Int): org.apache.spark.sql.types.Geography =
     get(i).asInstanceOf[org.apache.spark.sql.types.Geography]
 
+  /** Position of the field named `name`. Requires a schema. */
   def fieldIndex(name: String): Int =
     schema match
       case Some(s) => s.fieldIndex(name)
       case None    =>
         throw UnsupportedOperationException("fieldIndex requires a Row with schema")
 
+  /** True iff any field is `null`. */
   def anyNull: Boolean =
     // while loop avoids the Int boxing that `(0 until size).exists(isNullAt)` incurs
     // (Range.exists lifts the index into a boxed Integer via the Function1 adapter).
@@ -89,6 +117,7 @@ final class Row private (
       i += 1
     false
 
+  /** Render this row as a single-line JSON object. Requires a schema. */
   def json: String =
     schema match
       case Some(s) =>
@@ -105,9 +134,10 @@ final class Row private (
       case None =>
         throw UnsupportedOperationException("json requires a Row with schema")
 
-  /** Alias for `json`. */
+  /** Alias for [[json]]. */
   def toJson: String = json
 
+  /** Render this row as a multi-line indented JSON object. Requires a schema. */
   def prettyJson: String =
     schema match
       case Some(s) =>
@@ -124,12 +154,10 @@ final class Row private (
       case None =>
         throw UnsupportedOperationException("prettyJson requires a Row with schema")
 
+  /** Shallow copy of this row. The schema is dropped. */
   def copy(): Row = Row.fromSeq(toSeq)
 
-  /** Get values for the given field names as a Map.
-    *
-    * Requires that this Row was created with a schema.
-    */
+  /** Map from each given field name to its value. Requires a schema. */
   def getValuesMap[T](fieldNames: Seq[String]): Map[String, T] =
     schema match
       case Some(s) =>
@@ -141,8 +169,10 @@ final class Row private (
           "getValuesMap requires a Row with schema"
         )
 
+  /** All field values as a `Seq`, in positional order. */
   def toSeq: Seq[Any] = values.toSeq
 
+  /** Concatenate field values as strings, separated by `sep`. `null` is rendered as `"null"`. */
   def mkString(sep: String): String =
     values.map(v => if v == null then "null" else v.toString).mkString(sep)
 
