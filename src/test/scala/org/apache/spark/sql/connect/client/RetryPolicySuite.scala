@@ -131,3 +131,29 @@ class RetryPolicySuite extends AnyFunSuite with Matchers:
     sleepTimes(1) shouldBe 500
     sleepTimes(2) shouldBe 500
   }
+
+  test("GrpcRetryHandler rethrows when maxTotalDurationMs is exhausted") {
+    // Use a sleep callback that consumes real wall time so the deadline check trips.
+    var attempts = 0
+    val handler = GrpcRetryHandler(
+      RetryPolicy(
+        maxRetries = 100, // generous — deadline must trip first
+        initialBackoffMs = 1,
+        jitterMs = 0,
+        maxTotalDurationMs = 30
+      ),
+      sleep = _ => Thread.sleep(50) // single sleep already exceeds the 30ms budget
+    )
+    val thrown = intercept[StatusRuntimeException] {
+      handler.retry {
+        attempts += 1
+        throw StatusRuntimeException(Status.UNAVAILABLE)
+      }
+    }
+    thrown.getStatus.getCode shouldBe Status.Code.UNAVAILABLE
+    // Expected: 1st call fails → sleep(50ms) → 2nd call fails → deadline check trips → rethrow.
+    // We do not assert exact attempt count to avoid flakiness on slow CI, but it must be < 100
+    // (the deadline path, not the maxRetries path).
+    attempts should be < 100
+    attempts should be >= 2
+  }
