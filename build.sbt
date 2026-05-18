@@ -94,7 +94,8 @@ lazy val root = (project in file("."))
         "com.lihaoyi" % s"ammonite_$scalaFullVersion" % ammoniteVersion cross CrossVersion.disabled,
 
         // Testing
-        "org.scalatest" %% "scalatest" % scalatestVersion % Test
+        "org.scalatest" %% "scalatest" % scalatestVersion % Test,
+        "org.scalatestplus" %% "scalacheck-1-18" % "3.2.19.0" % Test
       )
     },
 
