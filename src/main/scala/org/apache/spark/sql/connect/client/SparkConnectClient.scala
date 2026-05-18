@@ -28,7 +28,11 @@ final class SparkConnectClient private (
   /** The connection URL with any token redacted — safe for logging/display. */
   private[sql] def redactedUrl: String = connectionUrl
 
-  /** Reconstruct the full URL (with token) for internal use only. */
+  /** Reconstruct the full URL (with token) for internal use only.
+    *
+    * SECURITY: contains plaintext token — never log, serialize, or expose this value. Use
+    * [[redactedUrl]] anywhere user-visible.
+    */
   private def fullUrl: String = token match
     case Some(t) =>
       s"$connectionUrl;token=${UrlEncoding.encode(t)}"

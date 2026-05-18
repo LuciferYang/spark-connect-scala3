@@ -153,6 +153,9 @@ object ArrowDeserializer:
         null
 
       case v =>
+        // Fallback for vector types not covered above. `getObject` may throw on malformed
+        // values (corrupt buffer, schema/data mismatch); swallow and return null so a
+        // single bad value doesn't fail the whole batch — matches upstream Spark behavior.
         try v.getObject(index)
         catch case _: Exception => null
 

@@ -52,7 +52,9 @@ private[sql] object ArrowSerializer:
           root.setRowCount(rows.size)
           val vectors = root.getFieldVectors.asScala.toArray
           val numCols = vectors.length
-          rows.indices.foreach { rowIdx =>
+          val numRows = rows.length
+          var rowIdx = 0
+          while rowIdx < numRows do
             val row = rows(rowIdx)
             var colIdx = 0
             while colIdx < numCols do
@@ -63,7 +65,7 @@ private[sql] object ArrowSerializer:
                 schema.fields(colIdx).dataType
               )
               colIdx += 1
-          }
+            rowIdx += 1
           vectors.foreach(_.setValueCount(rows.size))
           writer.writeBatch()
           writer.end()
