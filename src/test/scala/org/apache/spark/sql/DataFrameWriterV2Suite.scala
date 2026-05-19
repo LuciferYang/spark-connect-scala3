@@ -15,13 +15,13 @@ class DataFrameWriterV2Suite extends AnyFunSuite:
 
   test("writeTo returns DataFrameWriterV2") {
     val df = dummyDf
-    val writer = DataFrameWriterV2("test_table", df)
+    val writer = DataFrameWriterV2[Row]("test_table", df)
     assert(writer != null)
   }
 
   test("chained configuration methods compile and return same instance") {
     val df = dummyDf
-    val writer = DataFrameWriterV2("test_table", df)
+    val writer = DataFrameWriterV2[Row]("test_table", df)
     val result = writer
       .using("parquet")
       .option("key1", "value1")
@@ -35,14 +35,30 @@ class DataFrameWriterV2Suite extends AnyFunSuite:
 
   test("partitionedBy accepts Column varargs") {
     val df = dummyDf
-    val writer = DataFrameWriterV2("test_table", df)
+    val writer = DataFrameWriterV2[Row]("test_table", df)
     val result = writer.partitionedBy(Column("year"), Column("month"))
     assert(result eq writer)
   }
 
   test("clusterBy accepts String varargs") {
     val df = dummyDf
-    val writer = DataFrameWriterV2("test_table", df)
+    val writer = DataFrameWriterV2[Row]("test_table", df)
     val result = writer.clusterBy("col1", "col2", "col3")
     assert(result eq writer)
+  }
+
+  test("DataFrame.writeTo returns DataFrameWriterV2[Row]") {
+    val df = dummyDf
+    val writer: DataFrameWriterV2[Row] = df.writeTo("t")
+    assert(writer != null)
+  }
+
+  test("Dataset[T].writeTo preserves T as DataFrameWriterV2[T]") {
+    case class Person(name: String, age: Int)
+    given enc: Encoder[Person] = Encoders.product[Person]
+    val df = dummyDf
+    val ds: Dataset[Person] = df.as[Person]
+    // Compile-time assertion: the writer's type parameter must match Dataset's T.
+    val writer: DataFrameWriterV2[Person] = ds.writeTo("t")
+    assert(writer != null)
   }

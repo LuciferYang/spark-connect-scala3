@@ -860,7 +860,7 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
 
   test("Dataset.writeTo returns DataFrameWriterV2") {
     val ds = stubDs
-    ds.writeTo("my_table") shouldBe a[DataFrameWriterV2]
+    ds.writeTo("my_table") shouldBe a[DataFrameWriterV2[?]]
   }
 
   test("Dataset.writeStream returns DataStreamWriter") {
@@ -1836,7 +1836,7 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
   test("Dataset.writeTo(table) has correct table name") {
     val ds = stubDs
     val writer = ds.writeTo("catalog.db.table")
-    writer shouldBe a[DataFrameWriterV2]
+    writer shouldBe a[DataFrameWriterV2[?]]
   }
 
   // -- groupByKey returns KeyValueGroupedDataset with correct references --

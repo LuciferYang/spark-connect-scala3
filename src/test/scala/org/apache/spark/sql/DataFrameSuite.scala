@@ -1260,7 +1260,7 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
 
   test("writeTo returns DataFrameWriterV2") {
     val df = testDf()
-    df.writeTo("my_table") shouldBe a[DataFrameWriterV2]
+    df.writeTo("my_table") shouldBe a[DataFrameWriterV2[?]]
   }
 
   test("writeStream returns DataStreamWriter") {
@@ -1844,55 +1844,55 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
   test("DataFrameWriterV2.using sets provider") {
     val df = testDf()
     val writer = df.writeTo("my_table").using("parquet")
-    writer shouldBe a[DataFrameWriterV2]
+    writer shouldBe a[DataFrameWriterV2[?]]
   }
 
   test("DataFrameWriterV2.option sets option") {
     val df = testDf()
     val writer = df.writeTo("my_table").option("key", "value")
-    writer shouldBe a[DataFrameWriterV2]
+    writer shouldBe a[DataFrameWriterV2[?]]
   }
 
   test("DataFrameWriterV2.option(Boolean) sets option") {
     val df = testDf()
     val writer = df.writeTo("my_table").option("key", true)
-    writer shouldBe a[DataFrameWriterV2]
+    writer shouldBe a[DataFrameWriterV2[?]]
   }
 
   test("DataFrameWriterV2.option(Long) sets option") {
     val df = testDf()
     val writer = df.writeTo("my_table").option("key", 42L)
-    writer shouldBe a[DataFrameWriterV2]
+    writer shouldBe a[DataFrameWriterV2[?]]
   }
 
   test("DataFrameWriterV2.option(Double) sets option") {
     val df = testDf()
     val writer = df.writeTo("my_table").option("key", 3.14)
-    writer shouldBe a[DataFrameWriterV2]
+    writer shouldBe a[DataFrameWriterV2[?]]
   }
 
   test("DataFrameWriterV2.options sets options map") {
     val df = testDf()
     val writer = df.writeTo("my_table").options(Map("k1" -> "v1"))
-    writer shouldBe a[DataFrameWriterV2]
+    writer shouldBe a[DataFrameWriterV2[?]]
   }
 
   test("DataFrameWriterV2.tableProperty sets table property") {
     val df = testDf()
     val writer = df.writeTo("my_table").tableProperty("prop", "val")
-    writer shouldBe a[DataFrameWriterV2]
+    writer shouldBe a[DataFrameWriterV2[?]]
   }
 
   test("DataFrameWriterV2.partitionedBy sets partitioning columns") {
     val df = testDf()
     val writer = df.writeTo("my_table").partitionedBy(Column("year"), Column("month"))
-    writer shouldBe a[DataFrameWriterV2]
+    writer shouldBe a[DataFrameWriterV2[?]]
   }
 
   test("DataFrameWriterV2.clusterBy sets clustering columns") {
     val df = testDf()
     val writer = df.writeTo("my_table").clusterBy("col1", "col2")
-    writer shouldBe a[DataFrameWriterV2]
+    writer shouldBe a[DataFrameWriterV2[?]]
   }
 
   // ---------- DataStreamWriter proto tests ----------
