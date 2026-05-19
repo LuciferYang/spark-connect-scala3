@@ -11,6 +11,7 @@ import org.apache.spark.connect.proto.{
   WithRelations
 }
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.ProductEncoder
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.{
@@ -649,7 +650,9 @@ final class Dataset[T: ClassTag] private[sql] (
   def writeTo(table: String): DataFrameWriterV2 = df.writeTo(table)
 
   /** Access the streaming writer. */
-  def writeStream: DataStreamWriter = df.writeStream
+  def writeStream: DataStreamWriter[T] =
+    val ag = Option(encoder.agnosticEncoder).getOrElse(AgnosticEncoders.UnboundRowEncoder)
+    new DataStreamWriter[T](df, ag)
 
   /** Define a watermark for streaming aggregations. */
   def withWatermark(eventTime: String, delayThreshold: String): Dataset[T] =

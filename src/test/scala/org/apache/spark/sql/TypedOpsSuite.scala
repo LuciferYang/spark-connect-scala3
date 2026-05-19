@@ -865,7 +865,7 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
 
   test("Dataset.writeStream returns DataStreamWriter") {
     val ds = stubDs
-    ds.writeStream shouldBe a[DataStreamWriter]
+    ds.writeStream shouldBe a[DataStreamWriter[?]]
   }
 
   // -- toJSON proto structure --

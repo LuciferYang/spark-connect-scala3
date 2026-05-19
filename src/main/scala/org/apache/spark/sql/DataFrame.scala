@@ -929,7 +929,7 @@ final class DataFrame private[sql] (
   def mergeInto(table: String, condition: Column): MergeIntoWriter =
     MergeIntoWriter(table, this, condition)
 
-  def writeStream: DataStreamWriter = DataStreamWriter(this)
+  def writeStream: DataStreamWriter[Row] = DataStreamWriter(this)
 
   // ---------------------------------------------------------------------------
   // Subquery expressions

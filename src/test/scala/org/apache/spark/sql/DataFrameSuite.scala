@@ -1265,7 +1265,7 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
 
   test("writeStream returns DataStreamWriter") {
     val df = testDf()
-    df.writeStream shouldBe a[DataStreamWriter]
+    df.writeStream shouldBe a[DataStreamWriter[?]]
   }
 
   test("mergeInto returns MergeIntoWriter") {
@@ -1900,61 +1900,61 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
   test("DataStreamWriter.format sets format") {
     val df = testDf()
     val writer = df.writeStream.format("console")
-    writer shouldBe a[DataStreamWriter]
+    writer shouldBe a[DataStreamWriter[?]]
   }
 
   test("DataStreamWriter.outputMode sets output mode") {
     val df = testDf()
     val writer = df.writeStream.outputMode("append")
-    writer shouldBe a[DataStreamWriter]
+    writer shouldBe a[DataStreamWriter[?]]
   }
 
   test("DataStreamWriter.queryName sets query name") {
     val df = testDf()
     val writer = df.writeStream.queryName("myQuery")
-    writer shouldBe a[DataStreamWriter]
+    writer shouldBe a[DataStreamWriter[?]]
   }
 
   test("DataStreamWriter.option sets option") {
     val df = testDf()
     val writer = df.writeStream.option("key", "value")
-    writer shouldBe a[DataStreamWriter]
+    writer shouldBe a[DataStreamWriter[?]]
   }
 
   test("DataStreamWriter.options sets options map") {
     val df = testDf()
     val writer = df.writeStream.options(Map("k1" -> "v1"))
-    writer shouldBe a[DataStreamWriter]
+    writer shouldBe a[DataStreamWriter[?]]
   }
 
   test("DataStreamWriter.partitionBy sets partition columns") {
     val df = testDf()
     val writer = df.writeStream.partitionBy("col1", "col2")
-    writer shouldBe a[DataStreamWriter]
+    writer shouldBe a[DataStreamWriter[?]]
   }
 
   test("DataStreamWriter.trigger sets trigger") {
     val df = testDf()
     val writer = df.writeStream.trigger(Trigger.ProcessingTime(1000))
-    writer shouldBe a[DataStreamWriter]
+    writer shouldBe a[DataStreamWriter[?]]
   }
 
   test("DataStreamWriter.trigger(AvailableNow) sets trigger") {
     val df = testDf()
     val writer = df.writeStream.trigger(Trigger.AvailableNow)
-    writer shouldBe a[DataStreamWriter]
+    writer shouldBe a[DataStreamWriter[?]]
   }
 
   test("DataStreamWriter.trigger(Once) sets trigger") {
     val df = testDf()
     val writer = df.writeStream.trigger(Trigger.Once)
-    writer shouldBe a[DataStreamWriter]
+    writer shouldBe a[DataStreamWriter[?]]
   }
 
   test("DataStreamWriter.trigger(Continuous) sets trigger") {
     val df = testDf()
     val writer = df.writeStream.trigger(Trigger.Continuous(500))
-    writer shouldBe a[DataStreamWriter]
+    writer shouldBe a[DataStreamWriter[?]]
   }
 
   test("DataStreamWriter.buildWriteStreamOp builds proto with format and options") {

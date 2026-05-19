@@ -1,6 +1,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -316,4 +317,57 @@ class DataStreamWriterSuite extends AnyFunSuite with Matchers:
     val writer = DataStreamWriter(stubStreamDf)
     val proto = writer.outputMode("Append").buildWriteStreamOp().build()
     proto.getOutputMode shouldBe "Append"
+  }
+
+  // ---------------------------------------------------------------------------
+  // R75: typed encoder propagation (Dataset[T].writeStream.foreach)
+  //
+  // When called from Dataset[T], the writer's encoder field must be the
+  // dataset's encoder, NOT UnboundRowEncoder. Otherwise the server-side
+  // foreach handler feeds Row instances into ForeachWriter[T] and crashes
+  // with ClassCastException. (We can't round-trip-deserialize the payload
+  // because EncoderSerializationProxy.readResolve targets server-side Scala
+  // 2.13 classes that aren't present in unit tests.)
+  // ---------------------------------------------------------------------------
+
+  test("typed DataStreamWriter[T] retains the supplied encoder") {
+    val writer = new DataStreamWriter[Long](stubStreamDf, AgnosticEncoders.PrimitiveLongEncoder)
+    writer.encoder shouldBe AgnosticEncoders.PrimitiveLongEncoder
+    writer.encoder should not be AgnosticEncoders.UnboundRowEncoder
+  }
+
+  test("foreach payload is built (typed writer carries the right encoder)") {
+    val writer = new DataStreamWriter[Long](stubStreamDf, AgnosticEncoders.PrimitiveLongEncoder)
+    val foreachWriter = new ForeachWriter[Long]:
+      def open(partitionId: Long, epochId: Long): Boolean = true
+      def process(value: Long): Unit = ()
+      def close(errorOrNull: Throwable): Unit = ()
+
+    val proto = writer.foreach(foreachWriter).buildWriteStreamOp().build()
+    proto.hasForeachWriter shouldBe true
+    proto.getForeachWriter.getScalaFunction.getPayload.size() should be > 0
+  }
+
+  test("DataFrame.writeStream defaults to UnboundRowEncoder (backward-compat)") {
+    val writer: DataStreamWriter[Row] = stubStreamDf.writeStream
+    writer.encoder shouldBe AgnosticEncoders.UnboundRowEncoder
+  }
+
+  test("DataStreamWriter(df) companion apply produces Row writer with Row encoder") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val typed: DataStreamWriter[Row] = writer
+    typed.encoder shouldBe AgnosticEncoders.UnboundRowEncoder
+  }
+
+  test("Dataset[Long].writeStream propagates the dataset's encoder") {
+    val ds: Dataset[Long] = Dataset(stubStreamDf, summon[Encoder[Long]])
+    val writer: DataStreamWriter[Long] = ds.writeStream
+    writer.encoder shouldBe AgnosticEncoders.PrimitiveLongEncoder
+    writer.encoder should not be AgnosticEncoders.UnboundRowEncoder
+  }
+
+  test("Dataset[String].writeStream propagates the dataset's encoder") {
+    val ds: Dataset[String] = Dataset(stubStreamDf, summon[Encoder[String]])
+    val writer: DataStreamWriter[String] = ds.writeStream
+    writer.encoder shouldBe AgnosticEncoders.StringEncoder
   }

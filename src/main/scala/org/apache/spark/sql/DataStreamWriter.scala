@@ -2,7 +2,7 @@ package org.apache.spark.sql
 
 import com.google.protobuf.ByteString
 import org.apache.spark.connect.proto.*
-import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
+import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.ForeachWriterPacket
 import org.apache.spark.sql.streaming.StreamingQueryListener.QueryStartedEvent
@@ -27,7 +27,10 @@ object Trigger:
   *     .start()
   * }}}
   */
-final class DataStreamWriter private[sql] (private val df: DataFrame):
+final class DataStreamWriter[T] private[sql] (
+    private val df: DataFrame,
+    private[sql] val encoder: AgnosticEncoder[?]
+):
   private var source: String = ""
   private var mode: String = ""
   private var triggerOpt: Option[Trigger] = None
@@ -38,55 +41,54 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
   private var foreachBatchPayload: Option[Array[Byte]] = None
   private var foreachWriterPayload: Option[Array[Byte]] = None
 
-  def format(fmt: String): DataStreamWriter =
+  def format(fmt: String): DataStreamWriter[T] =
     source = fmt
     this
 
-  def outputMode(m: String): DataStreamWriter =
+  def outputMode(m: String): DataStreamWriter[T] =
     mode = m
     this
 
-  def outputMode(outputMode: streaming.OutputMode): DataStreamWriter =
+  def outputMode(outputMode: streaming.OutputMode): DataStreamWriter[T] =
     this.outputMode(outputMode.toString.toLowerCase(Locale.ROOT))
 
-  def trigger(t: Trigger): DataStreamWriter =
+  def trigger(t: Trigger): DataStreamWriter[T] =
     triggerOpt = Some(t)
     this
 
-  def queryName(qn: String): DataStreamWriter =
+  def queryName(qn: String): DataStreamWriter[T] =
     name = qn
     this
 
-  def option(key: String, value: String): DataStreamWriter =
+  def option(key: String, value: String): DataStreamWriter[T] =
     opts = opts + (key -> value)
     this
 
-  def option(key: String, value: Boolean): DataStreamWriter = option(key, value.toString)
-  def option(key: String, value: Long): DataStreamWriter = option(key, value.toString)
-  def option(key: String, value: Double): DataStreamWriter = option(key, value.toString)
+  def option(key: String, value: Boolean): DataStreamWriter[T] = option(key, value.toString)
+  def option(key: String, value: Long): DataStreamWriter[T] = option(key, value.toString)
+  def option(key: String, value: Double): DataStreamWriter[T] = option(key, value.toString)
 
-  def options(m: Map[String, String]): DataStreamWriter =
+  def options(m: Map[String, String]): DataStreamWriter[T] =
     opts = opts ++ m
     this
 
-  def partitionBy(colNames: String*): DataStreamWriter =
+  def partitionBy(colNames: String*): DataStreamWriter[T] =
     partitionCols = colNames.toSeq
     this
 
-  def clusterBy(colNames: String*): DataStreamWriter =
+  def clusterBy(colNames: String*): DataStreamWriter[T] =
     clusteringCols = colNames.toSeq
     this
 
   /** Set a function to process each micro-batch DataFrame with its batch ID. */
-  def foreachBatch(func: (DataFrame, Long) => Unit): DataStreamWriter =
-    val packet = ForeachWriterPacket(func.asInstanceOf[AnyRef], AgnosticEncoders.UnboundRowEncoder)
+  def foreachBatch(func: (DataFrame, Long) => Unit): DataStreamWriter[T] =
+    val packet = ForeachWriterPacket(func.asInstanceOf[AnyRef], encoder)
     foreachBatchPayload = Some(ForeachWriterPacket.serialize(packet))
     this
 
   /** Set a ForeachWriter to process each row of the streaming query output. */
-  def foreach(writer: ForeachWriter[?]): DataStreamWriter =
-    val packet =
-      ForeachWriterPacket(writer.asInstanceOf[AnyRef], AgnosticEncoders.UnboundRowEncoder)
+  def foreach(writer: ForeachWriter[T]): DataStreamWriter[T] =
+    val packet = ForeachWriterPacket(writer.asInstanceOf[AnyRef], encoder)
     foreachWriterPayload = Some(ForeachWriterPacket.serialize(packet))
     this
 
@@ -166,3 +168,8 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
         builder.setOnce(true)
       case Trigger.Continuous(ms) =>
         builder.setContinuousCheckpointInterval(s"$ms milliseconds")
+
+private[sql] object DataStreamWriter:
+  /** Convenience constructor: untyped writer over a DataFrame, defaults to Row encoder. */
+  def apply(df: DataFrame): DataStreamWriter[Row] =
+    new DataStreamWriter[Row](df, AgnosticEncoders.UnboundRowEncoder)
