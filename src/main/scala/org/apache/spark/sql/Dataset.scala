@@ -38,7 +38,7 @@ import scala.reflect.ClassTag
 final class Dataset[T: ClassTag] private[sql] (
     private[sql] val df: DataFrame,
     private[sql] val encoder: Encoder[T]
-):
+) extends Serializable:
 
   /** The underlying SparkSession. */
   def sparkSession: SparkSession = df.session

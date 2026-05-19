@@ -12,7 +12,7 @@ import scala.reflect.ClassTag
   * In Scala 3, Encoders are derived at compile time using `Mirror.ProductOf`, eliminating the need
   * for runtime reflection (`scala.reflect.runtime.universe`).
   */
-trait Encoder[T]:
+trait Encoder[T] extends Serializable:
   /** The Spark SQL schema for type T. */
   def schema: StructType
 

@@ -12,7 +12,7 @@ import org.apache.spark.sql.types.StructType
 final class Row private (
     private val values: IndexedSeq[Any],
     val schema: Option[StructType] = None
-):
+) extends Serializable:
 
   /** Number of fields in this row. */
   def size: Int = values.size
