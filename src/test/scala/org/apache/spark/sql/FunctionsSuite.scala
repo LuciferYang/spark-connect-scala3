@@ -491,6 +491,29 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     fn.getArguments(1).getLambdaFunction.getArgumentsList should have size 2
   }
 
+  test("nested HOF lambda variables get unique name parts") {
+    // Outer transform binds `x`; inner filter also binds `x`. Without
+    // per-call uniqueness, both lambdas would emit identical nameParts and the
+    // server analyzer would mis-bind / raise ambiguous-name errors.
+    val c = functions.transform(
+      Column("arr"),
+      x => functions.filter(x, x => x > Column.lit(0))
+    )
+    val outerLambda = c.expr.getUnresolvedFunction.getArguments(1).getLambdaFunction
+    val outerVar = outerLambda.getArguments(0)
+    val innerCall = outerLambda.getFunction.getUnresolvedFunction
+    val innerLambda = innerCall.getArguments(1).getLambdaFunction
+    val innerVar = innerLambda.getArguments(0)
+
+    outerVar.getNamePartsList.size shouldBe 1
+    innerVar.getNamePartsList.size shouldBe 1
+    val outerName = outerVar.getNameParts(0)
+    val innerName = innerVar.getNameParts(0)
+    outerName should startWith("x_")
+    innerName should startWith("x_")
+    outerName should not equal innerName
+  }
+
   // ===================================================================
   // Comprehensive tests for all untested functions
   // ===================================================================

@@ -2078,6 +2078,12 @@ object functions:
     ).build())
 
   private def lambdaVar(name: String): Expression.UnresolvedNamedLambdaVariable =
+    // Mirror upstream `UnresolvedNamedLambdaVariable.apply` (sql/api/.../columnNodes.scala):
+    // each call must produce a unique nameParts entry so nested high-order function bodies
+    // (e.g. transform(x, x => filter(x, y => y > x))) don't reuse the same identifier across
+    // scopes, which would let the server analyzer mis-bind or raise ambiguous-name errors.
     Expression.UnresolvedNamedLambdaVariable.newBuilder()
-      .addNameParts(name)
+      .addNameParts(s"${name}_${nextLambdaId.incrementAndGet()}")
       .build()
+
+  private val nextLambdaId = java.util.concurrent.atomic.AtomicLong()
