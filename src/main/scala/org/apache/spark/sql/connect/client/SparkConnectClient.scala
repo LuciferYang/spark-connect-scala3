@@ -1,6 +1,6 @@
 package org.apache.spark.sql.connect.client
 
-import io.grpc.{ManagedChannelBuilder, Metadata}
+import io.grpc.{ClientInterceptor, ManagedChannelBuilder, Metadata}
 import io.grpc.stub.MetadataUtils
 import org.apache.spark.connect.proto.*
 
@@ -535,11 +535,18 @@ object SparkConnectClient:
     }
     (host, port, params)
 
-  /** Create a client connected to the given `sc://` URL. */
+  /** Create a client connected to the given `sc://` URL.
+    *
+    * `interceptors` are gRPC `ClientInterceptor` instances applied to the channel for
+    * cross-cutting concerns (tracing, metrics, custom auth). They are applied in addition to
+    * the token-based auth interceptor (when a token is supplied) and follow gRPC's
+    * "interceptors added last are executed first" ordering.
+    */
   def create(
       url: String,
       sessionId: String = UUID.randomUUID().toString,
-      configs: Map[String, String] = Map.empty
+      configs: Map[String, String] = Map.empty,
+      interceptors: List[ClientInterceptor] = List.empty
   ): SparkConnectClient =
     val (host, port, params) = parseUrl(url)
     val paramMap = params.toMap
@@ -567,16 +574,24 @@ object SparkConnectClient:
 
     val baseStub = SparkConnectServiceGrpc.newBlockingStub(channel)
     val baseAsyncStub = SparkConnectServiceGrpc.newStub(channel)
-    val (stub, aStub) = token match
-      case Some(t) =>
-        val metadata = Metadata()
-        metadata.put(
-          Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER),
-          s"Bearer $t"
-        )
-        val interceptor = MetadataUtils.newAttachHeadersInterceptor(metadata)
-        (baseStub.withInterceptors(interceptor), baseAsyncStub.withInterceptors(interceptor))
-      case None => (baseStub, baseAsyncStub)
+    val tokenInterceptor: Option[io.grpc.ClientInterceptor] = token.map { t =>
+      val metadata = Metadata()
+      metadata.put(
+        Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER),
+        s"Bearer $t"
+      )
+      MetadataUtils.newAttachHeadersInterceptor(metadata)
+    }
+    // Apply user-supplied interceptors first, then the token interceptor (if any). gRPC
+    // executes interceptors in reverse-of-addition order, so the token interceptor runs
+    // closest to the wire — matching upstream behavior where MetadataHeaderClientInterceptor
+    // is appended after user interceptors at channel-builder time.
+    val allInterceptors = interceptors ++ tokenInterceptor.toList
+    val (stub, aStub) =
+      if allInterceptors.isEmpty then (baseStub, baseAsyncStub)
+      else
+        val arr = allInterceptors.toArray
+        (baseStub.withInterceptors(arr*), baseAsyncStub.withInterceptors(arr*))
 
     val client = SparkConnectClient(
       SharedChannel(channel),

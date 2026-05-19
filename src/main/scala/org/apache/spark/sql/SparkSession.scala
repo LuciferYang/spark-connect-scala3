@@ -450,9 +450,18 @@ object SparkSession:
   final class Builder:
     private var url: String = SparkSession.DefaultRemoteUrl
     private var configs: Map[String, String] = Map.empty
+    private var interceptors: List[io.grpc.ClientInterceptor] = List.empty
 
     def remote(connectionString: String): Builder =
       url = connectionString
+      this
+
+    /** Add a gRPC `ClientInterceptor` to be used during channel creation.
+      *
+      * Note: interceptors added last are executed first by gRPC.
+      */
+    def interceptor(interceptor: io.grpc.ClientInterceptor): Builder =
+      interceptors = interceptors :+ interceptor
       this
 
     def config(key: String, value: String): Builder =
@@ -476,7 +485,7 @@ object SparkSession:
         url != null && url.startsWith("sc://"),
         s"Invalid Spark Connect URL: '$url'. URL must start with 'sc://'."
       )
-      val client = SparkConnectClient.create(url, configs = configs)
+      val client = SparkConnectClient.create(url, configs = configs, interceptors = interceptors)
       val session = SparkSession(client)
       if defaultSession.get() == null then defaultSession.compareAndSet(null, session)
       activeSession.set(session)

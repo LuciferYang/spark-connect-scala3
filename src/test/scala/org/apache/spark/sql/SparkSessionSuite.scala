@@ -397,6 +397,25 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
     builder shouldBe a[SparkSession.Builder]
   }
 
+  test("Builder.interceptor returns Builder for chaining") {
+    val noopInterceptor = new io.grpc.ClientInterceptor:
+      override def interceptCall[ReqT, RespT](
+          method: io.grpc.MethodDescriptor[ReqT, RespT],
+          callOptions: io.grpc.CallOptions,
+          next: io.grpc.Channel
+      ): io.grpc.ClientCall[ReqT, RespT] = next.newCall(method, callOptions)
+
+    val builder = SparkSession.builder().interceptor(noopInterceptor)
+    builder shouldBe a[SparkSession.Builder]
+  }
+
+  test("Builder.interceptor accepts io.grpc.ClientInterceptor type") {
+    val method = classOf[SparkSession.Builder]
+      .getMethod("interceptor", classOf[io.grpc.ClientInterceptor])
+    method should not be null
+    method.getReturnType shouldBe classOf[SparkSession.Builder]
+  }
+
   // ---------- Closeable / stop ----------
 
   test("stop method exists") {
