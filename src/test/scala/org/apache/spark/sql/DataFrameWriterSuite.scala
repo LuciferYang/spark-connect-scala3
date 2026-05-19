@@ -422,3 +422,24 @@ class DataFrameWriterSuite extends AnyFunSuite with Matchers:
     val op = buildWriteOp(writer)
     op.getClusteringColumnsList.asScala shouldBe empty
   }
+
+  // ---------------------------------------------------------------------------
+  // insertInto: mode preservation (R73 regression)
+  //
+  // insertInto must NOT silently coerce the user-supplied mode to APPEND.
+  // We can't directly invoke insertInto in unit tests (it triggers RPC), so
+  // we reflectively call the same `buildWriteOp` helper used by insertInto
+  // and verify that user-set modes flow through unmodified.
+  // ---------------------------------------------------------------------------
+
+  test("buildWriteOp preserves overwrite mode (insertInto regression)") {
+    val writer = DataFrameWriter(stubDf).mode("overwrite")
+    val op = buildWriteOp(writer)
+    op.getMode shouldBe WriteOperation.SaveMode.SAVE_MODE_OVERWRITE
+  }
+
+  test("buildWriteOp preserves SaveMode.Overwrite (insertInto regression)") {
+    val writer = DataFrameWriter(stubDf).mode(SaveMode.Overwrite)
+    val op = buildWriteOp(writer)
+    op.getMode shouldBe WriteOperation.SaveMode.SAVE_MODE_OVERWRITE
+  }

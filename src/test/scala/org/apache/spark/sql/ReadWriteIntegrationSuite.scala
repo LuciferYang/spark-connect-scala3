@@ -293,6 +293,20 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
       catch case _: Exception => ()
   }
 
+  test("insertInto with mode(overwrite) replaces existing rows") {
+    val tableName = "sc3_test_insert_into_overwrite"
+    try
+      testDf.write.mode("overwrite").saveAsTable(tableName)
+      // After R73 fix, user-provided mode("overwrite") must flow through
+      // insertInto rather than being silently coerced to append.
+      testDf.write.mode("overwrite").insertInto(tableName)
+      val result = spark.read.table(tableName).count()
+      assert(result == 3, s"expected 3 rows after overwrite-insertInto, got $result")
+    finally
+      try spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
+      catch case _: Exception => ()
+  }
+
   // ---------------------------------------------------------------------------
   // Reader option overloads
   // ---------------------------------------------------------------------------

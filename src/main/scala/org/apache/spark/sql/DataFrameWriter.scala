@@ -97,16 +97,14 @@ final class DataFrameWriter private[sql] (private val df: DataFrame)
 
   def insertInto(tableName: String): Unit =
     val writeBuilder = buildWriteOp()
-    writeBuilder
-      .setMode(WriteOperation.SaveMode.SAVE_MODE_APPEND)
-      .setTable(
-        WriteOperation.SaveTable.newBuilder()
-          .setTableName(tableName)
-          .setSaveMethod(
-            WriteOperation.SaveTable.TableSaveMethod.TABLE_SAVE_METHOD_INSERT_INTO
-          )
-          .build()
-      )
+    writeBuilder.setTable(
+      WriteOperation.SaveTable.newBuilder()
+        .setTableName(tableName)
+        .setSaveMethod(
+          WriteOperation.SaveTable.TableSaveMethod.TABLE_SAVE_METHOD_INSERT_INTO
+        )
+        .build()
+    )
     executeCommand(
       Command.newBuilder()
         .setWriteOperation(writeBuilder.build())
