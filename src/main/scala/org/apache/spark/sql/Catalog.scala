@@ -75,7 +75,7 @@ final class Catalog private[sql] (private val session: SparkSession):
       ListColumns.newBuilder().setTableName(tableName).build()
     ))
 
-  def listColumns(tableName: String, dbName: String): DataFrame =
+  def listColumns(dbName: String, tableName: String): DataFrame =
     catalogDf(_.setListColumns(
       ListColumns.newBuilder().setTableName(tableName).setDbName(dbName).build()
     ))
@@ -138,7 +138,7 @@ final class Catalog private[sql] (private val session: SparkSession):
       GetTable.newBuilder().setTableName(tableName).build()
     ))
 
-  def getTable(tableName: String, dbName: String): DataFrame =
+  def getTable(dbName: String, tableName: String): DataFrame =
     catalogDf(_.setGetTable(
       GetTable.newBuilder().setTableName(tableName).setDbName(dbName).build()
     ))
@@ -148,7 +148,7 @@ final class Catalog private[sql] (private val session: SparkSession):
       GetFunction.newBuilder().setFunctionName(functionName).build()
     ))
 
-  def getFunction(functionName: String, dbName: String): DataFrame =
+  def getFunction(dbName: String, functionName: String): DataFrame =
     catalogDf(_.setGetFunction(
       GetFunction.newBuilder().setFunctionName(functionName).setDbName(dbName).build()
     ))
@@ -177,7 +177,7 @@ final class Catalog private[sql] (private val session: SparkSession):
       TableExists.newBuilder().setTableName(tableName).build()
     )).collect().head.getBoolean(0)
 
-  def tableExists(tableName: String, dbName: String): Boolean =
+  def tableExists(dbName: String, tableName: String): Boolean =
     catalogDf(_.setTableExists(
       TableExists.newBuilder().setTableName(tableName).setDbName(dbName).build()
     )).collect().head.getBoolean(0)
@@ -187,7 +187,7 @@ final class Catalog private[sql] (private val session: SparkSession):
       FunctionExists.newBuilder().setFunctionName(functionName).build()
     )).collect().head.getBoolean(0)
 
-  def functionExists(functionName: String, dbName: String): Boolean =
+  def functionExists(dbName: String, functionName: String): Boolean =
     catalogDf(_.setFunctionExists(
       FunctionExists.newBuilder().setFunctionName(functionName).setDbName(dbName).build()
     )).collect().head.getBoolean(0)
@@ -227,7 +227,8 @@ final class Catalog private[sql] (private val session: SparkSession):
   // ---------------------------------------------------------------------------
 
   def createTable(tableName: String, path: String): DataFrame =
-    createTable(tableName, "parquet", "", StructType(Seq.empty), Map("path" -> path))
+    val source = session.conf.get("spark.sql.sources.default", "parquet")
+    createTable(tableName, source, "", StructType(Seq.empty), Map("path" -> path))
 
   def createTable(tableName: String, path: String, source: String): DataFrame =
     createTable(tableName, source, Map("path" -> path))

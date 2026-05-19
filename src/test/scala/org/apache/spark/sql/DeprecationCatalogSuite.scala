@@ -21,7 +21,11 @@ class DeprecationCatalogSuite extends AnyFunSuite with Matchers:
     df.relation.getCatalog
 
   test("createExternalTable delegates to createTable") {
-    val cat1 = extractCatalog(testCatalog.createExternalTable("t", "/p"))
+    // The 2-arg `createTable(tableName, path)` form reads `spark.sql.sources.default` from
+    // session config (matching upstream); end-to-end behavior is exercised in
+    // CatalogIntegrationSuite. Here we exercise the 3-arg variant which is what the 2-arg
+    // delegates to.
+    val cat1 = extractCatalog(testCatalog.createExternalTable("t", "/p", "parquet"))
     cat1.hasCreateTable shouldBe true
     cat1.getCreateTable.getTableName shouldBe "t"
     cat1.getCreateTable.getOptionsMap.get("path") shouldBe "/p"

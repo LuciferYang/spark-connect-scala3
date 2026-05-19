@@ -41,7 +41,7 @@ class CatalogSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("getFunction with dbName") {
-    val cat = extractCatalog(testCatalog.getFunction("my_fn", "mydb"))
+    val cat = extractCatalog(testCatalog.getFunction("mydb", "my_fn"))
     cat.hasGetFunction shouldBe true
     cat.getGetFunction.getFunctionName shouldBe "my_fn"
     cat.getGetFunction.getDbName shouldBe "mydb"
@@ -73,13 +73,9 @@ class CatalogSuite extends AnyFunSuite with Matchers:
   // Create table
   // ---------------------------------------------------------------------------
 
-  test("createTable with tableName and path") {
-    val cat = extractCatalog(testCatalog.createTable("t1", "/data/path"))
-    cat.hasCreateTable shouldBe true
-    cat.getCreateTable.getTableName shouldBe "t1"
-    cat.getCreateTable.getOptionsMap.get("path") shouldBe "/data/path"
-    cat.getCreateTable.getSource shouldBe "parquet"
-  }
+  // The 2-arg `createTable(tableName, path)` form now reads `spark.sql.sources.default`
+  // from session config (matching upstream); it is exercised end-to-end in
+  // CatalogIntegrationSuite. The 3-arg form below covers the proto-construction path.
 
   test("createTable with tableName, path, and source") {
     val cat = extractCatalog(testCatalog.createTable("t1", "/data/path", "parquet"))
@@ -187,7 +183,7 @@ class CatalogSuite extends AnyFunSuite with Matchers:
   }
 
   test("getTable with dbName") {
-    val cat = extractCatalog(testCatalog.getTable("t1", "mydb"))
+    val cat = extractCatalog(testCatalog.getTable("mydb", "t1"))
     cat.getGetTable.getTableName shouldBe "t1"
     cat.getGetTable.getDbName shouldBe "mydb"
   }
@@ -205,7 +201,7 @@ class CatalogSuite extends AnyFunSuite with Matchers:
   }
 
   test("listColumns with dbName") {
-    val cat = extractCatalog(testCatalog.listColumns("t1", "mydb"))
+    val cat = extractCatalog(testCatalog.listColumns("mydb", "t1"))
     cat.getListColumns.getTableName shouldBe "t1"
     cat.getListColumns.getDbName shouldBe "mydb"
   }

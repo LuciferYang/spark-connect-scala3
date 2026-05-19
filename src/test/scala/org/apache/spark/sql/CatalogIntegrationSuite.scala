@@ -221,7 +221,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
     try
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       spark.sql(s"CREATE TABLE $tableName (x INT, y STRING) USING parquet").collect()
-      val cols = spark.catalog.listColumns(tableName, "default")
+      val cols = spark.catalog.listColumns("default", tableName)
       val rows = cols.collect()
       assert(rows.length == 2, s"Expected 2 columns but got ${rows.length}")
     finally
@@ -312,7 +312,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
     try
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       spark.sql(s"CREATE TABLE $tableName (id INT) USING parquet").collect()
-      val table = spark.catalog.getTable(tableName, "default")
+      val table = spark.catalog.getTable("default", tableName)
       val rows = table.collect()
       assert(rows.length == 1, "getTable with dbName should return exactly one row")
       assert(rows.head.getString(0) == tableName, "Table name should match")
@@ -353,11 +353,11 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
     try
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       assert(
-        !spark.catalog.tableExists(tableName, "default"),
+        !spark.catalog.tableExists("default", tableName),
         "Table should not exist before creation"
       )
       spark.sql(s"CREATE TABLE $tableName (id INT) USING parquet").collect()
-      assert(spark.catalog.tableExists(tableName, "default"), "Table should exist after creation")
+      assert(spark.catalog.tableExists("default", tableName), "Table should exist after creation")
     finally
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
   }
