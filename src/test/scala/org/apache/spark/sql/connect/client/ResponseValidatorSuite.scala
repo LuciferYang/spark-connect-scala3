@@ -1,6 +1,7 @@
 package org.apache.spark.sql.connect.client
 
 import com.google.protobuf.GeneratedMessage
+import io.grpc.{Status, StatusRuntimeException}
 import org.apache.spark.connect.proto.{AnalyzePlanResponse, ConfigResponse, ExecutePlanResponse}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -84,4 +85,30 @@ class ResponseValidatorSuite extends AnyFunSuite with Matchers:
       .build()
     rv.verifyResponse(resp)
     rv.getServerSideSessionId shouldBe Some("session-analyze")
+  }
+
+  test("wrapIterator flips sessionValid when SESSION_CHANGED is raised mid-stream") {
+    val rv = ResponseValidator()
+    val sessionChanged =
+      StatusRuntimeException(Status.INTERNAL.withDescription("[INVALID_HANDLE.SESSION_CHANGED]"))
+
+    val inner = new Iterator[ExecutePlanResponse] with AutoCloseable:
+      private var emitted = false
+      def hasNext: Boolean = true
+      def next(): ExecutePlanResponse =
+        if !emitted then
+          emitted = true
+          ExecutePlanResponse.newBuilder().setServerSideSessionId("session-a").build()
+        else throw sessionChanged
+      def close(): Unit = ()
+
+    val wrapped = rv.wrapIterator(inner)
+    wrapped.next() // first response — sessionValid stays true
+    rv.isSessionValid shouldBe true
+
+    val thrown = intercept[StatusRuntimeException] {
+      wrapped.next() // SESSION_CHANGED escapes from iter.next()
+    }
+    thrown.getStatus.getCode shouldBe Status.Code.INTERNAL
+    rv.isSessionValid shouldBe false // ← key assertion: streaming path now flips the flag
   }

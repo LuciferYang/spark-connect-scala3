@@ -28,16 +28,19 @@ class ResponseValidator:
     extractServerSideSessionId(resp).foreach(trackSessionId)
     resp
 
-  /** Wrap a streaming iterator so that every `next()` call is validated. */
+  /** Wrap a streaming iterator so that every `next()` call is validated.
+    *
+    * Mirrors upstream `ResponseValidator.wrapIterator` by routing `iter.next()` through
+    * `verifyResponse`, so a `INVALID_HANDLE.SESSION_CHANGED` raised mid-stream flips
+    * `sessionValid = false` (same as the unary path) and any subsequent unary RPC can
+    * fail-fast locally instead of round-tripping to a server that will reject it.
+    */
   def wrapIterator[RespT <: GeneratedMessage](
       iter: Iterator[RespT] & AutoCloseable
   ): Iterator[RespT] & AutoCloseable =
     new Iterator[RespT] with AutoCloseable:
       def hasNext: Boolean = iter.hasNext
-      def next(): RespT =
-        val resp = iter.next()
-        extractServerSideSessionId(resp).foreach(trackSessionId)
-        resp
+      def next(): RespT = verifyResponse(iter.next())
       def close(): Unit = iter.close()
 
   def getServerSideSessionId: Option[String] = serverSideSessionIdRef.get()
