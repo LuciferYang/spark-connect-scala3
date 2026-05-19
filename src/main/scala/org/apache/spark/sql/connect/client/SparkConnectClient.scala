@@ -106,9 +106,10 @@ final class SparkConnectClient private (
 
   /** Lazily fetch compression options from server config (cached after first call).
     *
-    * Only permanently disables compression on ClassNotFoundException or
-    * UnsupportedOperationException (indicating the feature is truly unavailable). Transient errors
-    * (e.g., network issues) leave the cache `Uninitialized` so callers can retry.
+    * Permanently disables compression on ClassNotFoundException, UnsupportedOperationException
+    * (feature truly unavailable), or NumberFormatException (server returned an unparsable threshold
+    * — typically empty string when the config key is unknown). Transient errors (e.g., network
+    * issues) leave the cache `Uninitialized` so callers can retry.
     */
   private def getPlanCompressionOptions: CompressionState =
     _planCompressionOptions match
@@ -126,7 +127,8 @@ final class SparkConnectClient private (
                 _planCompressionOptions = state
                 state
               catch
-                case _: ClassNotFoundException | _: UnsupportedOperationException =>
+                case _: ClassNotFoundException | _: UnsupportedOperationException |
+                    _: NumberFormatException =>
                   _planCompressionOptions = CompressionState.Disabled
                   CompressionState.Disabled
                 case e if NonFatal(e) =>
