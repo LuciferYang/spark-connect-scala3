@@ -287,13 +287,6 @@ final class SparkSession private[sql] (
         observationRegistry.remove(planId)
     }
 
-  /** Fail all pending observations so their `get` unblocks with the given cause. */
-  private[sql] def failPendingObservations(cause: Throwable): Unit =
-    observationRegistry.values().forEach { obs =>
-      obs.failMetrics(cause)
-    }
-    observationRegistry.clear()
-
   // ---------------------------------------------------------------------------
   // Operation Tags
   // ---------------------------------------------------------------------------

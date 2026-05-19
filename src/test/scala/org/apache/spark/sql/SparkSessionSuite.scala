@@ -326,6 +326,24 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
     session.processObservedMetrics(Seq((999L, row)))
   }
 
+  // R29 regression: a per-plan-id metric notification must not affect sibling
+  // observations registered for unrelated plan IDs. The previous catch-all
+  // `failPendingObservations` would clear the entire registry on any error,
+  // wiping siblings; aligning with upstream Connect we only touch the row's
+  // own plan ID.
+  test("processObservedMetrics for one planId does not clear sibling observations") {
+    val session = stubSession
+    val obsA = Observation("query_A")
+    val obsB = Observation("query_B")
+    session.registerObservation(1L, obsA)
+    session.registerObservation(2L, obsB)
+    session.processObservedMetrics(Seq((1L, Row(100L))))
+    obsA.future.isCompleted shouldBe true
+    obsB.future.isCompleted shouldBe false
+    session.observationRegistry.containsKey(2L) shouldBe true
+    session.observationRegistry.get(2L) shouldBe obsB
+  }
+
   // ---------- plan IDs on produced DataFrames ----------
 
   test("sql produces DataFrame with unique plan IDs") {
