@@ -85,14 +85,19 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
   /** Load XML files. Equivalent to `format("xml").load(paths)`. */
   def xml(paths: String*): DataFrame = format("xml").load(paths)
 
-  /** Load a text file and return its `value` column as a single-column DataFrame — a convenience
-    * for the common "treat file as list of strings" pattern.
+  /** Load a text file and return its `value` column as a `Dataset[String]` — a convenience for
+    * the common "treat file as list of strings" pattern. Rejects user-specified schemas to match
+    * upstream Spark's contract.
     */
-  def textFile(path: String): DataFrame = format("text").load(path).select(Column("value"))
+  def textFile(path: String): Dataset[String] = textFile(Seq(path)*)
 
   /** Varargs variant of `textFile(path)`. */
-  def textFile(paths: String*)(using DummyImplicit): DataFrame =
-    format("text").load(paths).select(Column("value"))
+  def textFile(paths: String*)(using DummyImplicit): Dataset[String] =
+    if userSchema.isDefined then
+      throw IllegalArgumentException(
+        "User specified schema not supported with `textFile`"
+      )
+    format("text").load(paths).select(Column("value")).as[String]
 
   /** Load a table from a JDBC data source.
     *

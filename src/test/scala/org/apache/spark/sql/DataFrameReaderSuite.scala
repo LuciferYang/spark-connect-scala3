@@ -238,16 +238,21 @@ class DataFrameReaderSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("textFile selects value column") {
-    val df = stubSession.read.textFile("/data.txt")
-    // textFile wraps text().select("value"), so the relation should be a Project
-    val rel = df.relation
+    val ds = stubSession.read.textFile("/data.txt")
+    ds shouldBe a[Dataset[?]]
+    val rel = ds.toDF().relation
     rel.hasProject shouldBe true
     val proj = rel.getProject
     proj.getExpressionsCount shouldBe 1
     val expr = proj.getExpressions(0)
     expr.hasUnresolvedAttribute shouldBe true
     expr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "value"
-    // The input to the project should be a Read with text format
     proj.getInput.hasRead shouldBe true
     proj.getInput.getRead.getDataSource.getFormat shouldBe "text"
+  }
+
+  test("textFile rejects user-specified schema") {
+    intercept[IllegalArgumentException] {
+      stubSession.read.schema("value STRING").textFile("/data.txt")
+    }
   }
