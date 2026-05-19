@@ -496,7 +496,16 @@ object SparkSession:
 
 /** Thin wrapper around client config get/set. */
 final class RuntimeConfig private[sql] (private val client: SparkConnectClient):
-  def get(key: String): String = client.getConfig(key)
+  /** Look up a config value by key.
+    *
+    * @throws java.util.NoSuchElementException if the key is unset and has no default.
+    */
+  @throws[java.util.NoSuchElementException]
+  def get(key: String): String =
+    getOption(key).getOrElse(
+      throw java.util.NoSuchElementException(s"Spark config not set: $key")
+    )
+
   def get(key: String, default: String): String = getOption(key).getOrElse(default)
   def getOption(key: String): Option[String] = client.getConfigOption(key)
   def getAll: Map[String, String] = client.getAllConfig()
