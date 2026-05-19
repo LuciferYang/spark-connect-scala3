@@ -80,14 +80,17 @@ final class DataStreamReader private[sql] (private val session: SparkSession):
     text(path).select(Column("value")).as[String]
 
   def table(tableName: String): DataFrame =
+    require(tableName != null, "The table name can't be null")
+    val ntBuilder = Read.NamedTable.newBuilder()
+      .setUnparsedIdentifier(tableName)
+    opts.foreach((k, v) => ntBuilder.putOptions(k, v))
     DataFrame(
       session,
       Relation.newBuilder()
         .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
         .setRead(Read.newBuilder()
           .setIsStreaming(true)
-          .setNamedTable(Read.NamedTable.newBuilder()
-            .setUnparsedIdentifier(tableName).build())
+          .setNamedTable(ntBuilder.build())
           .build())
         .build()
     )

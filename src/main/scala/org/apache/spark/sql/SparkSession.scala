@@ -107,17 +107,7 @@ final class SparkSession private[sql] (
   // Table / Range / Empty
   // ---------------------------------------------------------------------------
 
-  def table(tableName: String): DataFrame =
-    DataFrame(
-      this,
-      Relation.newBuilder()
-        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-        .setRead(Read.newBuilder()
-          .setNamedTable(Read.NamedTable.newBuilder()
-            .setUnparsedIdentifier(tableName).build())
-          .build())
-        .build()
-    )
+  def table(tableName: String): DataFrame = read.table(tableName)
 
   /** Create a `Dataset[java.lang.Long]` with elements `[0, end)` step 1.
     *

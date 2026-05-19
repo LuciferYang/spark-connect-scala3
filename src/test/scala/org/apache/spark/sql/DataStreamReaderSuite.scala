@@ -62,6 +62,25 @@ class DataStreamReaderSuite extends AnyFunSuite with Matchers:
     read.getNamedTable.getUnparsedIdentifier shouldBe "my_table"
   }
 
+  test("table propagates user-set options into NamedTable") {
+    val spark = session
+    val df = spark.readStream
+      .option("startingOffsets", "earliest")
+      .option("maxOffsetsPerTrigger", "1000")
+      .table("kafka_topic")
+    val read = extractRead(df)
+    read.getIsStreaming shouldBe true
+    read.hasNamedTable shouldBe true
+    val opts = read.getNamedTable.getOptionsMap
+    opts.get("startingOffsets") shouldBe "earliest"
+    opts.get("maxOffsetsPerTrigger") shouldBe "1000"
+  }
+
+  test("table rejects null tableName") {
+    val spark = session
+    an[IllegalArgumentException] should be thrownBy spark.readStream.table(null)
+  }
+
   test("default format is empty when not specified") {
     val spark = session
     val df = spark.readStream.load()

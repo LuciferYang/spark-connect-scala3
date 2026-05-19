@@ -63,7 +63,30 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
         .build()
     )
 
-  def table(tableName: String): DataFrame = session.table(tableName)
+  /** Read a managed/external table by name.
+    *
+    * Any options set via `option(...)` / `options(...)` on this reader are forwarded to the
+    * server as part of the `NamedTable` proto and used during table resolution (e.g. format
+    * options for Hive/Parquet/Delta tables). Calling `table` with a user-specified schema
+    * raises `IllegalArgumentException` to match upstream Spark's contract.
+    */
+  def table(tableName: String): DataFrame =
+    if userSchema.isDefined then
+      throw IllegalArgumentException(
+        "User specified schema not supported with `table`"
+      )
+    val ntBuilder = Read.NamedTable.newBuilder()
+      .setUnparsedIdentifier(tableName)
+    opts.foreach((k, v) => ntBuilder.putOptions(k, v))
+    DataFrame(
+      session,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+        .setRead(Read.newBuilder()
+          .setNamedTable(ntBuilder.build())
+          .build())
+        .build()
+    )
 
   /** Load JSON files. Equivalent to `format("json").load(paths)`. */
   def json(paths: String*): DataFrame = format("json").load(paths)

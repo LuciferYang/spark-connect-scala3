@@ -133,6 +133,25 @@ class DataFrameReaderSuite extends AnyFunSuite with Matchers:
     df.relation.getRead.getNamedTable.getUnparsedIdentifier shouldBe "my_table"
   }
 
+  test("table propagates user-set options into NamedTable") {
+    val df = stubSession.read
+      .option("mergeSchema", "true")
+      .option("recursiveFileLookup", "true")
+      .table("hive_db.t")
+    val nt = df.relation.getRead.getNamedTable
+    nt.getUnparsedIdentifier shouldBe "hive_db.t"
+    val opts = nt.getOptionsMap
+    opts.get("mergeSchema") shouldBe "true"
+    opts.get("recursiveFileLookup") shouldBe "true"
+  }
+
+  test("table rejects user-specified schema") {
+    val ex = the[IllegalArgumentException] thrownBy {
+      stubSession.read.schema("a INT").table("t")
+    }
+    ex.getMessage should include("table")
+  }
+
   // ---------------------------------------------------------------------------
   // Convenience read methods
   // ---------------------------------------------------------------------------
