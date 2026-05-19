@@ -728,8 +728,8 @@ final class Dataset[T: ClassTag] private[sql] (
   def write: DataFrameWriter = df.write
 
   /** MERGE INTO DML. */
-  def mergeInto(table: String, condition: Column): MergeIntoWriter =
-    df.mergeInto(table, condition)
+  def mergeInto(table: String, condition: Column): MergeIntoWriter[T] =
+    new MergeIntoWriter[T](table, df, condition)
 
   /** Attach metadata (as JSON string) to a column. */
   def withMetadata(columnName: String, metadata: String): DataFrame =

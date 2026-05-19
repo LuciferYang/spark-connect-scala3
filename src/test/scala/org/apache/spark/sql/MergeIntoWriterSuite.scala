@@ -141,3 +141,54 @@ class MergeIntoWriterSuite extends AnyFunSuite:
     assert(ma.hasCondition)
     assert(ma.getAssignmentsCount == 0)
   }
+
+  // ---------------------------------------------------------------------------
+  // Typed DSL chain (R67)
+  //
+  // Dataset[T].mergeInto must return MergeIntoWriter[T] so the WhenMatched[T] /
+  // WhenNotMatched[T] / WhenNotMatchedBySource[T] helper chain preserves T.
+  // Compile-time-only assertions: if these assignments compile, the chain is
+  // typed. Runtime values are not exercised because mergeInto is a pure
+  // DSL builder.
+  // ---------------------------------------------------------------------------
+
+  test("DataFrame.mergeInto produces MergeIntoWriter[Row]") {
+    val df = dummyDf
+    val writer: MergeIntoWriter[Row] = df.mergeInto("target", Column("id") === Column("id"))
+    assert(writer != null)
+  }
+
+  test("typed MergeIntoWriter[T] preserves T through whenMatched chain") {
+    val df = dummyDf
+    val writer: MergeIntoWriter[Long] =
+      new MergeIntoWriter[Long]("target", df, Column("id") === Column("id"))
+    val matched: WhenMatched[Long] = writer.whenMatched()
+    val w2: MergeIntoWriter[Long] = matched.updateAll()
+    assert(w2 eq writer)
+  }
+
+  test("typed MergeIntoWriter[T] preserves T through whenNotMatched chain") {
+    val df = dummyDf
+    val writer: MergeIntoWriter[Long] =
+      new MergeIntoWriter[Long]("target", df, Column("id") === Column("id"))
+    val notMatched: WhenNotMatched[Long] = writer.whenNotMatched()
+    val w2: MergeIntoWriter[Long] = notMatched.insertAll()
+    assert(w2 eq writer)
+  }
+
+  test("typed MergeIntoWriter[T] preserves T through whenNotMatchedBySource chain") {
+    val df = dummyDf
+    val writer: MergeIntoWriter[Long] =
+      new MergeIntoWriter[Long]("target", df, Column("id") === Column("id"))
+    val nbs: WhenNotMatchedBySource[Long] = writer.whenNotMatchedBySource()
+    val w2: MergeIntoWriter[Long] = nbs.delete()
+    assert(w2 eq writer)
+  }
+
+  test("typed MergeIntoWriter[T].withSchemaEvolution preserves T") {
+    val df = dummyDf
+    val writer: MergeIntoWriter[Long] =
+      new MergeIntoWriter[Long]("target", df, Column("id") === Column("id"))
+    val w2: MergeIntoWriter[Long] = writer.withSchemaEvolution()
+    assert(w2 eq writer)
+  }

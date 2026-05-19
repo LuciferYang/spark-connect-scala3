@@ -926,7 +926,7 @@ final class DataFrame private[sql] (
 
   def writeTo(table: String): DataFrameWriterV2 = DataFrameWriterV2(table, this)
 
-  def mergeInto(table: String, condition: Column): MergeIntoWriter =
+  def mergeInto(table: String, condition: Column): MergeIntoWriter[Row] =
     MergeIntoWriter(table, this, condition)
 
   def writeStream: DataStreamWriter[Row] = DataStreamWriter(this)

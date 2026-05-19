@@ -10,8 +10,12 @@ import org.apache.spark.connect.proto.*
   *     .whenNotMatched().insertAll()
   *     .merge()
   * }}}
+  *
+  * The type parameter `T` propagates the source dataset element type through the DSL chain so
+  * typed `Dataset[T].mergeInto(...)` flows the element type into the `WhenMatched[T]` /
+  * `WhenNotMatched[T]` / `WhenNotMatchedBySource[T]` helper classes.
   */
-final class MergeIntoWriter private[sql] (table: String, df: DataFrame, on: Column):
+final class MergeIntoWriter[T] private[sql] (table: String, df: DataFrame, on: Column):
 
   private val builder = MergeIntoTableCommand.newBuilder()
     .setTargetTableName(table)
@@ -20,17 +24,17 @@ final class MergeIntoWriter private[sql] (table: String, df: DataFrame, on: Colu
 
   private var hasActions: Boolean = false
 
-  def whenMatched(): WhenMatched = WhenMatched(this, None)
-  def whenMatched(condition: Column): WhenMatched = WhenMatched(this, Some(condition))
+  def whenMatched(): WhenMatched[T] = WhenMatched(this, None)
+  def whenMatched(condition: Column): WhenMatched[T] = WhenMatched(this, Some(condition))
 
-  def whenNotMatched(): WhenNotMatched = WhenNotMatched(this, None)
-  def whenNotMatched(condition: Column): WhenNotMatched = WhenNotMatched(this, Some(condition))
+  def whenNotMatched(): WhenNotMatched[T] = WhenNotMatched(this, None)
+  def whenNotMatched(condition: Column): WhenNotMatched[T] = WhenNotMatched(this, Some(condition))
 
-  def whenNotMatchedBySource(): WhenNotMatchedBySource = WhenNotMatchedBySource(this, None)
-  def whenNotMatchedBySource(condition: Column): WhenNotMatchedBySource =
+  def whenNotMatchedBySource(): WhenNotMatchedBySource[T] = WhenNotMatchedBySource(this, None)
+  def whenNotMatchedBySource(condition: Column): WhenNotMatchedBySource[T] =
     WhenNotMatchedBySource(this, Some(condition))
 
-  def withSchemaEvolution(): MergeIntoWriter =
+  def withSchemaEvolution(): MergeIntoWriter[T] =
     builder.setWithSchemaEvolution(true)
     this
 
@@ -47,17 +51,17 @@ final class MergeIntoWriter private[sql] (table: String, df: DataFrame, on: Colu
 
   // ---- Internal callbacks used by WhenXxx helpers ----
 
-  private[sql] def addMatchAction(action: Expression): MergeIntoWriter =
+  private[sql] def addMatchAction(action: Expression): MergeIntoWriter[T] =
     builder.addMatchActions(action)
     hasActions = true
     this
 
-  private[sql] def addNotMatchedAction(action: Expression): MergeIntoWriter =
+  private[sql] def addNotMatchedAction(action: Expression): MergeIntoWriter[T] =
     builder.addNotMatchedActions(action)
     hasActions = true
     this
 
-  private[sql] def addNotMatchedBySourceAction(action: Expression): MergeIntoWriter =
+  private[sql] def addNotMatchedBySourceAction(action: Expression): MergeIntoWriter[T] =
     builder.addNotMatchedBySourceActions(action)
     hasActions = true
     this
@@ -81,37 +85,42 @@ final class MergeIntoWriter private[sql] (table: String, df: DataFrame, on: Colu
     }
     Expression.newBuilder().setMergeAction(actionBuilder.build()).build()
 
+private[sql] object MergeIntoWriter:
+  /** Convenience constructor: untyped writer over a DataFrame, defaults to Row marker. */
+  def apply(table: String, df: DataFrame, on: Column): MergeIntoWriter[Row] =
+    new MergeIntoWriter[Row](table, df, on)
+
 // ---------------------------------------------------------------------------
 // When-clause helper classes
 // ---------------------------------------------------------------------------
 
 /** Actions available when the merge condition is matched. */
-final class WhenMatched private[sql] (writer: MergeIntoWriter, condition: Option[Column]):
+final class WhenMatched[T] private[sql] (writer: MergeIntoWriter[T], condition: Option[Column]):
 
-  def updateAll(): MergeIntoWriter =
+  def updateAll(): MergeIntoWriter[T] =
     writer.addMatchAction(
       writer.buildMergeAction(MergeAction.ActionType.ACTION_TYPE_UPDATE_STAR, condition)
     )
 
-  def update(assignments: Map[String, Column]): MergeIntoWriter =
+  def update(assignments: Map[String, Column]): MergeIntoWriter[T] =
     writer.addMatchAction(
       writer.buildMergeAction(MergeAction.ActionType.ACTION_TYPE_UPDATE, condition, assignments)
     )
 
-  def delete(): MergeIntoWriter =
+  def delete(): MergeIntoWriter[T] =
     writer.addMatchAction(
       writer.buildMergeAction(MergeAction.ActionType.ACTION_TYPE_DELETE, condition)
     )
 
 /** Actions available when the merge condition is not matched (source rows without target match). */
-final class WhenNotMatched private[sql] (writer: MergeIntoWriter, condition: Option[Column]):
+final class WhenNotMatched[T] private[sql] (writer: MergeIntoWriter[T], condition: Option[Column]):
 
-  def insertAll(): MergeIntoWriter =
+  def insertAll(): MergeIntoWriter[T] =
     writer.addNotMatchedAction(
       writer.buildMergeAction(MergeAction.ActionType.ACTION_TYPE_INSERT_STAR, condition)
     )
 
-  def insert(assignments: Map[String, Column]): MergeIntoWriter =
+  def insert(assignments: Map[String, Column]): MergeIntoWriter[T] =
     writer.addNotMatchedAction(
       writer.buildMergeAction(MergeAction.ActionType.ACTION_TYPE_INSERT, condition, assignments)
     )
@@ -119,22 +128,22 @@ final class WhenNotMatched private[sql] (writer: MergeIntoWriter, condition: Opt
 /** Actions available when the merge condition is not matched by source (target rows without source
   * match).
   */
-final class WhenNotMatchedBySource private[sql] (
-    writer: MergeIntoWriter,
+final class WhenNotMatchedBySource[T] private[sql] (
+    writer: MergeIntoWriter[T],
     condition: Option[Column]
 ):
 
-  def updateAll(): MergeIntoWriter =
+  def updateAll(): MergeIntoWriter[T] =
     writer.addNotMatchedBySourceAction(
       writer.buildMergeAction(MergeAction.ActionType.ACTION_TYPE_UPDATE_STAR, condition)
     )
 
-  def update(assignments: Map[String, Column]): MergeIntoWriter =
+  def update(assignments: Map[String, Column]): MergeIntoWriter[T] =
     writer.addNotMatchedBySourceAction(
       writer.buildMergeAction(MergeAction.ActionType.ACTION_TYPE_UPDATE, condition, assignments)
     )
 
-  def delete(): MergeIntoWriter =
+  def delete(): MergeIntoWriter[T] =
     writer.addNotMatchedBySourceAction(
       writer.buildMergeAction(MergeAction.ActionType.ACTION_TYPE_DELETE, condition)
     )

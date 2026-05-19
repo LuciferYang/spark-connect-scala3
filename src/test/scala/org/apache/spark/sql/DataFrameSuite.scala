@@ -1271,7 +1271,7 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
   test("mergeInto returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("target_table", Column("id") === Column("id"))
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   // ---------- scalar / exists subquery expressions ----------
@@ -2002,7 +2002,7 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
   test("MergeIntoWriter.withSchemaEvolution returns self") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id")).withSchemaEvolution()
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("MergeIntoWriter.merge without actions throws") {
@@ -2015,77 +2015,77 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenMatched().updateAll()
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("WhenMatched.update with assignments returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenMatched().update(Map("name" -> Column("source.name")))
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("WhenMatched.delete returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenMatched().delete()
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("WhenNotMatched.insertAll returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenNotMatched().insertAll()
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("WhenNotMatched.insert with assignments returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenNotMatched().insert(Map("id" -> Column("source.id")))
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("WhenNotMatchedBySource.updateAll returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenNotMatchedBySource().updateAll()
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("WhenNotMatchedBySource.update with assignments returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenNotMatchedBySource().update(Map("status" -> Column.lit("deleted")))
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("WhenNotMatchedBySource.delete returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenNotMatchedBySource().delete()
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("WhenMatched with condition returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenMatched(Column("source.updated") > Column.lit(0)).updateAll()
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("WhenNotMatched with condition returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenNotMatched(Column("source.active") === Column.lit(true)).insertAll()
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   test("WhenNotMatchedBySource with condition returns MergeIntoWriter") {
     val df = testDf()
     val writer = df.mergeInto("t", Column("id") === Column("id"))
       .whenNotMatchedBySource(Column("target.stale") === Column.lit(true)).delete()
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   // ---------- chained merge actions ----------
@@ -2096,7 +2096,7 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
       .whenMatched().updateAll()
       .whenNotMatched().insertAll()
       .whenNotMatchedBySource().delete()
-    writer shouldBe a[MergeIntoWriter]
+    writer shouldBe a[MergeIntoWriter[?]]
   }
 
   // ---------- P0 API: head() / show() / filter / sort / rollup / cube ----------
