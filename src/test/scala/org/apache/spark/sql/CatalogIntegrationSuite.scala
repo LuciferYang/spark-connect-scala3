@@ -179,7 +179,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
       spark.sql(s"CREATE TABLE $tableName (id INT) USING parquet").collect()
       val tables = spark.catalog.listTables("default")
       val rows = tables.collect()
-      val names = rows.map(_.getString(0))
+      val names = rows.map(_.name)
       assert(names.contains(tableName), s"Table '$tableName' should be in default database listing")
     finally
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
@@ -210,7 +210,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
       val cols = spark.catalog.listColumns(tableName)
       val rows = cols.collect()
       assert(rows.length == 3, s"Expected 3 columns but got ${rows.length}")
-      val colNames = rows.map(_.getString(0)).toSet
+      val colNames = rows.map(_.name).toSet
       assert(colNames == Set("id", "name", "value"), s"Column names mismatch: $colNames")
     finally
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
@@ -288,10 +288,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
 
   test("catalog getDatabase") {
     val db = spark.catalog.getDatabase("default")
-    val rows = db.collect()
-    assert(rows.length == 1, "getDatabase should return exactly one row")
-    val name = rows.head.getString(0)
-    assert(name == "default", s"Database name should be 'default' but got '$name'")
+    assert(db.name == "default", s"Database name should be 'default' but got '${db.name}'")
   }
 
   test("catalog getTable by tableName") {
@@ -300,9 +297,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       spark.sql(s"CREATE TABLE $tableName (id INT) USING parquet").collect()
       val table = spark.catalog.getTable(tableName)
-      val rows = table.collect()
-      assert(rows.length == 1, "getTable should return exactly one row")
-      assert(rows.head.getString(0) == tableName, "Table name should match")
+      assert(table.name == tableName, "Table name should match")
     finally
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
   }
@@ -313,18 +308,14 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
       spark.sql(s"CREATE TABLE $tableName (id INT) USING parquet").collect()
       val table = spark.catalog.getTable("default", tableName)
-      val rows = table.collect()
-      assert(rows.length == 1, "getTable with dbName should return exactly one row")
-      assert(rows.head.getString(0) == tableName, "Table name should match")
+      assert(table.name == tableName, "Table name should match")
     finally
       spark.sql(s"DROP TABLE IF EXISTS $tableName").collect()
   }
 
   test("catalog getFunction by name") {
     val func = spark.catalog.getFunction("abs")
-    val rows = func.collect()
-    assert(rows.length == 1, "getFunction should return exactly one row for 'abs'")
-    assert(rows.head.getString(0) == "abs", "Function name should be 'abs'")
+    assert(func.name == "abs", "Function name should be 'abs'")
   }
 
   test("catalog getFunction with name and dbName") {
@@ -337,9 +328,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
         s"CREATE TEMPORARY FUNCTION $funcName AS 'org.apache.spark.sql.catalyst.expressions.Abs'"
       ).collect()
       val func = spark.catalog.getFunction(funcName)
-      val rows = func.collect()
-      assert(rows.length == 1, s"getFunction should return one row for '$funcName'")
-      assert(rows.head.getString(0) == funcName, s"Function name should be '$funcName'")
+      assert(func.name == funcName, s"Function name should be '$funcName'")
     catch
       case e: Exception =>
         cancel("getFunction with dbName test requires SQL UDF registration support")
@@ -664,7 +653,7 @@ class CatalogIntegrationSuite extends IntegrationTestBase:
       ).collect()
       assert(spark.catalog.tableExists(tableName), "Table should exist after creation with schema")
       val cols = spark.catalog.listColumns(tableName).collect()
-      val colNames = cols.map(_.getString(0)).toSet
+      val colNames = cols.map(_.name).toSet
       assert(colNames.contains("id"), "Table should have 'id' column")
       assert(colNames.contains("label"), "Table should have 'label' column")
     finally

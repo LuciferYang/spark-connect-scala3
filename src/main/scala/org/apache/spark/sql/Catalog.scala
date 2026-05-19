@@ -5,6 +5,13 @@ import org.apache.spark.connect.proto.{
   StorageLevel as _,
   *
 }
+import org.apache.spark.sql.catalog.{
+  CatalogMetadata,
+  Column as CatalogColumn,
+  Database,
+  Function as CatalogFunction,
+  Table
+}
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.types.StructType
 
@@ -46,60 +53,60 @@ final class Catalog private[sql] (private val session: SparkSession):
     )).collect()
 
   // ---------------------------------------------------------------------------
-  // List operations (return DataFrames)
+  // List operations (return typed Datasets, matching upstream Catalog.scala)
   // ---------------------------------------------------------------------------
 
-  def listDatabases(): DataFrame =
-    catalogDf(_.setListDatabases(ListDatabases.getDefaultInstance))
+  def listDatabases(): Dataset[Database] =
+    catalogDf(_.setListDatabases(ListDatabases.getDefaultInstance)).as[Database]
 
-  def listDatabases(pattern: String): DataFrame =
+  def listDatabases(pattern: String): Dataset[Database] =
     catalogDf(_.setListDatabases(
       ListDatabases.newBuilder().setPattern(pattern).build()
-    ))
+    )).as[Database]
 
-  def listTables(): DataFrame =
-    catalogDf(_.setListTables(ListTables.getDefaultInstance))
+  def listTables(): Dataset[Table] =
+    catalogDf(_.setListTables(ListTables.getDefaultInstance)).as[Table]
 
-  def listTables(dbName: String): DataFrame =
+  def listTables(dbName: String): Dataset[Table] =
     catalogDf(_.setListTables(
       ListTables.newBuilder().setDbName(dbName).build()
-    ))
+    )).as[Table]
 
-  def listTables(dbName: String, pattern: String): DataFrame =
+  def listTables(dbName: String, pattern: String): Dataset[Table] =
     catalogDf(_.setListTables(
       ListTables.newBuilder().setDbName(dbName).setPattern(pattern).build()
-    ))
+    )).as[Table]
 
-  def listColumns(tableName: String): DataFrame =
+  def listColumns(tableName: String): Dataset[CatalogColumn] =
     catalogDf(_.setListColumns(
       ListColumns.newBuilder().setTableName(tableName).build()
-    ))
+    )).as[CatalogColumn]
 
-  def listColumns(dbName: String, tableName: String): DataFrame =
+  def listColumns(dbName: String, tableName: String): Dataset[CatalogColumn] =
     catalogDf(_.setListColumns(
       ListColumns.newBuilder().setTableName(tableName).setDbName(dbName).build()
-    ))
+    )).as[CatalogColumn]
 
-  def listFunctions(): DataFrame =
-    catalogDf(_.setListFunctions(ListFunctions.getDefaultInstance))
+  def listFunctions(): Dataset[CatalogFunction] =
+    catalogDf(_.setListFunctions(ListFunctions.getDefaultInstance)).as[CatalogFunction]
 
-  def listFunctions(dbName: String): DataFrame =
+  def listFunctions(dbName: String): Dataset[CatalogFunction] =
     catalogDf(_.setListFunctions(
       ListFunctions.newBuilder().setDbName(dbName).build()
-    ))
+    )).as[CatalogFunction]
 
-  def listFunctions(dbName: String, pattern: String): DataFrame =
+  def listFunctions(dbName: String, pattern: String): Dataset[CatalogFunction] =
     catalogDf(_.setListFunctions(
       ListFunctions.newBuilder().setDbName(dbName).setPattern(pattern).build()
-    ))
+    )).as[CatalogFunction]
 
-  def listCatalogs(): DataFrame =
-    catalogDf(_.setListCatalogs(ListCatalogs.getDefaultInstance))
+  def listCatalogs(): Dataset[CatalogMetadata] =
+    catalogDf(_.setListCatalogs(ListCatalogs.getDefaultInstance)).as[CatalogMetadata]
 
-  def listCatalogs(pattern: String): DataFrame =
+  def listCatalogs(pattern: String): Dataset[CatalogMetadata] =
     catalogDf(_.setListCatalogs(
       ListCatalogs.newBuilder().setPattern(pattern).build()
-    ))
+    )).as[CatalogMetadata]
 
   /** List all tables in the current database.
     *
@@ -125,33 +132,33 @@ final class Catalog private[sql] (private val session: SparkSession):
     session.sql(s"SHOW VIEWS IN ${quoteIdent(dbName)} LIKE '${escapeSqlLiteral(pattern)}'")
 
   // ---------------------------------------------------------------------------
-  // Get operations
+  // Get operations (return scalar typed values; eagerly fetch first row)
   // ---------------------------------------------------------------------------
 
-  def getDatabase(dbName: String): DataFrame =
+  def getDatabase(dbName: String): Database =
     catalogDf(_.setGetDatabase(
       GetDatabase.newBuilder().setDbName(dbName).build()
-    ))
+    )).as[Database].head()
 
-  def getTable(tableName: String): DataFrame =
+  def getTable(tableName: String): Table =
     catalogDf(_.setGetTable(
       GetTable.newBuilder().setTableName(tableName).build()
-    ))
+    )).as[Table].head()
 
-  def getTable(dbName: String, tableName: String): DataFrame =
+  def getTable(dbName: String, tableName: String): Table =
     catalogDf(_.setGetTable(
       GetTable.newBuilder().setTableName(tableName).setDbName(dbName).build()
-    ))
+    )).as[Table].head()
 
-  def getFunction(functionName: String): DataFrame =
+  def getFunction(functionName: String): CatalogFunction =
     catalogDf(_.setGetFunction(
       GetFunction.newBuilder().setFunctionName(functionName).build()
-    ))
+    )).as[CatalogFunction].head()
 
-  def getFunction(dbName: String, functionName: String): DataFrame =
+  def getFunction(dbName: String, functionName: String): CatalogFunction =
     catalogDf(_.setGetFunction(
       GetFunction.newBuilder().setFunctionName(functionName).setDbName(dbName).build()
-    ))
+    )).as[CatalogFunction].head()
 
   def getTableProperties(tableName: String): DataFrame =
     session.sql(s"SHOW TBLPROPERTIES ${quoteIdent(tableName)}")

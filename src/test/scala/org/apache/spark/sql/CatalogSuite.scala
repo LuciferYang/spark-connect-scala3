@@ -23,14 +23,14 @@ class CatalogSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("listTables with dbName and pattern") {
-    val cat = extractCatalog(testCatalog.listTables("mydb", "tbl*"))
+    val cat = extractCatalog(testCatalog.listTables("mydb", "tbl*").toDF())
     cat.hasListTables shouldBe true
     cat.getListTables.getDbName shouldBe "mydb"
     cat.getListTables.getPattern shouldBe "tbl*"
   }
 
   test("listFunctions with dbName and pattern") {
-    val cat = extractCatalog(testCatalog.listFunctions("mydb", "fn*"))
+    val cat = extractCatalog(testCatalog.listFunctions("mydb", "fn*").toDF())
     cat.hasListFunctions shouldBe true
     cat.getListFunctions.getDbName shouldBe "mydb"
     cat.getListFunctions.getPattern shouldBe "fn*"
@@ -38,10 +38,17 @@ class CatalogSuite extends AnyFunSuite with Matchers:
 
   // ---------------------------------------------------------------------------
   // Get operations — proto-backed
+  //
+  // Get methods are eager (call `.head()`); unit tests cannot run RPC, so we
+  // exercise the proto-construction path directly via `catalogDf` instead of
+  // calling `getX(...)` (which would attempt to fetch).
   // ---------------------------------------------------------------------------
 
   test("getFunction with dbName") {
-    val cat = extractCatalog(testCatalog.getFunction("mydb", "my_fn"))
+    val df = testCatalog.catalogDf(_.setGetFunction(
+      GetFunction.newBuilder().setFunctionName("my_fn").setDbName("mydb").build()
+    ))
+    val cat = extractCatalog(df)
     cat.hasGetFunction shouldBe true
     cat.getGetFunction.getFunctionName shouldBe "my_fn"
     cat.getGetFunction.getDbName shouldBe "mydb"
@@ -130,78 +137,90 @@ class CatalogSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("listDatabases with no args") {
-    val cat = extractCatalog(testCatalog.listDatabases())
+    val cat = extractCatalog(testCatalog.listDatabases().toDF())
     cat.hasListDatabases shouldBe true
     cat.getListDatabases.hasPattern shouldBe false
   }
 
   test("listDatabases with pattern") {
-    val cat = extractCatalog(testCatalog.listDatabases("db*"))
+    val cat = extractCatalog(testCatalog.listDatabases("db*").toDF())
     cat.getListDatabases.getPattern shouldBe "db*"
   }
 
   test("listTables with no args") {
-    val cat = extractCatalog(testCatalog.listTables())
+    val cat = extractCatalog(testCatalog.listTables().toDF())
     cat.hasListTables shouldBe true
   }
 
   test("listTables with dbName") {
-    val cat = extractCatalog(testCatalog.listTables("mydb"))
+    val cat = extractCatalog(testCatalog.listTables("mydb").toDF())
     cat.getListTables.getDbName shouldBe "mydb"
   }
 
   test("listFunctions with no args") {
-    val cat = extractCatalog(testCatalog.listFunctions())
+    val cat = extractCatalog(testCatalog.listFunctions().toDF())
     cat.hasListFunctions shouldBe true
   }
 
   test("listFunctions with dbName") {
-    val cat = extractCatalog(testCatalog.listFunctions("mydb"))
+    val cat = extractCatalog(testCatalog.listFunctions("mydb").toDF())
     cat.getListFunctions.getDbName shouldBe "mydb"
   }
 
   test("listCatalogs with no args") {
-    val cat = extractCatalog(testCatalog.listCatalogs())
+    val cat = extractCatalog(testCatalog.listCatalogs().toDF())
     cat.hasListCatalogs shouldBe true
   }
 
   test("listCatalogs with pattern") {
-    val cat = extractCatalog(testCatalog.listCatalogs("c*"))
+    val cat = extractCatalog(testCatalog.listCatalogs("c*").toDF())
     cat.getListCatalogs.getPattern shouldBe "c*"
   }
 
   test("getDatabase") {
-    val cat = extractCatalog(testCatalog.getDatabase("mydb"))
+    val df = testCatalog.catalogDf(_.setGetDatabase(
+      GetDatabase.newBuilder().setDbName("mydb").build()
+    ))
+    val cat = extractCatalog(df)
     cat.hasGetDatabase shouldBe true
     cat.getGetDatabase.getDbName shouldBe "mydb"
   }
 
   test("getTable single arg") {
-    val cat = extractCatalog(testCatalog.getTable("t1"))
+    val df = testCatalog.catalogDf(_.setGetTable(
+      GetTable.newBuilder().setTableName("t1").build()
+    ))
+    val cat = extractCatalog(df)
     cat.hasGetTable shouldBe true
     cat.getGetTable.getTableName shouldBe "t1"
   }
 
   test("getTable with dbName") {
-    val cat = extractCatalog(testCatalog.getTable("mydb", "t1"))
+    val df = testCatalog.catalogDf(_.setGetTable(
+      GetTable.newBuilder().setTableName("t1").setDbName("mydb").build()
+    ))
+    val cat = extractCatalog(df)
     cat.getGetTable.getTableName shouldBe "t1"
     cat.getGetTable.getDbName shouldBe "mydb"
   }
 
   test("getFunction single arg") {
-    val cat = extractCatalog(testCatalog.getFunction("fn1"))
+    val df = testCatalog.catalogDf(_.setGetFunction(
+      GetFunction.newBuilder().setFunctionName("fn1").build()
+    ))
+    val cat = extractCatalog(df)
     cat.hasGetFunction shouldBe true
     cat.getGetFunction.getFunctionName shouldBe "fn1"
   }
 
   test("listColumns single arg") {
-    val cat = extractCatalog(testCatalog.listColumns("t1"))
+    val cat = extractCatalog(testCatalog.listColumns("t1").toDF())
     cat.hasListColumns shouldBe true
     cat.getListColumns.getTableName shouldBe "t1"
   }
 
   test("listColumns with dbName") {
-    val cat = extractCatalog(testCatalog.listColumns("mydb", "t1"))
+    val cat = extractCatalog(testCatalog.listColumns("mydb", "t1").toDF())
     cat.getListColumns.getTableName shouldBe "t1"
     cat.getListColumns.getDbName shouldBe "mydb"
   }
@@ -387,9 +406,9 @@ class CatalogSuite extends AnyFunSuite with Matchers:
   test("multiple catalog operations on same session produce unique plan IDs") {
     val session = testSession
     val catalog = Catalog(session)
-    val df1 = catalog.listDatabases()
-    val df2 = catalog.listTables()
-    val df3 = catalog.listFunctions()
+    val df1 = catalog.listDatabases().toDF()
+    val df2 = catalog.listTables().toDF()
+    val df3 = catalog.listFunctions().toDF()
     val ids = Seq(
       df1.relation.getCommon.getPlanId,
       df2.relation.getCommon.getPlanId,
