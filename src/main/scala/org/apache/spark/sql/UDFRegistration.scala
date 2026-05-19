@@ -1,7 +1,7 @@
 package org.apache.spark.sql
 
-import org.apache.spark.connect.proto.Command
-import org.apache.spark.sql.connect.client.SparkConnectClient
+import org.apache.spark.connect.proto.{Command, CommonInlineUserDefinedFunction, JavaUDF}
+import org.apache.spark.sql.connect.client.{DataTypeProtoConverter, SparkConnectClient}
 
 /** Functions for registering user-defined functions (UDFs).
   *
@@ -93,3 +93,35 @@ final class UDFRegistration private[sql] (
       func: (A1, A2, A3, A4, A5, A6, A7, A8, A9, A10) => R
   ): UserDefinedFunction =
     register(name, functions.udf(func))
+
+  /** Register a Java UDF class by its fully-qualified class name with an explicit return type.
+    *
+    * {{{
+    *   spark.udf.registerJava("strLen", "com.example.StrLen", IntegerType)
+    *   spark.sql("SELECT strLen(name) FROM people")
+    * }}}
+    */
+  def registerJava(name: String, className: String, returnDataType: types.DataType): Unit =
+    val command = Command.newBuilder()
+      .setRegisterFunction(UDFRegistration.buildJavaUdf(name, className, returnDataType))
+      .build()
+    client.executeCommand(command)
+
+end UDFRegistration
+
+private[sql] object UDFRegistration:
+  /** Build the proto for a Java UDF registration. Extracted for unit testing. */
+  private[sql] def buildJavaUdf(
+      name: String,
+      className: String,
+      returnDataType: types.DataType
+  ): CommonInlineUserDefinedFunction =
+    val javaUdf = JavaUDF.newBuilder()
+      .setClassName(className)
+      .setOutputType(DataTypeProtoConverter.toProto(returnDataType))
+      .setAggregate(false)
+      .build()
+    CommonInlineUserDefinedFunction.newBuilder()
+      .setFunctionName(name)
+      .setJavaUdf(javaUdf)
+      .build()

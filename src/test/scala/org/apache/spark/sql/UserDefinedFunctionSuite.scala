@@ -200,3 +200,30 @@ class UserDefinedFunctionSuite extends AnyFunSuite with Matchers:
       val f2 = functions.udf((a: Int, b: Int) => a + b)
     """)
   }
+
+  // ---------------------------------------------------------------------------
+  // UDFRegistration.registerJava — proto-shape verification
+  // ---------------------------------------------------------------------------
+
+  test("registerJava builds a CommonInlineUserDefinedFunction with JavaUDF payload") {
+    val udf = UDFRegistration.buildJavaUdf("strLen", "com.example.StrLen", IntegerType)
+
+    udf.getFunctionName shouldBe "strLen"
+    udf.hasJavaUdf shouldBe true
+    val javaUdf = udf.getJavaUdf
+    javaUdf.getClassName shouldBe "com.example.StrLen"
+    javaUdf.getAggregate shouldBe false
+    DataTypeProtoConverter.fromProto(javaUdf.getOutputType) shouldBe IntegerType
+  }
+
+  test("registerJava supports complex return types") {
+    val structType = StructType(Seq(
+      StructField("name", StringType),
+      StructField("count", LongType)
+    ))
+    val udf = UDFRegistration.buildJavaUdf("complex", "com.example.Complex", structType)
+
+    udf.getFunctionName shouldBe "complex"
+    udf.getJavaUdf.getClassName shouldBe "com.example.Complex"
+    DataTypeProtoConverter.fromProto(udf.getJavaUdf.getOutputType) shouldBe structType
+  }
