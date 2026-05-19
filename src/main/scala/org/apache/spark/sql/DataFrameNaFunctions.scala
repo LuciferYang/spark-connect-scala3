@@ -96,21 +96,53 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
     df.withRelation(_.setFillNa(naFillBuilder.build()))
 
   def replace[T](col: String, replacement: Map[T, T]): DataFrame =
-    replace(Seq(col), replacement)
+    val cols = if col != "*" then Some(Seq(col)) else None
+    buildReplaceDataFrame(cols, buildReplacement(replacement))
+
+  def replace[T](cols: Array[String], replacement: Map[T, T]): DataFrame =
+    replace(cols.toSeq, replacement)
 
   def replace[T](cols: Seq[String], replacement: Map[T, T]): DataFrame =
-    val naReplaceBuilder = NAReplace.newBuilder()
-      .setInput(df.relation)
-    cols.foreach(naReplaceBuilder.addCols)
-    replacement.foreach { (old, nw) =>
-      naReplaceBuilder.addReplacements(
-        NAReplace.Replacement.newBuilder()
-          .setOldValue(toLiteral(old))
-          .setNewValue(toLiteral(nw))
-          .build()
-      )
-    }
+    buildReplaceDataFrame(Some(cols), buildReplacement(replacement))
+
+  private def buildReplaceDataFrame(
+      cols: Option[Seq[String]],
+      replacements: Iterable[NAReplace.Replacement]
+  ): DataFrame =
+    val naReplaceBuilder = NAReplace.newBuilder().setInput(df.relation)
+    replacements.foreach(naReplaceBuilder.addReplacements)
+    cols.foreach(_.foreach(naReplaceBuilder.addCols))
     df.withRelation(_.setReplace(naReplaceBuilder.build()))
+
+  /** Build replacement entries with upstream's type unification: numeric keys/values normalize
+    * to Double; String/Boolean pass through; null preserved.
+    */
+  private def buildReplacement[T](
+      replacement: Map[T, T]
+  ): Iterable[NAReplace.Replacement] =
+    val normalized: Map[Any, Any] = replacement.map {
+      case (k, v: String)     => (k, v)
+      case (k, v: Boolean)    => (k, v)
+      case (k: String, null)  => (k, null)
+      case (k: Boolean, null) => (k, null)
+      case (k, null)          => (convertToDouble(k), null)
+      case (k, v)             => (convertToDouble(k), convertToDouble(v))
+    }
+    normalized.map { case (oldValue, newValue) =>
+      NAReplace.Replacement.newBuilder()
+        .setOldValue(toLiteral(oldValue))
+        .setNewValue(toLiteral(newValue))
+        .build()
+    }
+
+  private def convertToDouble(v: Any): Double = v match
+    case x: Float  => x.toDouble
+    case x: Double => x
+    case x: Long   => x.toDouble
+    case x: Int    => x.toDouble
+    case x         => throw IllegalArgumentException(
+        s"Unsupported value type ${x.getClass.getName} ($x)."
+      )
 
   private def toLiteral(value: Any): Expression.Literal = value match
     case null => Expression.Literal.newBuilder()

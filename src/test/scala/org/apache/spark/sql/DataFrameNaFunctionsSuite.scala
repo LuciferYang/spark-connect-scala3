@@ -124,19 +124,35 @@ class DataFrameNaFunctionsSuite extends AnyFunSuite with Matchers:
   // replace
   // ---------------------------------------------------------------------------
 
-  test("replace builds NAReplace with correct replacements") {
+  // Numeric replacement values are unified to Double (matching upstream): the server treats
+  // numeric replacements as DoubleType internally, so Int/Long/Float keys/values are normalized.
+  test("replace unifies Int keys/values to Double literals") {
     val result = naFunctions.replace("col1", Map(1 -> 10, 2 -> 20))
     val rel = result.relation
     assert(rel.hasReplace)
     val naReplace = rel.getReplace
     naReplace.getColsList.asScala.toSeq shouldBe Seq("col1")
     naReplace.getReplacementsCount shouldBe 2
-    val r0 = naReplace.getReplacements(0)
-    r0.getOldValue.getInteger shouldBe 1
-    r0.getNewValue.getInteger shouldBe 10
+    val pairs = naReplace.getReplacementsList.asScala.toSeq
+      .map(r => r.getOldValue.getDouble -> r.getNewValue.getDouble).toSet
+    pairs shouldBe Set(1.0 -> 10.0, 2.0 -> 20.0)
   }
 
-  test("replace with String values") {
+  test("replace unifies Long keys/values to Double literals") {
+    val result = naFunctions.replace("col1", Map(1L -> 10L))
+    val r = result.relation.getReplace.getReplacements(0)
+    r.getOldValue.getDouble shouldBe 1.0
+    r.getNewValue.getDouble shouldBe 10.0
+  }
+
+  test("replace unifies Float keys/values to Double literals") {
+    val result = naFunctions.replace("col1", Map(1.5f -> 2.5f))
+    val r = result.relation.getReplace.getReplacements(0)
+    r.getOldValue.getDouble shouldBe 1.5
+    r.getNewValue.getDouble shouldBe 2.5
+  }
+
+  test("replace with String values preserves String literal type") {
     val result = naFunctions.replace("name", Map("old" -> "new"))
     val naReplace = result.relation.getReplace
     naReplace.getReplacementsCount shouldBe 1
@@ -144,12 +160,71 @@ class DataFrameNaFunctionsSuite extends AnyFunSuite with Matchers:
     naReplace.getReplacements(0).getNewValue.getString shouldBe "new"
   }
 
-  test("replace with Double values") {
+  test("replace with Double values stays Double") {
     val result = naFunctions.replace("price", Map(0.0 -> 99.9))
     val naReplace = result.relation.getReplace
     naReplace.getReplacementsCount shouldBe 1
     naReplace.getReplacements(0).getOldValue.getDouble shouldBe 0.0
     naReplace.getReplacements(0).getNewValue.getDouble shouldBe 99.9
+  }
+
+  test("replace with Boolean values preserves Boolean literal type") {
+    val result = naFunctions.replace("flag", Map(true -> false))
+    val r = result.relation.getReplace.getReplacements(0)
+    r.getOldValue.getBoolean shouldBe true
+    r.getNewValue.getBoolean shouldBe false
+  }
+
+  test("replace with String key and null value preserves null literal") {
+    val result = naFunctions.replace("name", Map[String, String]("UNKNOWN" -> null))
+    val r = result.relation.getReplace.getReplacements(0)
+    r.getOldValue.getString shouldBe "UNKNOWN"
+    r.getNewValue.hasNull shouldBe true
+  }
+
+  test("replace with numeric key and null value: key normalized to Double, value null") {
+    val result = naFunctions.replace("score", Map[Any, Any](1 -> null))
+    val r = result.relation.getReplace.getReplacements(0)
+    r.getOldValue.getDouble shouldBe 1.0
+    r.getNewValue.hasNull shouldBe true
+  }
+
+  test("replace with unsupported value type rejects with IllegalArgumentException") {
+    val ex = intercept[IllegalArgumentException] {
+      naFunctions.replace("col1", Map[Any, Any](java.math.BigDecimal.ONE -> java.math.BigDecimal.ONE))
+    }
+    ex.getMessage should include("Unsupported value type")
+  }
+
+  // ---------------------------------------------------------------------------
+  // replace — wildcard "*" support
+  // ---------------------------------------------------------------------------
+
+  test("replace(\"*\", Map) sends an empty cols list (all-columns wildcard)") {
+    val result = naFunctions.replace("*", Map("UNKNOWN" -> "unnamed"))
+    val naReplace = result.relation.getReplace
+    // Upstream: the single-string variant maps "*" to None → no addCols call → server expands.
+    naReplace.getColsCount shouldBe 0
+    naReplace.getReplacementsCount shouldBe 1
+    naReplace.getReplacements(0).getOldValue.getString shouldBe "UNKNOWN"
+    naReplace.getReplacements(0).getNewValue.getString shouldBe "unnamed"
+  }
+
+  test("replace(non-wildcard col, Map) still includes that col") {
+    val result = naFunctions.replace("name", Map("UNKNOWN" -> "unnamed"))
+    val naReplace = result.relation.getReplace
+    naReplace.getColsList.asScala.toSeq shouldBe Seq("name")
+  }
+
+  // ---------------------------------------------------------------------------
+  // replace(Array, Map)
+  // ---------------------------------------------------------------------------
+
+  test("replace(Array, Map) delegates to replace(Seq, Map)") {
+    val result = naFunctions.replace(Array("col1", "col2"), Map("a" -> "b"))
+    val naReplace = result.relation.getReplace
+    naReplace.getColsList.asScala.toSeq shouldBe Seq("col1", "col2")
+    naReplace.getReplacementsCount shouldBe 1
   }
 
   // ---------------------------------------------------------------------------
