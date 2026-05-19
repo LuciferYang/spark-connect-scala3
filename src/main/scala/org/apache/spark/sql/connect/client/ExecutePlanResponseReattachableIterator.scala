@@ -120,6 +120,12 @@ class ExecutePlanResponseReattachableIterator private[client] (
   /** Apply `f` to the current iterator. On `OPERATION_NOT_FOUND` or `SESSION_NOT_FOUND`, re-execute
     * the original plan and throw [[GrpcRetryHandler.RetryException]] so the outer retry loop
     * restarts.
+    *
+    * If responses were already returned to the caller (`lastReturnedResponseId.isDefined`), a full
+    * re-execute would replay the prefix to user business logic and double-consume side effects
+    * (writes, metrics, state transitions). In that case, raise an `IllegalStateException` so the
+    * caller can decide to abort or compensate — mirrors upstream `callIter` (sql/connect/common's
+    * ExecutePlanResponseReattachableIterator.scala:244-249).
     */
   private def callIter[T](f: java.util.Iterator[ExecutePlanResponse] => T): T =
     try
@@ -127,6 +133,8 @@ class ExecutePlanResponseReattachableIterator private[client] (
       f(iter)
     catch
       case e: StatusRuntimeException if isRetryableExecuteStatus(e) =>
+        ExecutePlanResponseReattachableIterator
+          .assertNoResponsesConsumedBeforeReExecute(lastReturnedResponseId, e)
         iter = rawExecutePlan(request)
         throw GrpcRetryHandler.RetryException(e)
 
@@ -201,3 +209,23 @@ class ExecutePlanResponseReattachableIterator private[client] (
         System.err.println(
           s"[WARN] [SparkConnect] releaseExecute async call failed: ${e.getMessage}"
         )
+
+object ExecutePlanResponseReattachableIterator:
+
+  /** Throw an `IllegalStateException` if a retry-eligible RPC failure surfaces after at least one
+    * response has already been delivered to user code. Replaying the stream would re-deliver
+    * `lastReturnedResponseId`'s prefix and double-consume any observable side effects in user
+    * business logic. Extracted as a pure helper so retry-guard semantics can be unit-tested without
+    * mocking a `ManagedChannel`.
+    */
+  private[client] def assertNoResponsesConsumedBeforeReExecute(
+      lastReturnedResponseId: Option[String],
+      cause: StatusRuntimeException
+  ): Unit =
+    if lastReturnedResponseId.isDefined then
+      throw IllegalStateException(
+        "OPERATION_NOT_FOUND/SESSION_NOT_FOUND on the server but responses were already " +
+          s"received from it (last response_id=${lastReturnedResponseId.get}). A full " +
+          "re-execute would duplicate observable side effects.",
+        cause
+      )

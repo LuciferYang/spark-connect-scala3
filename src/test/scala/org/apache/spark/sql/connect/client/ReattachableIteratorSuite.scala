@@ -1,5 +1,6 @@
 package org.apache.spark.sql.connect.client
 
+import io.grpc.{Status, StatusRuntimeException}
 import org.apache.spark.connect.proto.{ExecutePlanRequest, ReattachOptions}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -62,4 +63,27 @@ class ReattachableIteratorSuite extends AnyFunSuite with Matchers:
       .build()
     reattachOpt.hasReattachOptions shouldBe true
     reattachOpt.getReattachOptions.getReattachable shouldBe true
+  }
+
+  test("assertNoResponsesConsumedBeforeReExecute is no-op before any response is consumed") {
+    val cause = StatusRuntimeException(
+      Status.INTERNAL.withDescription("INVALID_HANDLE.OPERATION_NOT_FOUND")
+    )
+    // Should not throw — caller can safely re-execute.
+    ExecutePlanResponseReattachableIterator
+      .assertNoResponsesConsumedBeforeReExecute(None, cause)
+  }
+
+  test("assertNoResponsesConsumedBeforeReExecute fails after a response was already returned") {
+    val cause = StatusRuntimeException(
+      Status.INTERNAL.withDescription("INVALID_HANDLE.SESSION_NOT_FOUND")
+    )
+    val thrown = intercept[IllegalStateException] {
+      ExecutePlanResponseReattachableIterator
+        .assertNoResponsesConsumedBeforeReExecute(Some("resp-42"), cause)
+    }
+    thrown.getMessage should include("OPERATION_NOT_FOUND/SESSION_NOT_FOUND")
+    thrown.getMessage should include("resp-42")
+    thrown.getMessage should include("duplicate observable side effects")
+    thrown.getCause shouldBe cause
   }
