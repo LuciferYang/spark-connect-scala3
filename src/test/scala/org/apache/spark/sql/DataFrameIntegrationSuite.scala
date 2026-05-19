@@ -108,6 +108,23 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     assert(result.map(_.getLong(0)).toSet == Set(0L, 1L, 2L, 3L, 4L, 5L))
   }
 
+  // Regression: previously `union` / `unionAll` / `unionByName` did not pass `isAll = true` to the
+  // server, which silently applied Distinct. Overlapping inputs catch that — duplicates must
+  // survive (bag-union / SQL UNION ALL semantics).
+  test("union/unionAll/unionByName preserve duplicates (UNION ALL semantics)") {
+    val df1 = spark.range(0, 3).select(col("id").as("x"))
+    val df2 = spark.range(2, 5).select(col("id").as("x"))
+
+    val u  = df1.union(df2).collect().map(_.getLong(0)).sorted.toSeq
+    val ua = df1.unionAll(df2).collect().map(_.getLong(0)).sorted.toSeq
+    val ub = df1.unionByName(df2).collect().map(_.getLong(0)).sorted.toSeq
+
+    val expected = Seq(0L, 1L, 2L, 2L, 3L, 3L, 4L) // 2 and 3 appear twice
+    assert(u == expected)
+    assert(ua == expected)
+    assert(ub == expected)
+  }
+
   test("intersect and except") {
     val df1 = spark.range(5).select(col("id").as("x"))
     val df2 = spark.range(3, 8).select(col("id").as("x"))

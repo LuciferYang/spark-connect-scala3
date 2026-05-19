@@ -224,13 +224,22 @@ final class DataFrame private[sql] (
   def dropDuplicatesWithinWatermark(col1: String, cols: String*): DataFrame =
     dropDuplicatesWithinWatermark(col1 +: cols)
 
+  // Spark's `union` / `unionAll` / `unionByName` are bag-union — i.e. SQL UNION ALL semantics —
+  // and therefore must pass `isAll = true`. Omitting it lets the server apply Distinct and produces
+  // SQL UNION (deduplicated) instead, silently dropping duplicate rows.
   def union(other: DataFrame): DataFrame =
-    setOp(other, SetOperation.SetOpType.SET_OP_TYPE_UNION, byName = false)
+    setOp(other, SetOperation.SetOpType.SET_OP_TYPE_UNION, byName = false, isAll = true)
 
   def unionAll(other: DataFrame): DataFrame = union(other)
 
   def unionByName(other: DataFrame, allowMissingColumns: Boolean = false): DataFrame =
-    setOp(other, SetOperation.SetOpType.SET_OP_TYPE_UNION, byName = true, allowMissingColumns)
+    setOp(
+      other,
+      SetOperation.SetOpType.SET_OP_TYPE_UNION,
+      byName = true,
+      allowMissingColumns,
+      isAll = true
+    )
 
   def intersect(other: DataFrame): DataFrame =
     setOp(other, SetOperation.SetOpType.SET_OP_TYPE_INTERSECT, byName = false)

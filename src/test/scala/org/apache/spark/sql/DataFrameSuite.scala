@@ -828,7 +828,7 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
 
   // ---------- union ----------
 
-  test("union builds SetOperation UNION proto") {
+  test("union builds SetOperation UNION proto with isAll=true") {
     val df1 = testDf()
     val df2 = testDf()
     val result = df1.union(df2)
@@ -837,7 +837,8 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     val setOp = rel.getSetOp
     setOp.getSetOpType shouldBe SetOperation.SetOpType.SET_OP_TYPE_UNION
     setOp.getByName shouldBe false
-    setOp.getIsAll shouldBe false
+    // bag-union (SQL UNION ALL) — must preserve duplicates
+    setOp.getIsAll shouldBe true
   }
 
   // ---------- unionAll ----------
