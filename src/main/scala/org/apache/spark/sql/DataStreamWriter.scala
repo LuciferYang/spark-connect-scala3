@@ -8,6 +8,8 @@ import org.apache.spark.sql.connect.common.ForeachWriterPacket
 import org.apache.spark.sql.streaming.StreamingQueryListener.QueryStartedEvent
 import org.apache.spark.sql.types.NullType
 
+import java.util.Locale
+
 /** Trigger types for structured streaming queries. */
 sealed trait Trigger
 object Trigger:
@@ -45,7 +47,7 @@ final class DataStreamWriter private[sql] (private val df: DataFrame):
     this
 
   def outputMode(outputMode: streaming.OutputMode): DataStreamWriter =
-    this.outputMode(outputMode.toString)
+    this.outputMode(outputMode.toString.toLowerCase(Locale.ROOT))
 
   def trigger(t: Trigger): DataStreamWriter =
     triggerOpt = Some(t)

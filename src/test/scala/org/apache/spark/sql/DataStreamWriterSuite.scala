@@ -288,22 +288,32 @@ class DataStreamWriterSuite extends AnyFunSuite with Matchers:
 
   // ---------------------------------------------------------------------------
   // P1: outputMode(OutputMode) overload
+  //
+  // Must lowercase (Locale.ROOT) at the client to match upstream Spark Connect
+  // and the server's `InternalOutputModes.apply`, which strict-matches lower-cased
+  // input. R74 regression: typed overload previously sent PascalCase verbatim.
   // ---------------------------------------------------------------------------
 
-  test("outputMode(OutputMode.Append) sets 'Append'") {
+  test("outputMode(OutputMode.Append) sets 'append' (lowercased)") {
     val writer = DataStreamWriter(stubStreamDf)
     val proto = writer.outputMode(streaming.OutputMode.Append).buildWriteStreamOp().build()
-    proto.getOutputMode shouldBe "Append"
+    proto.getOutputMode shouldBe "append"
   }
 
-  test("outputMode(OutputMode.Update) sets 'Update'") {
+  test("outputMode(OutputMode.Update) sets 'update' (lowercased)") {
     val writer = DataStreamWriter(stubStreamDf)
     val proto = writer.outputMode(streaming.OutputMode.Update).buildWriteStreamOp().build()
-    proto.getOutputMode shouldBe "Update"
+    proto.getOutputMode shouldBe "update"
   }
 
-  test("outputMode(OutputMode.Complete) sets 'Complete'") {
+  test("outputMode(OutputMode.Complete) sets 'complete' (lowercased)") {
     val writer = DataStreamWriter(stubStreamDf)
     val proto = writer.outputMode(streaming.OutputMode.Complete).buildWriteStreamOp().build()
-    proto.getOutputMode shouldBe "Complete"
+    proto.getOutputMode shouldBe "complete"
+  }
+
+  test("outputMode(String) preserves case (only typed overload lowercases)") {
+    val writer = DataStreamWriter(stubStreamDf)
+    val proto = writer.outputMode("Append").buildWriteStreamOp().build()
+    proto.getOutputMode shouldBe "Append"
   }
