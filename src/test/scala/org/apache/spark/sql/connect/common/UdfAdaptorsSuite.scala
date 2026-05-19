@@ -125,6 +125,52 @@ class UdfAdaptorsSuite extends AnyFunSuite with Matchers:
   }
 
   // ---------------------------------------------------------------------------
+  // MapValuesCoGroupAdaptor
+  // ---------------------------------------------------------------------------
+
+  test("MapValuesCoGroupAdaptor passes through when neither side has mapValues") {
+    val adaptor = MapValuesCoGroupAdaptor[String, Int, Int, Int](
+      leftValueMapFunc = None,
+      rightValueMapFunc = None,
+      func = (_, l, r) => Iterator(l.sum + r.sum)
+    )
+    val result = adaptor("k", Iterator(1, 2, 3), Iterator(10, 20)).iterator.toList
+    result shouldBe List(36)
+  }
+
+  test("MapValuesCoGroupAdaptor applies left transform only") {
+    val adaptor = MapValuesCoGroupAdaptor[String, Int, Int, Int](
+      leftValueMapFunc = Some((v: Any) => v.asInstanceOf[Int] * 10),
+      rightValueMapFunc = None,
+      func = (_, l, r) => Iterator(l.sum + r.sum)
+    )
+    val result = adaptor("k", Iterator(1, 2), Iterator(100, 200)).iterator.toList
+    // left: 1*10 + 2*10 = 30; right: 100 + 200 = 300; total 330
+    result shouldBe List(330)
+  }
+
+  test("MapValuesCoGroupAdaptor applies right transform only") {
+    val adaptor = MapValuesCoGroupAdaptor[String, Int, Int, Int](
+      leftValueMapFunc = None,
+      rightValueMapFunc = Some((v: Any) => v.asInstanceOf[Int] + 1),
+      func = (_, l, r) => Iterator(l.sum + r.sum)
+    )
+    val result = adaptor("k", Iterator(1, 2), Iterator(10, 20)).iterator.toList
+    // left: 1+2=3; right: 11+21=32; total 35
+    result shouldBe List(35)
+  }
+
+  test("MapValuesCoGroupAdaptor applies transforms on both sides") {
+    val adaptor = MapValuesCoGroupAdaptor[String, String, String, String](
+      leftValueMapFunc = Some((v: Any) => s"L${v}"),
+      rightValueMapFunc = Some((v: Any) => s"R${v}"),
+      func = (k, l, r) => Iterator(s"$k=${l.toList.mkString(",")}|${r.toList.mkString(",")}")
+    )
+    val result = adaptor("g", Iterator(1, 2), Iterator(9, 8)).iterator.toList
+    result shouldBe List("g=L1,L2|R9,R8")
+  }
+
+  // ---------------------------------------------------------------------------
   // Serializable
   // ---------------------------------------------------------------------------
 
@@ -142,7 +188,12 @@ class UdfAdaptorsSuite extends AnyFunSuite with Matchers:
         (v: Any) => v,
         (_, iter) => iter.map(_.asInstanceOf[Int])
       ),
-      CoGroupAdaptor[String, Int, Int, Int]((_, l, r) => Iterator.empty)
+      CoGroupAdaptor[String, Int, Int, Int]((_, l, r) => Iterator.empty),
+      MapValuesCoGroupAdaptor[String, Int, Int, Int](
+        Some((v: Any) => v.asInstanceOf[Int]),
+        Some((v: Any) => v.asInstanceOf[Int]),
+        (_, l, r) => Iterator.empty
+      )
     )
 
     for adaptor <- adaptors do

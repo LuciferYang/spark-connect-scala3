@@ -18,6 +18,7 @@ import org.apache.spark.sql.connect.common.{
   CoGroupAdaptor,
   CountGroupsAdaptor,
   MapGroupsAdaptor,
+  MapValuesCoGroupAdaptor,
   MapValuesFlatMapAdaptor,
   ReduceGroupsAdaptor,
   UdfPacket
@@ -271,19 +272,34 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val outAg = outEnc.agnosticEncoder
     if keyAg == null || valueAg == null || otherValueAg == null || outAg == null then
       return cogroupLocal(other, func, outEnc)
-    val thisGroupingUdf = buildGroupingUdf(keyAg, valueAg)
-    val otherGroupingUdf = other.buildGroupingUdf(keyAg, otherValueAg)
+    // For mapValues-derived KVGDs, use the original relations and value encoders.
+    val thisInputRelation = originalRelation.getOrElse(ds.df.relation)
+    val otherInputRelation = other.originalRelation.getOrElse(other.ds.df.relation)
+    val thisInputValueAg =
+      originalValueEncoder.map(_.agnosticEncoder).getOrElse(valueAg)
+    val otherInputValueAg =
+      other.originalValueEncoder.map(_.agnosticEncoder).getOrElse(otherValueAg)
+    val thisGroupingUdf = buildGroupingUdf(keyAg, thisInputValueAg)
+    val otherGroupingUdf = other.buildGroupingUdf(keyAg, otherInputValueAg)
+    val effectiveFunc: AnyRef =
+      if mapValuesFunc.isDefined || other.mapValuesFunc.isDefined then
+        new MapValuesCoGroupAdaptor[K, V, U, R](
+          mapValuesFunc.map(_.asInstanceOf[Any => V]),
+          other.mapValuesFunc.map(_.asInstanceOf[Any => U]),
+          func
+        )
+      else new CoGroupAdaptor(func)
     val cogroupUdf = buildCoGroupUdf(
-      new CoGroupAdaptor(func).asInstanceOf[AnyRef],
+      effectiveFunc,
       keyAg,
-      valueAg,
-      otherValueAg,
+      thisInputValueAg,
+      otherInputValueAg,
       outAg
     )
     val builder = CoGroupMap
       .newBuilder()
-      .setInput(ds.df.relation)
-      .setOther(other.ds.df.relation)
+      .setInput(thisInputRelation)
+      .setOther(otherInputRelation)
       .addInputGroupingExpressions(
         Expression.newBuilder().setCommonInlineUserDefinedFunction(thisGroupingUdf).build()
       )
@@ -320,19 +336,34 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val outAg = outEnc.agnosticEncoder
     if keyAg == null || valueAg == null || otherValueAg == null || outAg == null then
       return cogroupLocal(other, func, outEnc)
-    val thisGroupingUdf = buildGroupingUdf(keyAg, valueAg)
-    val otherGroupingUdf = other.buildGroupingUdf(keyAg, otherValueAg)
+    // For mapValues-derived KVGDs, use the original relations and value encoders.
+    val thisInputRelation = originalRelation.getOrElse(ds.df.relation)
+    val otherInputRelation = other.originalRelation.getOrElse(other.ds.df.relation)
+    val thisInputValueAg =
+      originalValueEncoder.map(_.agnosticEncoder).getOrElse(valueAg)
+    val otherInputValueAg =
+      other.originalValueEncoder.map(_.agnosticEncoder).getOrElse(otherValueAg)
+    val thisGroupingUdf = buildGroupingUdf(keyAg, thisInputValueAg)
+    val otherGroupingUdf = other.buildGroupingUdf(keyAg, otherInputValueAg)
+    val effectiveFunc: AnyRef =
+      if mapValuesFunc.isDefined || other.mapValuesFunc.isDefined then
+        new MapValuesCoGroupAdaptor[K, V, U, R](
+          mapValuesFunc.map(_.asInstanceOf[Any => V]),
+          other.mapValuesFunc.map(_.asInstanceOf[Any => U]),
+          func
+        )
+      else new CoGroupAdaptor(func)
     val cogroupUdf = buildCoGroupUdf(
-      new CoGroupAdaptor(func).asInstanceOf[AnyRef],
+      effectiveFunc,
       keyAg,
-      valueAg,
-      otherValueAg,
+      thisInputValueAg,
+      otherInputValueAg,
       outAg
     )
     val builder = CoGroupMap
       .newBuilder()
-      .setInput(ds.df.relation)
-      .setOther(other.ds.df.relation)
+      .setInput(thisInputRelation)
+      .setOther(otherInputRelation)
       .addInputGroupingExpressions(
         Expression.newBuilder().setCommonInlineUserDefinedFunction(thisGroupingUdf).build()
       )

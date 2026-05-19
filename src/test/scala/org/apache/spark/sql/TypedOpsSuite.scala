@@ -1262,6 +1262,77 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     ) shouldBe true
   }
 
+  // -- KVGD.cogroup proto regressions for mapValues propagation --
+
+  test("KVGD.cogroup without mapValues sets CoGroupMap inputs to original relations") {
+    val left = stubDs.groupByKey(identity)
+    val right = stubDs.groupByKey(identity)
+    val result =
+      left.cogroup(right)((_, l, r) => Iterator(l.sum + r.sum))
+    result.df.relation.hasCoGroupMap shouldBe true
+    val cgm = result.df.relation.getCoGroupMap
+    // No mapValues on either side: inputs pass through as the original LocalRelation,
+    // not a derived MapPartitions relation.
+    cgm.getInput.hasLocalRelation shouldBe true
+    cgm.getOther.hasLocalRelation shouldBe true
+    cgm.hasFunc shouldBe true
+    cgm.getInputGroupingExpressionsCount shouldBe 1
+    cgm.getOtherGroupingExpressionsCount shouldBe 1
+  }
+
+  test("KVGD.cogroup with this-side mapValues propagates originalRelation, not MapPartitions") {
+    val left = stubDs.groupByKey(identity).mapValues(_ * 2)
+    val right = stubDs.groupByKey(identity)
+    val result =
+      left.cogroup(right)((_, l, r) => Iterator(l.sum + r.sum))
+    result.df.relation.hasCoGroupMap shouldBe true
+    val cgm = result.df.relation.getCoGroupMap
+    // The mapValues on the left would normally produce a MapPartitions relation —
+    // R49 fix routes it through originalRelation so the server sees the LocalRelation.
+    cgm.getInput.hasLocalRelation shouldBe true
+    cgm.getInput.hasMapPartitions shouldBe false
+    cgm.getOther.hasLocalRelation shouldBe true
+  }
+
+  test("KVGD.cogroup with other-side mapValues propagates originalRelation on other side") {
+    val left = stubDs.groupByKey(identity)
+    val right = stubDs.groupByKey(identity).mapValues(_ + 1)
+    val result =
+      left.cogroup(right)((_, l, r) => Iterator(l.sum + r.sum))
+    result.df.relation.hasCoGroupMap shouldBe true
+    val cgm = result.df.relation.getCoGroupMap
+    cgm.getInput.hasLocalRelation shouldBe true
+    cgm.getOther.hasLocalRelation shouldBe true
+    cgm.getOther.hasMapPartitions shouldBe false
+  }
+
+  test("KVGD.cogroup with mapValues on both sides propagates originalRelation on both sides") {
+    val left = stubDs.groupByKey(identity).mapValues(_ * 2)
+    val right = stubDs.groupByKey(identity).mapValues(_ + 10)
+    val result =
+      left.cogroup(right)((_, l, r) => Iterator(l.sum + r.sum))
+    result.df.relation.hasCoGroupMap shouldBe true
+    val cgm = result.df.relation.getCoGroupMap
+    cgm.getInput.hasLocalRelation shouldBe true
+    cgm.getOther.hasLocalRelation shouldBe true
+    cgm.getInput.hasMapPartitions shouldBe false
+    cgm.getOther.hasMapPartitions shouldBe false
+  }
+
+  test("KVGD.cogroupSorted with mapValues propagates originalRelation and records sort exprs") {
+    val left = stubDs.groupByKey(identity).mapValues(_ * 2)
+    val right = stubDs.groupByKey(identity)
+    val result = left.cogroupSorted(right)(Column("value").asc)(Column("value").desc)(
+      (_, l, r) => Iterator(l.sum + r.sum)
+    )
+    result.df.relation.hasCoGroupMap shouldBe true
+    val cgm = result.df.relation.getCoGroupMap
+    cgm.getInput.hasLocalRelation shouldBe true
+    cgm.getInput.hasMapPartitions shouldBe false
+    cgm.getInputSortingExpressionsCount shouldBe 1
+    cgm.getOtherSortingExpressionsCount shouldBe 1
+  }
+
   // -- KVGD buildGroupingUdf is accessible and correct --
 
   test("KVGD buildGroupingUdf produces correct proto") {

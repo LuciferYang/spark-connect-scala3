@@ -97,3 +97,27 @@ final class CoGroupAdaptor[K, V, U, R](
     with Serializable:
   def apply(k: K, left: Iterator[V], right: Iterator[U]): IterableOnce[R] =
     func(k, left, right)
+
+/** Adaptor for `KVGD.cogroup` after `mapValues` on either side — composes per-side value transforms
+  * with the user's cogroup function.
+  *
+  * After `mapValues(f)`, the CoGroupMap input/other relations still carry the original value types
+  * (`IV`, `IU`). The server deserializes each row as the original type, but the user function
+  * expects the post-`mapValues` types (`V`, `U`). This adaptor applies the appropriate value
+  * transform to each side's iterator before delegating to the user function. Mirrors upstream
+  * `ToScalaUDF.coGroupWithMappedValues` (sql/api ToScalaUDF.scala:815-829).
+  */
+final class MapValuesCoGroupAdaptor[K, V, U, R](
+    val leftValueMapFunc: Option[Any => V],
+    val rightValueMapFunc: Option[Any => U],
+    val func: (K, Iterator[V], Iterator[U]) => IterableOnce[R]
+) extends ((K, Iterator[Any], Iterator[Any]) => IterableOnce[R])
+    with Serializable:
+  def apply(k: K, left: Iterator[Any], right: Iterator[Any]): IterableOnce[R] =
+    val l: Iterator[V] = leftValueMapFunc match
+      case Some(m) => left.map(m)
+      case None    => left.asInstanceOf[Iterator[V]]
+    val r: Iterator[U] = rightValueMapFunc match
+      case Some(m) => right.map(m)
+      case None    => right.asInstanceOf[Iterator[U]]
+    func(k, l, r)
