@@ -113,6 +113,39 @@ object AgnosticEncoders:
         "UnboundRowEncoder"
       )
 
+  /** Encoder for [[org.apache.spark.sql.Row]] bound to a specific schema, produced by
+    * `Encoders.row(schema)` and `RowEncoder.encoderFor(schema)`. The `fields` describe the row's
+    * column names, types, and nullability; the resulting `dataType` is the corresponding
+    * [[StructType]].
+    *
+    * On the server, the proxy reconstructs the upstream
+    * `AgnosticEncoders.RowEncoder(Seq[EncoderField])` via reflection — the EncoderField proxies
+    * carry the per-field encoder shape and metadata.
+    */
+  @SerialVersionUID(1L)
+  case class RowEncoder(fields: Seq[EncoderField])
+      extends AgnosticEncoder[org.apache.spark.sql.Row]
+      with Serializable:
+    override def isPrimitive: Boolean = false
+    override def dataType: DataType =
+      StructType(fields.map(f => StructField(f.name, f.enc.dataType, f.nullable)))
+    override val clsTag: ClassTag[org.apache.spark.sql.Row] =
+      ClassTag(classOf[org.apache.spark.sql.Row])
+    @throws[ObjectStreamException]
+    private def writeReplace(): AnyRef =
+      RowEncoderProxy(
+        fields.map(f =>
+          EncoderFieldProxy(
+            f.name,
+            f.enc,
+            f.nullable,
+            f.metadata.json,
+            f.readMethod,
+            f.writeMethod
+          ): AnyRef
+        ).toArray
+      )
+
   // ---------------------------------------------------------------------------
   // Parameterized Encoders (Date, Timestamp, Decimal, etc.)
   // ---------------------------------------------------------------------------
@@ -210,6 +243,18 @@ object AgnosticEncoders:
 
   case object YearMonthIntervalEncoder
       extends LeafEncoder[java.time.Period](YearMonthIntervalType, "YearMonthIntervalEncoder")
+
+  /** Encoder for the `Variant` semi-structured type. The element class is SC3's vendored
+    * [[org.apache.spark.sql.types.VariantVal]]; the upstream server uses
+    * `org.apache.spark.unsafe.types.VariantVal`, but the proxy resolves to the server's
+    * `VariantEncoder` singleton via its `MODULE$` field, so the divergence in element class on the
+    * client side is irrelevant to wire compatibility.
+    */
+  case object VariantEncoder
+      extends LeafEncoder[org.apache.spark.sql.types.VariantVal](
+        VariantType,
+        "VariantEncoder"
+      )
 
   case class CharEncoder(length: Int)
       extends LeafEncoder[String](CharType(length), "CharEncoder"):
@@ -775,3 +820,31 @@ final class UDTEncoderProxy(
         throw ClassNotFoundException(s"No UDTEncoder constructor found")
       )
     ctor.newInstance(udt, udtClass)
+
+/** Serialization proxy for [[AgnosticEncoders.RowEncoder]] (the schema-bound row encoder produced
+  * by `Encoders.row(schema)`).
+  *
+  * Carries an array of `EncoderFieldProxy` instances; on the server side, `readResolve` reconstructs
+  * the upstream `AgnosticEncoders.RowEncoder(Seq[EncoderField])` case class via reflection.
+  */
+@SerialVersionUID(1L)
+final class RowEncoderProxy(
+    val fields: Array[AnyRef]
+) extends Serializable:
+  @throws[ObjectStreamException]
+  private def readResolve(): AnyRef =
+    val cl = getClass.getClassLoader match
+      case null => ClassLoader.getSystemClassLoader
+      case c    => Option(c.getParent).getOrElse(c)
+    val resolvedFields = fields.toSeq
+    val reClass = Class.forName(
+      "org.apache.spark.sql.catalyst.encoders.AgnosticEncoders$RowEncoder",
+      true,
+      cl
+    )
+    val ctor = reClass.getConstructors
+      .find(_.getParameterCount == 1)
+      .getOrElse(
+        throw ClassNotFoundException("No 1-arg constructor for RowEncoder")
+      )
+    ctor.newInstance(resolvedFields)

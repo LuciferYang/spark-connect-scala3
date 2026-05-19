@@ -202,6 +202,15 @@ object Encoders:
 
   def row: Encoder[Row] = wrap(AgnosticEncoders.UnboundRowEncoder)
 
+  /** Build a `Row` encoder bound to the given schema.
+    *
+    * Mirrors upstream `Encoders.row(schema)` — the resulting encoder reports `schema` as its
+    * structural type, and the underlying [[AgnosticEncoders.RowEncoder]] is reconstructed on the
+    * server (Scala 2.13) via the proxy graph defined alongside it.
+    */
+  def row(schema: StructType): Encoder[Row] =
+    wrap(org.apache.spark.sql.catalyst.encoders.RowEncoder.encoderFor(schema))
+
   // -- Tuple encoders -------------------------------------------------------
 
   def tuple[T1](e1: Encoder[T1]): Encoder[Tuple1[T1]] =

@@ -167,6 +167,69 @@ class EncodersSuite extends AnyFunSuite with Matchers:
     enc.agnosticEncoder shouldBe UnboundRowEncoder
   }
 
+  test("row(schema) returns schema-bound RowEncoder for primitive fields") {
+    val schema = StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("name", StringType, nullable = true)
+    ))
+    val enc = Encoders.row(schema)
+    enc should not be null
+    val ae = enc.agnosticEncoder.asInstanceOf[RowEncoder]
+    ae.dataType shouldBe schema
+    ae.fields should have size 2
+    ae.fields(0).name shouldBe "id"
+    ae.fields(0).enc shouldBe BoxedIntEncoder
+    ae.fields(0).nullable shouldBe false
+    ae.fields(1).name shouldBe "name"
+    ae.fields(1).enc shouldBe StringEncoder
+    ae.fields(1).nullable shouldBe true
+  }
+
+  test("row(schema) handles nested struct, array, and map types") {
+    val nested = StructType(Seq(StructField("inner", DoubleType)))
+    val schema = StructType(Seq(
+      StructField("nested", nested),
+      StructField("arr", ArrayType(LongType, containsNull = true)),
+      StructField("m", MapType(StringType, BooleanType, valueContainsNull = false))
+    ))
+    val enc = Encoders.row(schema)
+    val ae = enc.agnosticEncoder.asInstanceOf[RowEncoder]
+    ae.fields(0).enc shouldBe a[RowEncoder]
+    ae.fields(1).enc shouldBe a[IterableEncoder[?, ?]]
+    ae.fields(2).enc shouldBe a[MapEncoder[?, ?, ?]]
+  }
+
+  test("row(schema) maps decimal, timestamp, and date types") {
+    val schema = StructType(Seq(
+      StructField("price", DecimalType(10, 2)),
+      StructField("ts", TimestampType),
+      StructField("d", DateType)
+    ))
+    val enc = Encoders.row(schema)
+    val ae = enc.agnosticEncoder.asInstanceOf[RowEncoder]
+    ae.fields(0).enc shouldBe a[JavaDecimalEncoder]
+    ae.fields(1).enc shouldBe a[TimestampEncoder]
+    ae.fields(2).enc shouldBe a[DateEncoder]
+  }
+
+  test("row(schema) maps spatial and UDT types") {
+    val schema = StructType(Seq(
+      StructField("geom", GeometryType()),
+      StructField("geog", GeographyType())
+    ))
+    val enc = Encoders.row(schema)
+    val ae = enc.agnosticEncoder.asInstanceOf[RowEncoder]
+    ae.fields(0).enc shouldBe a[GeometryEncoder]
+    ae.fields(1).enc shouldBe a[GeographyEncoder]
+  }
+
+  test("row(schema) throws for unsupported types") {
+    val schema = StructType(Seq(StructField("ci", CalendarIntervalType)))
+    assertThrows[UnsupportedOperationException] {
+      Encoders.row(schema)
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Tuple encoders
   // ---------------------------------------------------------------------------
