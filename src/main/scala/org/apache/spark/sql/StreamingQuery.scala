@@ -1,6 +1,9 @@
 package org.apache.spark.sql
 
+import scala.jdk.CollectionConverters.*
+
 import org.apache.spark.connect.proto.*
+import org.apache.spark.sql.streaming.{StreamingQueryProgress, StreamingQueryStatus}
 
 /** Handle to a streaming query, used to manage its lifecycle.
   *
@@ -46,23 +49,29 @@ final class StreamingQuery private[sql] (
     executeQueryCmd(_.setProcessAllAvailable(true))
     ()
 
-  /** Returns the most recent progress updates as JSON strings. */
-  def recentProgress: Seq[String] =
+  /** Returns the most recent progress updates. */
+  def recentProgress: Array[StreamingQueryProgress] =
     val result = executeQueryCmd(_.setRecentProgress(true))
-    import scala.jdk.CollectionConverters.*
-    result.getRecentProgress.getRecentProgressJsonList.asScala.toSeq
+    result.getRecentProgress.getRecentProgressJsonList.asScala
+      .map(StreamingQueryProgress.fromJson)
+      .toArray
 
-  /** Returns the most recent progress update as a JSON string, if any. */
-  def lastProgress: Option[String] =
+  /** Returns the most recent progress update, or `null` if no progress has been recorded. */
+  def lastProgress: StreamingQueryProgress =
     val result = executeQueryCmd(_.setLastProgress(true))
     val progresses = result.getRecentProgress.getRecentProgressJsonList
-    if progresses.isEmpty then None
-    else Some(progresses.get(progresses.size() - 1))
+    if progresses.isEmpty then null
+    else StreamingQueryProgress.fromJson(progresses.get(progresses.size() - 1))
 
   /** Returns the current status of the query. */
-  def status: StreamingQueryCommandResult.StatusResult =
+  def status: StreamingQueryStatus =
     val result = executeQueryCmd(_.setStatus(true))
-    result.getStatus
+    val s = result.getStatus
+    new StreamingQueryStatus(
+      message = s.getStatusMessage,
+      isDataAvailable = s.getIsDataAvailable,
+      isTriggerActive = s.getIsTriggerActive
+    )
 
   /** Explain the query plan. */
   def explain(): Unit = explain(extended = false)

@@ -452,7 +452,7 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
   // P1: textFile convenience method
   // ---------------------------------------------------------------------------
 
-  test("read.textFile selects value column") {
+  test("read.textFile returns Dataset[String] of file lines") {
     withTempDir { dir =>
       val path = dir.resolve("data.text").toString
       val textDf = spark.createDataFrame(
@@ -460,11 +460,10 @@ class ReadWriteIntegrationSuite extends IntegrationTestBase:
         StructType(Seq(StructField("value", StringType)))
       )
       textDf.write.text(path)
-      val result = spark.read.textFile(path).orderBy(col("value")).collect()
+      val result: Array[String] = spark.read.textFile(path).orderBy(col("value")).collect()
       assert(result.length == 3)
-      // textFile returns DataFrame with single "value" column
-      assert(result(0).getString(0) == "hello")
-      assert(result(2).getString(0) == "world")
+      assert(result(0) == "hello")
+      assert(result(2) == "world")
     }
   }
 

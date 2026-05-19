@@ -127,11 +127,19 @@ class DataStreamReaderSuite extends AnyFunSuite with Matchers:
     read.getDataSource.getPaths(0) shouldBe "/data/stream.xml"
   }
 
-  test("textFile(path) sets format to text and selects value column") {
+  test("textFile(path) returns Dataset[String] backed by Project") {
     val spark = session
-    val df = spark.readStream.textFile("/data/stream.txt")
-    val rel = df.relation
+    val ds = spark.readStream.textFile("/data/stream.txt")
+    ds shouldBe a[Dataset[?]]
+    val rel = ds.toDF().relation
     rel.hasProject shouldBe true
+  }
+
+  test("textFile rejects user-specified schema") {
+    val spark = session
+    intercept[IllegalArgumentException] {
+      spark.readStream.schema("value STRING").textFile("/data/stream.txt")
+    }
   }
 
   test("typed option overloads set options correctly") {

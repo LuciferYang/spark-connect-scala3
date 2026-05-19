@@ -72,8 +72,12 @@ final class DataStreamReader private[sql] (private val session: SparkSession):
 
   def xml(path: String): DataFrame = format("xml").load(path)
 
-  def textFile(path: String): DataFrame =
-    text(path).select(Column("value"))
+  def textFile(path: String): Dataset[String] =
+    if userSchema.isDefined then
+      throw IllegalArgumentException(
+        "User specified schema not supported with `textFile`"
+      )
+    text(path).select(Column("value")).as[String]
 
   def table(tableName: String): DataFrame =
     DataFrame(

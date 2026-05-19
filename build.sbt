@@ -33,6 +33,7 @@ val ammoniteVersion = "3.0.9"
 val zstdVersion = "1.5.7-8"
 val asmVersion = "9.9.1"
 val scalatestVersion = "3.2.19"
+val jacksonVersion = "2.21.0"
 
 // The Spark Connect server version this client is built and tested against.
 // Encoded in the artifactId so users know which server version to target.
@@ -82,6 +83,10 @@ lazy val root = (project in file("."))
         // Apache Arrow for data transfer
         "org.apache.arrow" % "arrow-vector" % arrowVersion,
         "org.apache.arrow" % "arrow-memory-netty" % arrowVersion,
+
+        // Jackson for streaming progress JSON parsing (already transitive via Arrow,
+        // but pinned explicitly to avoid hidden coupling to Arrow's version).
+        "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,
 
         // Zstandard for plan compression
         "com.github.luben" % "zstd-jni" % zstdVersion,

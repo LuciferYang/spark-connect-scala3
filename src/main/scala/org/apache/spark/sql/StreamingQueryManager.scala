@@ -23,12 +23,16 @@ final class StreamingQueryManager private[sql] (private val session: SparkSessio
       StreamingQuery(session, qi.getId.getId, qi.getId.getRunId, name)
     }.toSeq
 
-  /** Returns the streaming query identified by the given id. */
+  /** Returns the streaming query identified by the given id, or `null` if not found. Matches the
+    * upstream `StreamingQueryManager.get` contract.
+    */
   def get(id: String): StreamingQuery =
     val result = executeManagerCmd(_.setGetQuery(id))
-    val qi = result.getQuery
-    val name = if qi.hasName then Some(qi.getName) else None
-    StreamingQuery(session, qi.getId.getId, qi.getId.getRunId, name)
+    if !result.hasQuery then null
+    else
+      val qi = result.getQuery
+      val name = if qi.hasName then Some(qi.getName) else None
+      StreamingQuery(session, qi.getId.getId, qi.getId.getRunId, name)
 
   /** Block until any streaming query terminates. */
   def awaitAnyTermination(): Unit =
