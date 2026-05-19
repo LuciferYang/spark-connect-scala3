@@ -1,7 +1,6 @@
 package org.apache.spark.sql
 
 import java.util.UUID
-import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{Await, Future, Promise}
 import scala.concurrent.duration.Duration
@@ -34,30 +33,32 @@ final class Observation(val name: String):
 
   /** Get the observed metrics as a `Map[String, Any]`.
     *
-    * Blocks until the first action on the observed dataset completes.
+    * Blocks until the first action on the observed dataset completes. Matches upstream
+    * `Observation.get`, which waits indefinitely; callers that need a bounded wait should use
+    * `future` directly.
     */
   @throws[InterruptedException]
-  @throws[TimeoutException]
   def get: Map[String, Any] =
-    val row =
-      try Await.result(future, Observation.ObservationTimeout)
-      catch
-        case _: TimeoutException =>
-          throw TimeoutException(
-            s"Observation '$name' timed out after ${Observation.ObservationTimeout} waiting for metrics"
-          )
+    val row = Await.result(future, Duration.Inf)
     if row == null then Map.empty
     else
+      // Metric rows are always constructed via `Row.fromSeqWithSchema`
+      // (see DataFrame.executeAndCollect), so `row.schema` should always be defined. A `None`
+      // here would indicate a server-side regression — fail loudly rather than silently returning
+      // an empty map and pretending no metrics exist.
       row.schema match
         case Some(s) => row.getValuesMap[Any](s.fields.map(_.name).toSeq)
-        case None    => Map.empty
+        case None    =>
+          throw IllegalStateException(
+            s"Observation '$name' received a metrics row without a schema; " +
+              "this should never happen — please file a bug report."
+          )
 
   /** Get the observed metrics as a `java.util.Map[String, Any]`.
     *
     * Java-friendly variant of `get`. Blocks until the first action completes.
     */
   @throws[InterruptedException]
-  @throws[TimeoutException]
   def getAsJava: java.util.Map[String, Any] =
     import scala.jdk.CollectionConverters.*
     get.asJava
@@ -81,8 +82,5 @@ final class Observation(val name: String):
   @volatile private[sql] var planId: Long = -1L
 
 object Observation:
-  /** Maximum time to wait for observation metrics (10 minutes). */
-  private val ObservationTimeout: Duration = Duration(10, "minutes")
-
   def apply(): Observation = Observation(UUID.randomUUID().toString)
   def apply(name: String): Observation = new Observation(name)

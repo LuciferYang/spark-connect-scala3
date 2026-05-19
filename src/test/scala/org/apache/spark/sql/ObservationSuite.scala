@@ -58,11 +58,15 @@ class ObservationSuite extends AnyFunSuite with Matchers:
     result("max_id") shouldBe 42
   }
 
-  test("Observation.get returns empty map when no schema") {
+  test("Observation.get throws IllegalStateException when metric row has no schema") {
+    // The setMetrics path is fed by DataFrame.executeAndCollect, which always uses
+    // Row.fromSeqWithSchema — so a schemaless row indicates a server-side regression and
+    // we fail loudly rather than silently returning an empty map.
     val obs = Observation("no-schema")
     obs.setMetrics(Row(1, 2, 3))
-    val result = obs.get
-    result shouldBe empty
+    val ex = intercept[IllegalStateException](obs.get)
+    ex.getMessage should include("no-schema")
+    ex.getMessage should include("metrics row without a schema")
   }
 
   test("Observation companion apply methods") {
