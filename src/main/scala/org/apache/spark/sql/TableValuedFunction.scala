@@ -22,12 +22,12 @@ class TableValuedFunction private[sql] (sparkSession: SparkSession):
   // Range (delegates to SparkSession.range)
   // ---------------------------------------------------------------------------
 
-  def range(end: Long): DataFrame = sparkSession.range(end)
+  def range(end: Long): DataFrame = sparkSession.range(end).toDF()
 
-  def range(start: Long, end: Long): DataFrame = sparkSession.range(start, end)
+  def range(start: Long, end: Long): DataFrame = sparkSession.range(start, end).toDF()
 
   def range(start: Long, end: Long, step: Long): DataFrame =
-    sparkSession.range(start, end, step)
+    sparkSession.range(start, end, step).toDF()
 
   // ---------------------------------------------------------------------------
   // Explode family

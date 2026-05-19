@@ -177,8 +177,8 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
 
   test("range(end) builds Range with start=0, step=1") {
     val session = stubSession
-    val df = session.range(10)
-    val rel = df.relation
+    val ds = session.range(10)
+    val rel = ds.df.relation
     rel.hasRange shouldBe true
     val range = rel.getRange
     range.getStart shouldBe 0
@@ -188,8 +188,8 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
 
   test("range(start, end) builds Range Relation") {
     val session = stubSession
-    val df = session.range(5, 100)
-    val range = df.relation.getRange
+    val ds = session.range(5, 100)
+    val range = ds.df.relation.getRange
     range.getStart shouldBe 5
     range.getEnd shouldBe 100
     range.getStep shouldBe 1
@@ -197,8 +197,8 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
 
   test("range(start, end, step) builds Range Relation with step") {
     val session = stubSession
-    val df = session.range(0, 100, 10)
-    val range = df.relation.getRange
+    val ds = session.range(0, 100, 10)
+    val range = ds.df.relation.getRange
     range.getStart shouldBe 0
     range.getEnd shouldBe 100
     range.getStep shouldBe 10
@@ -206,8 +206,8 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
 
   test("range(start, end, step, numPartitions) builds Range with partitions") {
     val session = stubSession
-    val df = session.range(0, 100, 5, 4)
-    val range = df.relation.getRange
+    val ds = session.range(0, 100, 5, 4)
+    val range = ds.df.relation.getRange
     range.getStart shouldBe 0
     range.getEnd shouldBe 100
     range.getStep shouldBe 5
@@ -220,6 +220,20 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
     assert(ex1.getMessage.contains("step must not be zero"))
     val ex2 = intercept[IllegalArgumentException](session.range(0, 10, 0, 4))
     assert(ex2.getMessage.contains("step must not be zero"))
+  }
+
+  test("range returns typed Dataset[java.lang.Long]") {
+    val session = stubSession
+    val ds: Dataset[java.lang.Long] = session.range(10)
+    ds shouldBe a[Dataset[?]]
+    ds.encoder.agnosticEncoder shouldBe Encoders.LONG.agnosticEncoder
+  }
+
+  test("range(start, end) does not set NumPartitions on proto") {
+    val session = stubSession
+    val ds = session.range(0, 100)
+    val range = ds.df.relation.getRange
+    range.hasNumPartitions shouldBe false
   }
 
   // ---------- emptyDataFrame ----------
@@ -355,9 +369,9 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
 
   test("range produces DataFrame with increasing plan IDs") {
     val session = stubSession
-    val df1 = session.range(10)
-    val df2 = session.range(20)
-    df2.relation.getCommon.getPlanId shouldBe >(df1.relation.getCommon.getPlanId)
+    val ds1 = session.range(10)
+    val ds2 = session.range(20)
+    ds2.df.relation.getCommon.getPlanId shouldBe >(ds1.df.relation.getCommon.getPlanId)
   }
 
   test("table produces DataFrame with plan ID") {
@@ -543,8 +557,8 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
 
   test("range with negative step") {
     val session = stubSession
-    val df = session.range(100, 0, -1)
-    val range = df.relation.getRange
+    val ds = session.range(100, 0, -1)
+    val range = ds.df.relation.getRange
     range.getStart shouldBe 100
     range.getEnd shouldBe 0
     range.getStep shouldBe -1
@@ -552,8 +566,8 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
 
   test("range(0) builds Range with start=0, end=0") {
     val session = stubSession
-    val df = session.range(0)
-    val range = df.relation.getRange
+    val ds = session.range(0)
+    val range = ds.df.relation.getRange
     range.getStart shouldBe 0
     range.getEnd shouldBe 0
     range.getStep shouldBe 1

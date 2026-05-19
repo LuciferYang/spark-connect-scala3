@@ -25,7 +25,7 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   // ---------------------------------------------------------------------------
 
   test("range and collect") {
-    val df = spark.range(10)
+    val df = spark.range(10).toDF()
     val rows = df.collect()
     assert(rows.length == 10)
     assert(rows.head.getLong(0) == 0L)
@@ -302,14 +302,14 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   }
 
   test("first and head") {
-    val df = spark.range(5)
+    val df = spark.range(5).toDF()
     assert(df.first().getLong(0) == 0L)
     assert(df.head().length == 1)
     assert(df.head(3).length == 3)
   }
 
   test("take and tail") {
-    val df = spark.range(10).orderBy(col("id"))
+    val df = spark.range(10).toDF().orderBy(col("id"))
     val taken = df.take(3)
     assert(taken.length == 3)
     assert(taken.map(_.getLong(0)).toSeq == Seq(0L, 1L, 2L))
@@ -320,7 +320,7 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   }
 
   test("limit and offset") {
-    val df = spark.range(10).orderBy(col("id"))
+    val df = spark.range(10).toDF().orderBy(col("id"))
     val limited = df.limit(3).collect()
     assert(limited.length == 3)
     assert(limited.map(_.getLong(0)).toSeq == Seq(0L, 1L, 2L))
@@ -356,7 +356,7 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   }
 
   test("toLocalIterator") {
-    val df = spark.range(5).orderBy(col("id"))
+    val df = spark.range(5).toDF().orderBy(col("id"))
     val iter = df.toLocalIterator()
     try
       val collected = scala.collection.mutable.ArrayBuffer.empty[Long]
@@ -404,7 +404,7 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   }
 
   test("where with string expression") {
-    val df = spark.range(10)
+    val df = spark.range(10).toDF()
     val result = df.where("id >= 8").orderBy(col("id")).collect()
     assert(result.length == 2)
     assert(result(0).getLong(0) == 8L)
@@ -887,7 +887,7 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   // --- Actions: collectAsList / takeAsList ---
 
   test("collectAsList") {
-    val df = spark.range(5)
+    val df = spark.range(5).toDF()
     val list = df.collectAsList()
     assert(list.size() == 5)
     assert(list.get(0).getLong(0) == 0L)
@@ -950,7 +950,7 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   // --- Misc: where(Column) / drop(Column*) / withMetadata ---
 
   test("where with Column condition") {
-    val df = spark.range(10)
+    val df = spark.range(10).toDF()
     val result = df.where(col("id") >= lit(8)).orderBy(col("id")).collect()
     assert(result.length == 2)
     assert(result(0).getLong(0) == 8L)
@@ -1030,7 +1030,7 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   // --- zipWithIndex ---
 
   test("zipWithIndex") {
-    val df = spark.range(5)
+    val df = spark.range(5).toDF()
     val result = df.zipWithIndex
     assert(result.columns.contains("index"))
     assert(result.count() == 5L)
@@ -1071,13 +1071,13 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   // ---------------------------------------------------------------------------
 
   test("functions.broadcast returns a DataFrame with broadcast hint") {
-    val df = spark.range(10)
+    val df = spark.range(10).toDF()
     val broadcasted = functions.broadcast(df)
     assert(broadcasted.count() == 10L)
   }
 
   test("DataFrame.broadcast returns a DataFrame with broadcast hint") {
-    val df = spark.range(10)
+    val df = spark.range(10).toDF()
     val broadcasted = df.broadcast
     assert(broadcasted.count() == 10L)
   }

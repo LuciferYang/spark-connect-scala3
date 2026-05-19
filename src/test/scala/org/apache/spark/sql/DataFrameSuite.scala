@@ -316,8 +316,8 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
 
   test("range with numPartitions builds Range proto with num_partitions") {
     val session = SparkSession(null)
-    val df = session.range(0, 100, 1, 4)
-    val rel = df.relation
+    val ds = session.range(0, 100, 1, 4)
+    val rel = ds.df.relation
     rel.hasRange shouldBe true
     val range = rel.getRange
     range.getStart shouldBe 0

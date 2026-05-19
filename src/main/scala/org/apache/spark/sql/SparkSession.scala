@@ -119,29 +119,38 @@ final class SparkSession private[sql] (
         .build()
     )
 
-  def range(end: Long): DataFrame = range(0, end, 1)
+  /** Create a `Dataset[java.lang.Long]` with elements `[0, end)` step 1.
+    *
+    * Returns typed `Dataset[java.lang.Long]` matching upstream Spark contract — supports typed
+    * pipelines like `spark.range(10).map(x => x * 2)` directly.
+    */
+  def range(end: Long): Dataset[java.lang.Long] = range(0, end, 1, None)
 
-  def range(start: Long, end: Long, step: Long = 1): DataFrame =
-    require(step != 0, "step must not be zero")
-    DataFrame(
-      this,
-      Relation.newBuilder()
-        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-        .setRange(Range.newBuilder()
-          .setStart(start).setEnd(end).setStep(step).build())
-        .build()
-    )
+  /** Create a `Dataset[java.lang.Long]` with elements `[start, end)` step 1. */
+  def range(start: Long, end: Long): Dataset[java.lang.Long] = range(start, end, 1, None)
 
-  def range(start: Long, end: Long, step: Long, numPartitions: Int): DataFrame =
+  /** Create a `Dataset[java.lang.Long]` with elements `[start, end)` and the given step. */
+  def range(start: Long, end: Long, step: Long): Dataset[java.lang.Long] =
+    range(start, end, step, None)
+
+  /** Create a `Dataset[java.lang.Long]` with elements `[start, end)`, given step, and partitions. */
+  def range(start: Long, end: Long, step: Long, numPartitions: Int): Dataset[java.lang.Long] =
+    range(start, end, step, Some(numPartitions))
+
+  private def range(
+      start: Long,
+      end: Long,
+      step: Long,
+      numPartitions: Option[Int]
+  ): Dataset[java.lang.Long] =
     require(step != 0, "step must not be zero")
-    DataFrame(
-      this,
-      Relation.newBuilder()
-        .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
-        .setRange(Range.newBuilder()
-          .setStart(start).setEnd(end).setStep(step).setNumPartitions(numPartitions).build())
-        .build()
-    )
+    val rangeBuilder = Range.newBuilder().setStart(start).setEnd(end).setStep(step)
+    numPartitions.foreach(rangeBuilder.setNumPartitions)
+    val rel = Relation.newBuilder()
+      .setCommon(RelationCommon.newBuilder().setPlanId(nextPlanId()).build())
+      .setRange(rangeBuilder.build())
+      .build()
+    Dataset(DataFrame(this, rel), Encoders.LONG)
 
   def emptyDataset[T: Encoder: scala.reflect.ClassTag]: Dataset[T] =
     val enc = summon[Encoder[T]]
