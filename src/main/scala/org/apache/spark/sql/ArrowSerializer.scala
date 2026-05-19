@@ -24,6 +24,7 @@ import org.apache.arrow.vector.types.FloatingPointPrecision
 import org.apache.arrow.vector.types.pojo.{ArrowType, Field, FieldType, Schema as ArrowSchema}
 
 import java.io.ByteArrayOutputStream
+import java.nio.charset.StandardCharsets
 import scala.jdk.CollectionConverters.*
 
 /** Encodes Row sequences into Arrow IPC byte arrays. */
@@ -169,7 +170,7 @@ private[sql] object ArrowSerializer:
         case v: BigIntVector   => v.setSafe(idx, value.asInstanceOf[Long])
         case v: Float4Vector   => v.setSafe(idx, value.asInstanceOf[Float])
         case v: Float8Vector   => v.setSafe(idx, value.asInstanceOf[Double])
-        case v: VarCharVector  => v.setSafe(idx, value.toString.getBytes("UTF-8"))
+        case v: VarCharVector  => v.setSafe(idx, value.toString.getBytes(StandardCharsets.UTF_8))
         case v: DateDayVector  =>
           val epochDay = value match
             case d: java.sql.Date        => d.toLocalDate.toEpochDay.toInt
@@ -231,7 +232,7 @@ private[sql] object ArrowSerializer:
                 case b: Byte    => listWriter.tinyInt().writeTinyInt(b)
                 case b: Boolean => listWriter.bit().writeBit(if b then 1 else 0)
                 case s: String  =>
-                  val bytes = s.getBytes("UTF-8")
+                  val bytes = s.getBytes(StandardCharsets.UTF_8)
                   val buf = v.getAllocator.buffer(bytes.length)
                   try
                     buf.writeBytes(bytes)
