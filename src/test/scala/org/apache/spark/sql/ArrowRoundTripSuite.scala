@@ -203,3 +203,47 @@ class ArrowRoundTripSuite
       assertRoundTrip(rows, schema)
     }
   }
+
+  test("round-trip: ArrayType[Date] (non-null elements)") {
+    val genArrayCol = Gen.listOf(Gen.listOf(genDate))
+    forAll(genArrayCol) { lists =>
+      val schema = StructType(Seq(
+        StructField("arr", ArrayType(DateType, containsNull = true), nullable = false)
+      ))
+      val rows = lists.map(xs => Row(xs.toSeq))
+      assertRoundTrip(rows, schema)
+    }
+  }
+
+  test("round-trip: ArrayType[Timestamp] (non-null elements)") {
+    val genArrayCol = Gen.listOf(Gen.listOf(genTimestamp))
+    forAll(genArrayCol) { lists =>
+      val schema = StructType(Seq(
+        StructField("arr", ArrayType(TimestampType, containsNull = true), nullable = false)
+      ))
+      val rows = lists.map(xs => Row(xs.toSeq))
+      assertRoundTrip(rows, schema)
+    }
+  }
+
+  test("round-trip: ArrayType[Decimal(10,2)] (non-null elements)") {
+    val genArrayCol = Gen.listOf(Gen.listOf(genDecimal))
+    forAll(genArrayCol) { lists =>
+      val schema = StructType(Seq(
+        StructField("arr", ArrayType(DecimalType(10, 2), containsNull = true), nullable = false)
+      ))
+      val rows = lists.map(xs => Row(xs.toSeq))
+      assertRoundTrip(rows, schema)
+    }
+  }
+
+  test("round-trip: ArrayType[Binary] (non-null elements)") {
+    val genArrayCol = Gen.listOf(Gen.listOf(genBinary))
+    forAll(genArrayCol) { lists =>
+      val schema = StructType(Seq(
+        StructField("arr", ArrayType(BinaryType, containsNull = true), nullable = false)
+      ))
+      val rows = lists.map(xs => Row(xs.toSeq))
+      assertRoundTrip(rows, schema)
+    }
+  }

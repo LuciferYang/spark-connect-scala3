@@ -217,34 +217,22 @@ private[sql] object ArrowSerializer:
             case _ =>
               throw IllegalArgumentException(s"Cannot convert ${value.getClass} to Map")
         case v: ListVector =>
-          val listWriter = v.getWriter
-          listWriter.setPosition(idx)
-          listWriter.startList()
-          val writeItem = (item: Any) =>
-            if item == null then listWriter.writeNull()
-            else
-              item match
-                case i: Int     => listWriter.integer().writeInt(i)
-                case l: Long    => listWriter.bigInt().writeBigInt(l)
-                case d: Double  => listWriter.float8().writeFloat8(d)
-                case f: Float   => listWriter.float4().writeFloat4(f)
-                case s: Short   => listWriter.smallInt().writeSmallInt(s)
-                case b: Byte    => listWriter.tinyInt().writeTinyInt(b)
-                case b: Boolean => listWriter.bit().writeBit(if b then 1 else 0)
-                case s: String  =>
-                  val bytes = s.getBytes(StandardCharsets.UTF_8)
-                  val buf = v.getAllocator.buffer(bytes.length)
-                  try
-                    buf.writeBytes(bytes)
-                    listWriter.varChar().writeVarChar(0, bytes.length, buf)
-                  finally buf.close()
-                case _ => listWriter.writeNull()
-          value match
-            case a: Array[?]          => a.foreach(writeItem)
-            case s: Iterable[?]       => s.foreach(writeItem)
-            case j: java.util.List[?] => j.forEach(item => writeItem(item))
-            case _                    => writeItem(value)
-          listWriter.endList()
+          val elemType = dt.asInstanceOf[types.ArrayType].elementType
+          val dataVec = v.getDataVector.asInstanceOf[FieldVector]
+          val offset = v.startNewValue(idx)
+          val items: Seq[Any] = value match
+            case a: Array[?]          => a.toSeq
+            case s: Iterable[?]       => s.toSeq
+            case j: java.util.List[?] =>
+              val buf = scala.collection.mutable.ArrayBuffer[Any]()
+              j.forEach(item => buf += item)
+              buf.toSeq
+            case other                => Seq(other)
+          var i = 0
+          while i < items.size do
+            setArrowValue(dataVec, offset + i, items(i), elemType)
+            i += 1
+          v.endValue(idx, items.size)
         case v: StructVector =>
           val row = value.asInstanceOf[Row]
           val st = dt.asInstanceOf[types.StructType]
