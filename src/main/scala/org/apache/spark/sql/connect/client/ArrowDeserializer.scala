@@ -87,7 +87,7 @@ object ArrowDeserializer:
       case v: Decimal256Vector => v.getObject(index)
 
       case v: DateDayVector =>
-        java.sql.Date(v.get(index).toLong * 86400000L)
+        java.sql.Date.valueOf(java.time.LocalDate.ofEpochDay(v.get(index).toLong))
 
       case v: TimeStampMicroVector =>
         microsToTimestamp(v.get(index))

@@ -80,10 +80,14 @@ class ArrowRoundTripSuite
   // ASCII printable; the decoder uses UTF-8 but we keep generators boring.
   private val genString: Gen[String] = Gen.listOf(Gen.choose(' ', '~')).map(_.mkString)
 
-  // The deserializer constructs `java.sql.Date(epochDay * 86400000L)` (UTC midnight). Match that
-  // representation directly so equality holds independent of the JVM's default time zone.
+  // Encoder extracts `epochDay` via `Date.toLocalDate.toEpochDay` (JVM default TZ);
+  // decoder reconstructs via `Date.valueOf(LocalDate.ofEpochDay(epochDay))` (JVM default TZ).
+  // Generate canonical Date values via the same `LocalDate.ofEpochDay → Date.valueOf` path so
+  // equality holds regardless of the test JVM's default time zone.
   private val genDate: Gen[java.sql.Date] =
-    Gen.choose(0, 50_000).map(epochDay => java.sql.Date(epochDay.toLong * 86400000L))
+    Gen.choose(0, 50_000).map(epochDay =>
+      java.sql.Date.valueOf(java.time.LocalDate.ofEpochDay(epochDay.toLong))
+    )
 
   // Microsecond-aligned timestamps so encode→decode round-trips losslessly. Build via
   // `Timestamp.from(Instant)` to match the decoder's internal representation exactly.
@@ -246,4 +250,33 @@ class ArrowRoundTripSuite
       val rows = lists.map(xs => Row(xs.toSeq))
       assertRoundTrip(rows, schema)
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // R20: DateType round-trip stays stable in non-UTC JVM time zones
+  //
+  // Previously the decoder reconstructed `Date(epochDay * 86400000L)` (UTC midnight) while
+  // the encoder extracted `epochDay` via `Date.toLocalDate.toEpochDay` (JVM default TZ).
+  // Under non-UTC TZ that asymmetry shifted dates by one day on round-trip — silently.
+  // ---------------------------------------------------------------------------
+
+  test("round-trip: DateType is stable across non-UTC default time zone (R20)") {
+    val originalTz = java.util.TimeZone.getDefault
+    try
+      // -05:00 — would have caused a one-day drift before the deserializer fix.
+      java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"))
+      val schema = StructType(Seq(StructField("d", DateType, nullable = false)))
+      val inputs = Seq(
+        java.sql.Date.valueOf("2020-06-15"),
+        java.sql.Date.valueOf("1970-01-01"),
+        java.sql.Date.valueOf("2025-12-31")
+      )
+      val rows = inputs.map(d => Row(d))
+      val bytes = ArrowSerializer.encodeRows(rows, schema)
+      val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+      decoded.toSeq.zip(inputs).foreach { (row, expected) =>
+        val got = row.get(0).asInstanceOf[java.sql.Date]
+        got.toLocalDate shouldBe expected.toLocalDate
+      }
+    finally java.util.TimeZone.setDefault(originalTz)
   }
