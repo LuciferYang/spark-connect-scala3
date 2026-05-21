@@ -437,7 +437,7 @@ The Arrow allocators in [`ArrowSerializer`](src/main/scala/org/apache/spark/sql/
 - [x] `foreachBatch` / `foreach` (ForeachWriter)
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
-- [x] Unit tests (1900 tests)
+- [x] Unit tests (2374 tests)
 - [x] Integration tests (Spark 4.1.1)
 - [x] Error handling (retry policies, gRPC exception conversion, reattachable execution, enriched error details via FetchErrorDetails RPC)
 - [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)
@@ -458,8 +458,9 @@ The Arrow allocators in [`ArrowSerializer`](src/main/scala/org/apache/spark/sql/
 - [x] Phase 3 API Completeness: `cloneSession`, `range(numPartitions)`, `emptyDataset[T]`, typed `select(TypedColumn)` (1-5 arity), `dropDuplicatesWithinWatermark`, `collectAsList`/`takeAsList`, `withMetadata`, `colRegex`, `metadataColumn`, `transpose`, `zipWithIndex`, `isLocal`, static session management, `executeCommand`
 - [x] Scalar / Exists / IN Subqueries (`Dataset.scalar()`, `Dataset.exists()`, `Column.isin(Dataset)` via `SubqueryExpression` + `WithRelations`)
 - [x] Row typed getters (`getDecimal`, `getDate`, `getTimestamp`, `getInstant`, `getLocalDate`, `getSeq`, `getList`, `getMap`, `getJavaMap`, `getStruct`, `getAs(fieldName)`, `fieldIndex`, `anyNull`, `json`, `prettyJson`, `copy`), `Encoders.row`, `SparkSession.time`, `Builder.config(Boolean/Long/Double)`, `UDFRegistration.register` Function0–10 inline overloads, `Catalog.catalogExists`
+- [x] Upstream-contract alignment batch: typed `Catalog.{listDatabases,listTables,listFunctions,getDatabase,getTable,getFunction}` returns; typed `DataFrameWriterV2[T]` / `MergeIntoWriter[T]` / `DataStreamWriter[T]` (incl. `foreach` encoder propagation); typed `SparkSession.range` (`Dataset[java.lang.Long]`); `DataFrameReader.textFile` → `Dataset[String]` with schema rejection; `DataFrameReader.{json,csv,xml}(Dataset[String])` parse-from-Dataset overloads; `DataFrameReader.table` options propagation; `Encoders.row(schema: StructType)`; `Encoder` / `Dataset` / `Row` `extends Serializable`; `SparkSession.Builder.interceptor` (gRPC `ClientInterceptor`); `Observation.get` waits indefinitely + surfaces schema-less rows; `RuntimeConfig.get` throws `NoSuchElementException` for unset keys; `DataFrameWriter.insertInto` respects user `mode(...)`; `DataStreamWriter.outputMode(streaming.OutputMode)` lowercased on the wire; `DataFrame.union/unionAll/unionByName` default to `UNION ALL`; reattachable execution + `SESSION_CHANGED` propagation hardening; lambda-var collision fix in nested HOFs
 
-See [API-GAPS.md](API-GAPS.md) for a detailed comparison with the official Spark Connect client.
+See [docs/SC3-COMPLETE-API.md](docs/SC3-COMPLETE-API.md) for the full public API surface as a flat reference.
 
 ## License
 
