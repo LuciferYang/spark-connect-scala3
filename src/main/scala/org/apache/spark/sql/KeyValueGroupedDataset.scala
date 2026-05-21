@@ -321,6 +321,11 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     *
     * Sorts this group's values by `thisSortExprs` and the other group's values by `otherSortExprs`
     * before applying the function.
+    *
+    * Requires AgnosticEncoder-compatible encoders on key, both value sides, and the output. The
+    * client-side `cogroupLocal` fallback used by [[cogroup]] cannot honour the sort expressions, so
+    * this method refuses to fall back silently — call [[cogroup]] explicitly if you do not need
+    * sorting and your encoders are not bridge-compatible.
     */
   @nowarn("msg=unused.*parameter")
   def cogroupSorted[U: Encoder: ClassTag, R: Encoder: ClassTag](
@@ -335,7 +340,12 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val otherValueAg = otherEnc.agnosticEncoder
     val outAg = outEnc.agnosticEncoder
     if keyAg == null || valueAg == null || otherValueAg == null || outAg == null then
-      return cogroupLocal(other, func, outEnc)
+      throw UnsupportedOperationException(
+        "cogroupSorted requires AgnosticEncoder-compatible encoders for key, both value sides, " +
+          "and the output. Falling back to client-side cogroup would silently drop sort " +
+          "expressions and break the contract. Either supply Spark-built-in encoders or call " +
+          "cogroup(other)(f) without sort semantics."
+      )
     // For mapValues-derived KVGDs, use the original relations and value encoders.
     val thisInputRelation = originalRelation.getOrElse(ds.df.relation)
     val otherInputRelation = other.originalRelation.getOrElse(other.ds.df.relation)

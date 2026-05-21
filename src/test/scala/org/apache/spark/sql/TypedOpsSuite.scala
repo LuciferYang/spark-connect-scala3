@@ -1333,6 +1333,27 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     cgm.getOtherSortingExpressionsCount shouldBe 1
   }
 
+  test("KVGD.cogroupSorted refuses encoder-null fallback rather than silently dropping sort exprs (R85)") {
+    // Build an output Encoder whose agnosticEncoder is null — this would have routed through
+    // the old client-side `cogroupLocal` fallback path that silently ignored sort expressions.
+    given customOutEnc: Encoder[Long] = new Encoder[Long]:
+      def schema: StructType = StructType(Seq(StructField("value", LongType)))
+      def fromRow(row: Row): Long = row.getLong(0)
+      def toRow(value: Long): Row = Row(value)
+      // Note: deliberately NOT overriding agnosticEncoder — defaults to null, triggering the
+      // fallback condition the fix protects against.
+
+    val left = stubDs.groupByKey(identity)
+    val right = stubDs.groupByKey(identity)
+    val ex = intercept[UnsupportedOperationException] {
+      left.cogroupSorted(right)(Column("value").asc)(Column("value").desc) {
+        (_, l, r) => Iterator(l.sum + r.sum)
+      }
+    }
+    ex.getMessage should include("silently drop sort expressions")
+    ex.getMessage should include("AgnosticEncoder")
+  }
+
   // -- KVGD buildGroupingUdf is accessible and correct --
 
   test("KVGD buildGroupingUdf produces correct proto") {
