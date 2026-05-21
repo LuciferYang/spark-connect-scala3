@@ -259,7 +259,12 @@ object Encoder:
       val values = new Array[Any](n)
       var i = 0
       while i < n do
-        val isOpt = _schema.fields(i).nullable && _schema.fields(i).dataType != NullType
+        val field = _schema.fields(i)
+        val isOpt = field.nullable && field.dataType != NullType
+        if !field.nullable && row.isNullAt(i) then
+          throw NullPointerException(
+            s"Field '${field.name}' is non-nullable but Row contains null at index $i"
+          )
         values(i) = extractField(row, i, isOpt)
         i += 1
       val tuple = Tuple.fromArray(values)

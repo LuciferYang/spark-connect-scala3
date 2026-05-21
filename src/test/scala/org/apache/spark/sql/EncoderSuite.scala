@@ -402,3 +402,34 @@ class EncoderSuite extends AnyFunSuite with Matchers:
     val row = Row(inst)
     enc.fromRow(row) shouldBe inst
   }
+
+  // ---------------------------------------------------------------------------
+  // R28: derived encoder must NOT silently unbox null on non-nullable primitive fields
+  //
+  // Without the guard, Scala 3's tuple → mirror path runs `BoxesRunTime.unboxToInt(null) → 0`
+  // (likewise for Long/Boolean/Double), so `as[CaseClass].collect()` quietly returns zero-
+  // valued rows whenever the server sent null (empty groups, OUTER joins, nullable UDFs).
+  // ---------------------------------------------------------------------------
+
+  test("derived encoder rejects null on non-nullable primitive field with field-context NPE") {
+    val enc = summon[Encoder[Person]] // case class Person(name: String, age: Int)
+    val schema = StructType(Seq(
+      StructField("name", StringType, nullable = false),
+      StructField("age", IntegerType, nullable = false)
+    ))
+    val row = Row.fromSeqWithSchema(Seq("alice", null), schema)
+    val ex = intercept[NullPointerException](enc.fromRow(row))
+    ex.getMessage should include("age")
+    ex.getMessage should include("non-nullable")
+    ex.getMessage should include("index 1")
+  }
+
+  test("derived encoder still accepts null on nullable Option field") {
+    val enc = summon[Encoder[WithOption]] // case class WithOption(name: String, score: Option[Int])
+    val schema = StructType(Seq(
+      StructField("name", StringType, nullable = false),
+      StructField("score", IntegerType, nullable = true)
+    ))
+    val row = Row.fromSeqWithSchema(Seq("bob", null), schema)
+    enc.fromRow(row) shouldBe WithOption("bob", None)
+  }
