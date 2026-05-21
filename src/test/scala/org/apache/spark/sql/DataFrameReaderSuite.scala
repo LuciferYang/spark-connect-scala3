@@ -275,3 +275,73 @@ class DataFrameReaderSuite extends AnyFunSuite with Matchers:
       stubSession.read.schema("value STRING").textFile("/data.txt")
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // R89: parse-from-Dataset[String] overloads (json / csv / xml)
+  // ---------------------------------------------------------------------------
+
+  /** Build a synthetic `Dataset[String]` whose underlying relation we can verify after parse. */
+  private def stringDataset(session: SparkSession): Dataset[String] =
+    session.read.textFile("/in.txt")
+
+  test("json(Dataset[String]) emits Parse relation with PARSE_FORMAT_JSON") {
+    val session = stubSession
+    val ds = stringDataset(session)
+    val df = session.read.json(ds)
+    df.relation.hasParse shouldBe true
+    val parse = df.relation.getParse
+    parse.getFormat shouldBe Parse.ParseFormat.PARSE_FORMAT_JSON
+    parse.hasInput shouldBe true
+    parse.getInput shouldBe ds.df.relation
+  }
+
+  test("csv(Dataset[String]) emits Parse relation with PARSE_FORMAT_CSV") {
+    val session = stubSession
+    val ds = stringDataset(session)
+    val df = session.read.csv(ds)
+    df.relation.getParse.getFormat shouldBe Parse.ParseFormat.PARSE_FORMAT_CSV
+  }
+
+  test("xml(Dataset[String]) emits Parse relation with PARSE_FORMAT_UNSPECIFIED (mirrors upstream)") {
+    val session = stubSession
+    val ds = stringDataset(session)
+    val df = session.read.xml(ds)
+    df.relation.getParse.getFormat shouldBe Parse.ParseFormat.PARSE_FORMAT_UNSPECIFIED
+  }
+
+  test("parse-from-Dataset forwards reader options") {
+    val session = stubSession
+    val ds = stringDataset(session)
+    val df = session.read
+      .option("multiline", true)
+      .option("primitivesAsString", "false")
+      .json(ds)
+    val opts = df.relation.getParse.getOptionsMap.asScala
+    opts("multiline") shouldBe "true"
+    opts("primitivesAsString") shouldBe "false"
+  }
+
+  test("parse-from-Dataset forwards user-specified schema as UNPARSED proto") {
+    val session = stubSession
+    val ds = stringDataset(session)
+    val df = session.read.schema("id BIGINT, name STRING").json(ds)
+    val parse = df.relation.getParse
+    parse.hasSchema shouldBe true
+    parse.getSchema.hasUnparsed shouldBe true
+    parse.getSchema.getUnparsed.getDataTypeString shouldBe "id BIGINT, name STRING"
+  }
+
+  test("parse-from-Dataset omits schema when none specified") {
+    val session = stubSession
+    val ds = stringDataset(session)
+    val df = session.read.csv(ds)
+    df.relation.getParse.hasSchema shouldBe false
+  }
+
+  test("parse-from-Dataset assigns a plan id") {
+    val session = stubSession
+    val ds = stringDataset(session)
+    val df = session.read.json(ds)
+    df.relation.hasCommon shouldBe true
+    df.relation.getCommon.getPlanId should be >= 0L
+  }

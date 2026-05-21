@@ -1,7 +1,9 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
+import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.internal.OptionBuilder
+import org.apache.spark.sql.types.UnparsedDataType
 
 /** Reader for loading DataFrames from external storage.
   *
@@ -91,6 +93,15 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
   /** Load JSON files. Equivalent to `format("json").load(paths)`. */
   def json(paths: String*): DataFrame = format("json").load(paths)
 
+  /** Parse a `Dataset[String]` as JSON, returning a `DataFrame`.
+    *
+    * Each string in `jsonDataset` must be a valid JSON record. Mirrors upstream
+    * `DataFrameReader.json(jsonDataset: Dataset[String])` so users can chain
+    * `spark.read.option(...).json(rddOfStrings.toDS)` pipelines unchanged.
+    */
+  def json(jsonDataset: Dataset[String]): DataFrame =
+    parse(jsonDataset, Parse.ParseFormat.PARSE_FORMAT_JSON)
+
   /** Load Parquet files. Equivalent to `format("parquet").load(paths)`. */
   def parquet(paths: String*): DataFrame = format("parquet").load(paths)
 
@@ -100,6 +111,12 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
   /** Load CSV files. Equivalent to `format("csv").load(paths)`. */
   def csv(paths: String*): DataFrame = format("csv").load(paths)
 
+  /** Parse a `Dataset[String]` as CSV, returning a `DataFrame`. Mirrors upstream
+    * `DataFrameReader.csv(csvDataset: Dataset[String])`.
+    */
+  def csv(csvDataset: Dataset[String]): DataFrame =
+    parse(csvDataset, Parse.ParseFormat.PARSE_FORMAT_CSV)
+
   /** Load text files. Each line becomes a row with a single `value` column. Equivalent to
     * `format("text").load(paths)`.
     */
@@ -107,6 +124,16 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
 
   /** Load XML files. Equivalent to `format("xml").load(paths)`. */
   def xml(paths: String*): DataFrame = format("xml").load(paths)
+
+  /** Parse a `Dataset[String]` as XML, returning a `DataFrame`. Mirrors upstream
+    * `DataFrameReader.xml(xmlDataset: Dataset[String])`.
+    *
+    * Note: the Connect proto's `ParseFormat` enum has no XML variant — upstream sends
+    * `PARSE_FORMAT_UNSPECIFIED` and relies on the server to dispatch XML parsing via
+    * options or default behavior. We mirror that wire shape to keep behavior identical.
+    */
+  def xml(xmlDataset: Dataset[String]): DataFrame =
+    parse(xmlDataset, Parse.ParseFormat.PARSE_FORMAT_UNSPECIFIED)
 
   /** Load a text file and return its `value` column as a `Dataset[String]` — a convenience for
     * the common "treat file as list of strings" pattern. Rejects user-specified schemas to match
@@ -191,5 +218,28 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
         .setRead(Read.newBuilder()
           .setDataSource(dsBuilder.build())
           .build())
+        .build()
+    )
+
+  /** Build a `Parse` relation from a `Dataset[String]` input.
+    *
+    * Forwards reader-level `option(...)` settings into `Parse.options` and, when the user has
+    * called `schema(...)`, threads the DDL string through as an `UNPARSED` `DataType` proto so
+    * the server parses and applies it. Format selection follows upstream's enum, including the
+    * XML quirk that sends `PARSE_FORMAT_UNSPECIFIED`.
+    */
+  private def parse(input: Dataset[String], format: Parse.ParseFormat): DataFrame =
+    val parseBuilder = Parse.newBuilder()
+      .setInput(input.df.relation)
+      .setFormat(format)
+    opts.foreach((k, v) => parseBuilder.putOptions(k, v))
+    userSchema.foreach { ddl =>
+      parseBuilder.setSchema(DataTypeProtoConverter.toProto(UnparsedDataType(ddl)))
+    }
+    DataFrame(
+      session,
+      Relation.newBuilder()
+        .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
+        .setParse(parseBuilder.build())
         .build()
     )
