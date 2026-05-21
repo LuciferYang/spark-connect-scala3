@@ -96,7 +96,7 @@ private[sql] object ArrowSerializer:
       new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MICROSECOND, null)
     case d: types.DecimalType      => new ArrowType.Decimal(d.precision, d.scale, 128)
     case types.BinaryType          => ArrowType.Binary.INSTANCE
-    case types.VariantType         => ArrowType.Binary.INSTANCE
+    case types.VariantType         => ArrowType.Struct.INSTANCE
     case _: types.ArrayType        => ArrowType.List.INSTANCE
     case _: types.StructType       => ArrowType.Struct.INSTANCE
     case _: types.MapType          => new ArrowType.Map(false)
@@ -141,6 +141,30 @@ private[sql] object ArrowSerializer:
           name,
           FieldType(nullable, new ArrowType.Map(false), null),
           java.util.Collections.singletonList(entriesField)
+        )
+      case types.VariantType =>
+        // Variant is wire-encoded as a Struct with two binary children, mirroring upstream
+        // ArrowWriter.VariantWriter. The "metadata" child carries an Arrow field-level metadata
+        // entry "variant" -> "true" so the deserializer (and server) can recognise the shape.
+        val valueChild = Field(
+          "value",
+          FieldType(false, ArrowType.Binary.INSTANCE, null),
+          java.util.Collections.emptyList()
+        )
+        val metadataChild = Field(
+          "metadata",
+          FieldType(
+            false,
+            ArrowType.Binary.INSTANCE,
+            null,
+            java.util.Map.of("variant", "true")
+          ),
+          java.util.Collections.emptyList()
+        )
+        Field(
+          name,
+          FieldType(nullable, ArrowType.Struct.INSTANCE, null),
+          java.util.List.of(valueChild, metadataChild)
         )
       case _ =>
         val arrowType = sparkTypeToArrow(dt)
@@ -234,15 +258,29 @@ private[sql] object ArrowSerializer:
             i += 1
           v.endValue(idx, items.size)
         case v: StructVector =>
-          val row = value.asInstanceOf[Row]
-          val st = dt.asInstanceOf[types.StructType]
-          val structWriter = v.getWriter
-          structWriter.setPosition(idx)
-          structWriter.start()
-          for i <- 0 until row.size do
-            val childVec = v.getChildByOrdinal(i).asInstanceOf[FieldVector]
-            setArrowValue(childVec, idx, row.get(i), st.fields(i).dataType)
-          structWriter.end()
+          dt match
+            case types.VariantType =>
+              val variant = value.asInstanceOf[org.apache.spark.sql.types.VariantVal]
+              val valueVec = v.getChild("value", classOf[VarBinaryVector])
+              val metadataVec = v.getChild("metadata", classOf[VarBinaryVector])
+              val vBytes = variant.value
+              val mBytes = variant.metadata
+              valueVec.setSafe(idx, vBytes, 0, vBytes.length)
+              metadataVec.setSafe(idx, mBytes, 0, mBytes.length)
+              v.setIndexDefined(idx)
+            case st: types.StructType =>
+              val row = value.asInstanceOf[Row]
+              val structWriter = v.getWriter
+              structWriter.setPosition(idx)
+              structWriter.start()
+              for i <- 0 until row.size do
+                val childVec = v.getChildByOrdinal(i).asInstanceOf[FieldVector]
+                setArrowValue(childVec, idx, row.get(i), st.fields(i).dataType)
+              structWriter.end()
+            case other =>
+              throw UnsupportedOperationException(
+                s"Cannot write StructVector for non-Struct/non-Variant DataType: $other"
+              )
         case other =>
           throw UnsupportedOperationException(
             s"Unsupported Arrow vector type: ${other.getClass.getName}"

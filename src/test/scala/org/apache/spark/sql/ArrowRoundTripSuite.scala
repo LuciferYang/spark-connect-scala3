@@ -280,3 +280,31 @@ class ArrowRoundTripSuite
       }
     finally java.util.TimeZone.setDefault(originalTz)
   }
+
+  // ---------------------------------------------------------------------------
+  // R84: VariantType is wire-encoded as Struct{value:Binary, metadata:Binary}
+  //
+  // Previously the encoder mapped VariantType to a single Binary buffer, which collided with
+  // VarBinaryVector's Array[Byte] cast and produced ClassCastException on the client. The
+  // deserializer was already implementing the upstream struct shape — this test pins both
+  // sides to the same wire format.
+  // ---------------------------------------------------------------------------
+
+  test("round-trip: VariantType encodes as struct with value/metadata binary children (R84)") {
+    val schema = StructType(Seq(StructField("v", VariantType, nullable = false)))
+    val variants = Seq(
+      VariantVal(Array[Byte](1, 2, 3), Array[Byte](10)),
+      VariantVal(Array[Byte](42), Array[Byte](20, 21)),
+      VariantVal(Array.emptyByteArray, Array[Byte](30))
+    )
+    val rows = variants.map(v => Row(v))
+    val bytes = ArrowSerializer.encodeRows(rows, schema)
+    val (decoded, decodedSchema) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decodedSchema shouldBe Some(schema)
+    decoded should have size variants.size
+    decoded.toSeq.zip(variants).foreach { (row, expected) =>
+      val got = row.get(0).asInstanceOf[VariantVal]
+      java.util.Arrays.equals(got.value, expected.value) shouldBe true
+      java.util.Arrays.equals(got.metadata, expected.metadata) shouldBe true
+    }
+  }
