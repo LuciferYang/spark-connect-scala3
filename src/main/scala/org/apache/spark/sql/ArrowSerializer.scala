@@ -251,7 +251,7 @@ private[sql] object ArrowSerializer:
               val buf = scala.collection.mutable.ArrayBuffer[Any]()
               j.forEach(item => buf += item)
               buf.toSeq
-            case other                => Seq(other)
+            case other => Seq(other)
           var i = 0
           while i < items.size do
             setArrowValue(dataVec, offset + i, items(i), elemType)

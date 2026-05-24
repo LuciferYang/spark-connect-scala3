@@ -1322,8 +1322,8 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
   test("KVGD.cogroupSorted with mapValues propagates originalRelation and records sort exprs") {
     val left = stubDs.groupByKey(identity).mapValues(_ * 2)
     val right = stubDs.groupByKey(identity)
-    val result = left.cogroupSorted(right)(Column("value").asc)(Column("value").desc)(
-      (_, l, r) => Iterator(l.sum + r.sum)
+    val result = left.cogroupSorted(right)(Column("value").asc)(Column("value").desc)((_, l, r) =>
+      Iterator(l.sum + r.sum)
     )
     result.df.relation.hasCoGroupMap shouldBe true
     val cgm = result.df.relation.getCoGroupMap
@@ -1333,7 +1333,9 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     cgm.getOtherSortingExpressionsCount shouldBe 1
   }
 
-  test("KVGD.cogroupSorted refuses encoder-null fallback rather than silently dropping sort exprs (R85)") {
+  test(
+    "KVGD.cogroupSorted refuses encoder-null fallback rather than silently dropping sort exprs (R85)"
+  ) {
     // Build an output Encoder whose agnosticEncoder is null — this would have routed through
     // the old client-side `cogroupLocal` fallback path that silently ignored sort expressions.
     given customOutEnc: Encoder[Long] = new Encoder[Long]:

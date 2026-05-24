@@ -17,9 +17,9 @@ import org.scalatest.matchers.should.Matchers
   *
   * Notes on round-trip behavior:
   *   - `Encoder` instances rely on a `writeReplace` proxy chain whose `readResolve` resolves
-  *     server-side (Scala 2.13) `AgnosticEncoders$Foo$` classes via `Class.forName`. On the
-  *     client we therefore only assert that `writeObject` succeeds; full round-trip is exercised
-  *     against the Spark Connect server in integration tests.
+  *     server-side (Scala 2.13) `AgnosticEncoders$Foo$` classes via `Class.forName`. On the client
+  *     we therefore only assert that `writeObject` succeeds; full round-trip is exercised against
+  *     the Spark Connect server in integration tests.
   *   - `Row` carries primitive/String values plus an optional `StructType` schema, all
   *     `Serializable`, so a complete client-side round-trip is asserted.
   *   - `Dataset[T]` references a `SparkConnectClient` (gRPC, non-`Serializable`) via its session,

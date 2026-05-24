@@ -9,8 +9,8 @@ import org.apache.spark.sql.internal.OptionBuilder
   * The type parameter `T` carries the originating `Dataset[T]` element type so callers can keep
   * typed pipelines like `ds.as[Person].writeTo("t").append()` aligned with upstream Spark's
   * `DataFrameWriterV2[T]` contract. `T` is not used in the writer's runtime behavior — proto
-  * construction is type-erased — but it preserves the signature shape so user code migrating
-  * from upstream compiles unchanged.
+  * construction is type-erased — but it preserves the signature shape so user code migrating from
+  * upstream compiles unchanged.
   *
   * {{{
   *   df.writeTo("my_table").using("parquet").create()

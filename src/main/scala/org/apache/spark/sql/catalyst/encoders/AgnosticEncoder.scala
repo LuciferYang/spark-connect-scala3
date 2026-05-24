@@ -824,8 +824,9 @@ final class UDTEncoderProxy(
 /** Serialization proxy for [[AgnosticEncoders.RowEncoder]] (the schema-bound row encoder produced
   * by `Encoders.row(schema)`).
   *
-  * Carries an array of `EncoderFieldProxy` instances; on the server side, `readResolve` reconstructs
-  * the upstream `AgnosticEncoders.RowEncoder(Seq[EncoderField])` case class via reflection.
+  * Carries an array of `EncoderFieldProxy` instances; on the server side, `readResolve`
+  * reconstructs the upstream `AgnosticEncoders.RowEncoder(Seq[EncoderField])` case class via
+  * reflection.
   */
 @SerialVersionUID(1L)
 final class RowEncoderProxy(

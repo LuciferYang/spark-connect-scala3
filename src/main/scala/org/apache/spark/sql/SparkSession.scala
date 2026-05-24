@@ -123,7 +123,8 @@ final class SparkSession private[sql] (
   def range(start: Long, end: Long, step: Long): Dataset[java.lang.Long] =
     range(start, end, step, None)
 
-  /** Create a `Dataset[java.lang.Long]` with elements `[start, end)`, given step, and partitions. */
+  /** Create a `Dataset[java.lang.Long]` with elements `[start, end)`, given step, and partitions.
+    */
   def range(start: Long, end: Long, step: Long, numPartitions: Int): Dataset[java.lang.Long] =
     range(start, end, step, Some(numPartitions))
 
@@ -499,7 +500,8 @@ object SparkSession:
 final class RuntimeConfig private[sql] (private val client: SparkConnectClient):
   /** Look up a config value by key.
     *
-    * @throws java.util.NoSuchElementException if the key is unset and has no default.
+    * @throws java.util.NoSuchElementException
+    *   if the key is unset and has no default.
     */
   @throws[java.util.NoSuchElementException]
   def get(key: String): String =

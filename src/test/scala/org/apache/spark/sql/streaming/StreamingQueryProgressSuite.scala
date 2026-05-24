@@ -190,10 +190,16 @@ class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
   test("StateOperatorProgress.json emits all known fields") {
     val op = new StateOperatorProgress(
       operatorName = "op",
-      numRowsTotal = 1L, numRowsUpdated = 2L, allUpdatesTimeMs = 3L,
-      numRowsRemoved = 4L, allRemovalsTimeMs = 5L, commitTimeMs = 6L,
-      memoryUsedBytes = 7L, numRowsDroppedByWatermark = 8L,
-      numShufflePartitions = 9L, numStateStoreInstances = 10L
+      numRowsTotal = 1L,
+      numRowsUpdated = 2L,
+      allUpdatesTimeMs = 3L,
+      numRowsRemoved = 4L,
+      allRemovalsTimeMs = 5L,
+      commitTimeMs = 6L,
+      memoryUsedBytes = 7L,
+      numRowsDroppedByWatermark = 8L,
+      numShufflePartitions = 9L,
+      numStateStoreInstances = 10L
     )
     val parsed = new ObjectMapper().readTree(op.json)
     parsed.get("operatorName").asText shouldBe "op"
@@ -225,8 +231,12 @@ class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
   test("SourceProgress.json round-trips simple fields") {
     val src = new SourceProgress(
       description = "S",
-      startOffset = "0", endOffset = "10", latestOffset = "10",
-      numInputRows = 1L, inputRowsPerSecond = 0.5, processedRowsPerSecond = 0.25
+      startOffset = "0",
+      endOffset = "10",
+      latestOffset = "10",
+      numInputRows = 1L,
+      inputRowsPerSecond = 0.5,
+      processedRowsPerSecond = 0.25
     )
     val parsed = new ObjectMapper().readTree(src.json)
     parsed.get("description").asText shouldBe "S"
@@ -237,7 +247,9 @@ class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
   test("non-finite rate metrics are omitted from emitted JSON") {
     val src = new SourceProgress(
       description = "S",
-      startOffset = null, endOffset = null, latestOffset = null,
+      startOffset = null,
+      endOffset = null,
+      latestOffset = null,
       numInputRows = 0L,
       inputRowsPerSecond = Double.NaN,
       processedRowsPerSecond = Double.PositiveInfinity

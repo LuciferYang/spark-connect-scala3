@@ -114,8 +114,8 @@ final class DataFrameNaFunctions private[sql] (private val df: DataFrame):
     cols.foreach(_.foreach(naReplaceBuilder.addCols))
     df.withRelation(_.setReplace(naReplaceBuilder.build()))
 
-  /** Build replacement entries with upstream's type unification: numeric keys/values normalize
-    * to Double; String/Boolean pass through; null preserved.
+  /** Build replacement entries with upstream's type unification: numeric keys/values normalize to
+    * Double; String/Boolean pass through; null preserved.
     */
   private def buildReplacement[T](
       replacement: Map[T, T]

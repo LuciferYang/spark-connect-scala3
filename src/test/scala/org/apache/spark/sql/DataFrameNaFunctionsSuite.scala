@@ -191,7 +191,10 @@ class DataFrameNaFunctionsSuite extends AnyFunSuite with Matchers:
 
   test("replace with unsupported value type rejects with IllegalArgumentException") {
     val ex = intercept[IllegalArgumentException] {
-      naFunctions.replace("col1", Map[Any, Any](java.math.BigDecimal.ONE -> java.math.BigDecimal.ONE))
+      naFunctions.replace(
+        "col1",
+        Map[Any, Any](java.math.BigDecimal.ONE -> java.math.BigDecimal.ONE)
+      )
     }
     ex.getMessage should include("Unsupported value type")
   }

@@ -9,8 +9,7 @@ import scala.jdk.CollectionConverters.*
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.{ArrayNode, JsonNodeFactory, ObjectNode}
 
-/** Information about updates made to stateful operators in a [[StreamingQuery]] during a
-  * trigger.
+/** Information about updates made to stateful operators in a [[StreamingQuery]] during a trigger.
   */
 class StateOperatorProgress private[spark] (
     val operatorName: String,
@@ -56,11 +55,11 @@ end StateOperatorProgress
 
 /** Information about progress made in the execution of a [[StreamingQuery]] during a trigger.
   *
-  * Each event relates to processing done for a single trigger of the streaming query. Events
-  * are emitted even when no new data is available to be processed.
+  * Each event relates to processing done for a single trigger of the streaming query. Events are
+  * emitted even when no new data is available to be processed.
   *
-  * Note: `observedMetrics` from upstream is intentionally omitted in this client port — it
-  * requires `GenericRowWithSchema` infrastructure not present in this thin client.
+  * Note: `observedMetrics` from upstream is intentionally omitted in this client port — it requires
+  * `GenericRowWithSchema` infrastructure not present in this thin client.
   */
 class StreamingQueryProgress private[spark] (
     val id: UUID,
@@ -218,8 +217,8 @@ object StreamingQueryProgress:
         metrics = readMetrics(node.get("metrics"))
       )
 
-  /** Server returns startOffset/endOffset as raw JSON values (object/string/null). Our typed
-    * field is `String`; preserve the JSON literal for non-string nodes so callers can re-parse.
+  /** Server returns startOffset/endOffset as raw JSON values (object/string/null). Our typed field
+    * is `String`; preserve the JSON literal for non-string nodes so callers can re-parse.
     */
   private def sourceOffsetToString(node: JsonNode): String =
     if node == null || node.isNull then null
@@ -249,8 +248,8 @@ object StreamingQueryProgress:
 
 end StreamingQueryProgress
 
-/** Information about progress made for a source in the execution of a [[StreamingQuery]] during
-  * a trigger.
+/** Information about progress made for a source in the execution of a [[StreamingQuery]] during a
+  * trigger.
   */
 class SourceProgress protected[spark] (
     val description: String,
@@ -285,8 +284,8 @@ class SourceProgress protected[spark] (
 end SourceProgress
 
 private object SourceProgress:
-  /** Offsets may be JSON literals or plain strings. Try to re-parse JSON; fall back to a
-    * string literal on failure (matches upstream's `tryParse` semantics).
+  /** Offsets may be JSON literals or plain strings. Try to re-parse JSON; fall back to a string
+    * literal on failure (matches upstream's `tryParse` semantics).
     */
   def putOffset(node: ObjectNode, field: String, value: String): Unit =
     if value == null then node.putNull(field)
@@ -297,8 +296,8 @@ private object SourceProgress:
         ()
       catch case _: Exception => node.put(field, value)
 
-/** Information about progress made for a sink in the execution of a [[StreamingQuery]] during
-  * a trigger.
+/** Information about progress made for a sink in the execution of a [[StreamingQuery]] during a
+  * trigger.
   */
 class SinkProgress protected[spark] (
     val description: String,

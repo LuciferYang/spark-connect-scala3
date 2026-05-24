@@ -146,9 +146,8 @@ class DataFrameReaderSuite extends AnyFunSuite with Matchers:
   }
 
   test("table rejects user-specified schema") {
-    val ex = the[IllegalArgumentException] thrownBy {
+    val ex = the[IllegalArgumentException] thrownBy
       stubSession.read.schema("a INT").table("t")
-    }
     ex.getMessage should include("table")
   }
 
@@ -302,7 +301,9 @@ class DataFrameReaderSuite extends AnyFunSuite with Matchers:
     df.relation.getParse.getFormat shouldBe Parse.ParseFormat.PARSE_FORMAT_CSV
   }
 
-  test("xml(Dataset[String]) emits Parse relation with PARSE_FORMAT_UNSPECIFIED (mirrors upstream)") {
+  test(
+    "xml(Dataset[String]) emits Parse relation with PARSE_FORMAT_UNSPECIFIED (mirrors upstream)"
+  ) {
     val session = stubSession
     val ds = stringDataset(session)
     val df = session.read.xml(ds)

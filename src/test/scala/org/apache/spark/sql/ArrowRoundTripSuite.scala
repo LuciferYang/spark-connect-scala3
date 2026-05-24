@@ -21,7 +21,7 @@ class ArrowRoundTripSuite
     with ScalaCheckPropertyChecks:
 
   // Bound size to keep individual properties fast (default scalacheck-min-successful=100 runs).
-  override implicit val generatorDrivenConfig: PropertyCheckConfiguration =
+  implicit override val generatorDrivenConfig: PropertyCheckConfiguration =
     PropertyCheckConfiguration(minSuccessful = 30, sizeRange = 20)
 
   // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ class ArrowRoundTripSuite
     case (null, null)                     => true
     case (null, _) | (_, null)            => false
     case (x: Array[Byte], y: Array[Byte]) => java.util.Arrays.equals(x, y)
-    case (x: Row, y: Row) =>
+    case (x: Row, y: Row)                 =>
       x.size == y.size && (0 until x.size).forall(i => deepEqual(x.get(i), y.get(i)))
     case (x: Seq[?], y: Seq[?]) =>
       x.size == y.size && x.lazyZip(y).forall(deepEqual)
@@ -68,10 +68,10 @@ class ArrowRoundTripSuite
   // ---------------------------------------------------------------------------
 
   private val genBoolean: Gen[Boolean] = Gen.oneOf(true, false)
-  private val genByte: Gen[Byte]       = Gen.choose(Byte.MinValue, Byte.MaxValue)
-  private val genShort: Gen[Short]     = Gen.choose(Short.MinValue, Short.MaxValue)
-  private val genInt: Gen[Int]         = Gen.choose(Int.MinValue, Int.MaxValue)
-  private val genLong: Gen[Long]       = Gen.choose(Long.MinValue, Long.MaxValue)
+  private val genByte: Gen[Byte] = Gen.choose(Byte.MinValue, Byte.MaxValue)
+  private val genShort: Gen[Short] = Gen.choose(Short.MinValue, Short.MaxValue)
+  private val genInt: Gen[Int] = Gen.choose(Int.MinValue, Int.MaxValue)
+  private val genLong: Gen[Long] = Gen.choose(Long.MinValue, Long.MaxValue)
   // Exclude NaN to keep equality straightforward.
   private val genFloat: Gen[Float] =
     Gen.choose(-1e6f, 1e6f).suchThat(f => !java.lang.Float.isNaN(f))
@@ -94,7 +94,7 @@ class ArrowRoundTripSuite
   private val genTimestamp: Gen[java.sql.Timestamp] =
     for
       epochSecond <- Gen.choose(0L, 4_000_000_000L) // up to year ~2096
-      micros      <- Gen.choose(0, 999_999)
+      micros <- Gen.choose(0, 999_999)
     yield java.sql.Timestamp.from(java.time.Instant.ofEpochSecond(epochSecond, micros * 1000L))
 
   // Fixed precision/scale so generated BigDecimal matches the schema after decode.
@@ -118,14 +118,14 @@ class ArrowRoundTripSuite
     test(s"round-trip: single column $name (non-null)") {
       forAll(Gen.listOf(gen)) { values =>
         val schema = StructType(Seq(StructField("c", dt, nullable = false)))
-        val rows   = values.map(v => Row(v))
+        val rows = values.map(v => Row(v))
         assertRoundTrip(rows, schema)
       }
     }
     test(s"round-trip: single column $name (nullable)") {
       forAll(Gen.listOf(nullable(gen))) { values =>
         val schema = StructType(Seq(StructField("c", dt, nullable = true)))
-        val rows   = values.map(v => Row(v))
+        val rows = values.map(v => Row(v))
         assertRoundTrip(rows, schema)
       }
     }

@@ -115,7 +115,7 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     val df1 = spark.range(0, 3).select(col("id").as("x"))
     val df2 = spark.range(2, 5).select(col("id").as("x"))
 
-    val u  = df1.union(df2).collect().map(_.getLong(0)).sorted.toSeq
+    val u = df1.union(df2).collect().map(_.getLong(0)).sorted.toSeq
     val ua = df1.unionAll(df2).collect().map(_.getLong(0)).sorted.toSeq
     val ub = df1.unionByName(df2).collect().map(_.getLong(0)).sorted.toSeq
 

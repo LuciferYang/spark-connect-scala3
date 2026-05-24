@@ -32,8 +32,8 @@ class ResponseValidator:
     *
     * Mirrors upstream `ResponseValidator.wrapIterator` by routing `iter.next()` through
     * `verifyResponse`, so a `INVALID_HANDLE.SESSION_CHANGED` raised mid-stream flips
-    * `sessionValid = false` (same as the unary path) and any subsequent unary RPC can
-    * fail-fast locally instead of round-tripping to a server that will reject it.
+    * `sessionValid = false` (same as the unary path) and any subsequent unary RPC can fail-fast
+    * locally instead of round-tripping to a server that will reject it.
     */
   def wrapIterator[RespT <: GeneratedMessage](
       iter: Iterator[RespT] & AutoCloseable

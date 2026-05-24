@@ -537,10 +537,10 @@ object SparkConnectClient:
 
   /** Create a client connected to the given `sc://` URL.
     *
-    * `interceptors` are gRPC `ClientInterceptor` instances applied to the channel for
-    * cross-cutting concerns (tracing, metrics, custom auth). They are applied in addition to
-    * the token-based auth interceptor (when a token is supplied) and follow gRPC's
-    * "interceptors added last are executed first" ordering.
+    * `interceptors` are gRPC `ClientInterceptor` instances applied to the channel for cross-cutting
+    * concerns (tracing, metrics, custom auth). They are applied in addition to the token-based auth
+    * interceptor (when a token is supplied) and follow gRPC's "interceptors added last are executed
+    * first" ordering.
     */
   def create(
       url: String,

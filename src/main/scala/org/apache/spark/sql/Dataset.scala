@@ -648,8 +648,8 @@ final class Dataset[T: ClassTag] private[sql] (
 
   /** Access the V2 writer.
     *
-    * Returns `DataFrameWriterV2[T]` so the originating element type stays attached to the
-    * writer chain — matches upstream Spark's contract for typed pipelines.
+    * Returns `DataFrameWriterV2[T]` so the originating element type stays attached to the writer
+    * chain — matches upstream Spark's contract for typed pipelines.
     */
   def writeTo(table: String): DataFrameWriterV2[T] = new DataFrameWriterV2[T](table, df)
 

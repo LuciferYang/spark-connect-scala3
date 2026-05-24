@@ -67,10 +67,10 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
 
   /** Read a managed/external table by name.
     *
-    * Any options set via `option(...)` / `options(...)` on this reader are forwarded to the
-    * server as part of the `NamedTable` proto and used during table resolution (e.g. format
-    * options for Hive/Parquet/Delta tables). Calling `table` with a user-specified schema
-    * raises `IllegalArgumentException` to match upstream Spark's contract.
+    * Any options set via `option(...)` / `options(...)` on this reader are forwarded to the server
+    * as part of the `NamedTable` proto and used during table resolution (e.g. format options for
+    * Hive/Parquet/Delta tables). Calling `table` with a user-specified schema raises
+    * `IllegalArgumentException` to match upstream Spark's contract.
     */
   def table(tableName: String): DataFrame =
     if userSchema.isDefined then
@@ -129,14 +129,14 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
     * `DataFrameReader.xml(xmlDataset: Dataset[String])`.
     *
     * Note: the Connect proto's `ParseFormat` enum has no XML variant — upstream sends
-    * `PARSE_FORMAT_UNSPECIFIED` and relies on the server to dispatch XML parsing via
-    * options or default behavior. We mirror that wire shape to keep behavior identical.
+    * `PARSE_FORMAT_UNSPECIFIED` and relies on the server to dispatch XML parsing via options or
+    * default behavior. We mirror that wire shape to keep behavior identical.
     */
   def xml(xmlDataset: Dataset[String]): DataFrame =
     parse(xmlDataset, Parse.ParseFormat.PARSE_FORMAT_UNSPECIFIED)
 
-  /** Load a text file and return its `value` column as a `Dataset[String]` — a convenience for
-    * the common "treat file as list of strings" pattern. Rejects user-specified schemas to match
+  /** Load a text file and return its `value` column as a `Dataset[String]` — a convenience for the
+    * common "treat file as list of strings" pattern. Rejects user-specified schemas to match
     * upstream Spark's contract.
     */
   def textFile(path: String): Dataset[String] = textFile(Seq(path)*)
@@ -224,9 +224,9 @@ final class DataFrameReader private[sql] (private val session: SparkSession)
   /** Build a `Parse` relation from a `Dataset[String]` input.
     *
     * Forwards reader-level `option(...)` settings into `Parse.options` and, when the user has
-    * called `schema(...)`, threads the DDL string through as an `UNPARSED` `DataType` proto so
-    * the server parses and applies it. Format selection follows upstream's enum, including the
-    * XML quirk that sends `PARSE_FORMAT_UNSPECIFIED`.
+    * called `schema(...)`, threads the DDL string through as an `UNPARSED` `DataType` proto so the
+    * server parses and applies it. Format selection follows upstream's enum, including the XML
+    * quirk that sends `PARSE_FORMAT_UNSPECIFIED`.
     */
   private def parse(input: Dataset[String], format: Parse.ParseFormat): DataFrame =
     val parseBuilder = Parse.newBuilder()
