@@ -261,7 +261,12 @@ object Encoder:
       while i < n do
         val field = _schema.fields(i)
         val isOpt = field.nullable && field.dataType != NullType
-        if !field.nullable && row.isNullAt(i) then
+        // Guard only the primitive types that Scala 3's mirror would silently unbox to a zero
+        // value (Int → 0, Long → 0L, Boolean → false, …). Reference types (String, Seq, Struct,
+        // ...) are allowed to be null at runtime even when the schema marks them non-nullable —
+        // upstream Spark's catalog rows commonly carry null `catalog`/`description` for built-in
+        // entries, and Scala accepts `case class Foo(s: String)` with `s = null` without harm.
+        if !field.nullable && row.isNullAt(i) && isPrimitiveBoxable(field.dataType) then
           throw NullPointerException(
             s"Field '${field.name}' is non-nullable but Row contains null at index $i"
           )
@@ -269,6 +274,14 @@ object Encoder:
         i += 1
       val tuple = Tuple.fromArray(values)
       mirror.fromTuple(tuple.asInstanceOf[mirror.MirroredElemTypes])
+
+    /** Spark SQL types whose Scala counterpart is a JVM primitive — null on these would be silently
+      * unboxed to a zero value by the mirror's `fromTuple` path.
+      */
+    private def isPrimitiveBoxable(dt: DataType): Boolean = dt match
+      case BooleanType | ByteType | ShortType | IntegerType | LongType | FloatType | DoubleType =>
+        true
+      case _ => false
 
     def toRow(value: T): Row =
       val product = value.asInstanceOf[Product]

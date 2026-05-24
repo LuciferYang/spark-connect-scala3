@@ -433,3 +433,19 @@ class EncoderSuite extends AnyFunSuite with Matchers:
     val row = Row.fromSeqWithSchema(Seq("bob", null), schema)
     enc.fromRow(row) shouldBe WithOption("bob", None)
   }
+
+  test("derived encoder accepts null on non-nullable reference-typed field (REG-2)") {
+    // Server returns null on schema-non-nullable String fields for built-in catalog rows
+    // (e.g. Function(catalog=null) for system functions). Scala accepts `null` on String
+    // case-class params at runtime, so the encoder should pass null through rather than
+    // raise — the R28 guard is scoped to primitive types where null would silently unbox to 0.
+    val enc = summon[Encoder[Person]] // Person(name: String, age: Int)
+    val schema = StructType(Seq(
+      StructField("name", StringType, nullable = false),
+      StructField("age", IntegerType, nullable = false)
+    ))
+    val row = Row.fromSeqWithSchema(Seq(null, 42), schema)
+    val result = enc.fromRow(row)
+    result.name shouldBe null
+    result.age shouldBe 42
+  }

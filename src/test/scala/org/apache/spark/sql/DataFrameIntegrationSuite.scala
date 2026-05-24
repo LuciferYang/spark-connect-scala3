@@ -112,7 +112,7 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
   // server, which silently applied Distinct. Overlapping inputs catch that — duplicates must
   // survive (bag-union / SQL UNION ALL semantics).
   test("union/unionAll/unionByName preserve duplicates (UNION ALL semantics)") {
-    val df1 = spark.range(0, 3).select(col("id").as("x"))
+    val df1 = spark.range(0, 4).select(col("id").as("x"))
     val df2 = spark.range(2, 5).select(col("id").as("x"))
 
     val u = df1.union(df2).collect().map(_.getLong(0)).sorted.toSeq

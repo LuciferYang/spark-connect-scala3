@@ -25,16 +25,22 @@ object Encoders:
 
   /** Wraps an `AgnosticEncoder` in the `Encoder[T]` trait.
     *
-    * The `schema`/`fromRow`/`toRow` methods delegate to the wrapped encoder's `dataType`. The
-    * critical method is `agnosticEncoder` which returns the underlying `AgnosticEncoder` used for
-    * UDF/UDAF serialization.
+    * Single-value leaf encoders (primitive boxes, String, Date/Timestamp, Decimal, etc.) wrap the
+    * underlying value as `row.get(0)`, mirroring the schema `{value: dataType}` that we report. Row
+    * encoders (the schema-bound [[AgnosticEncoders.RowEncoder]] and the unbound singleton) pass the
+    * Row through directly. The `agnosticEncoder` accessor remains the principal use of the wrapper
+    * for UDF/UDAF serialization.
     */
   private class AgnosticEncoderWrapper[T](val underlying: AgnosticEncoder[T]) extends Encoder[T]:
     def schema: StructType = StructType(Seq(StructField("value", underlying.dataType)))
-    def fromRow(row: Row): T =
-      throw UnsupportedOperationException("AgnosticEncoderWrapper.fromRow is not supported")
-    def toRow(value: T): Row =
-      throw UnsupportedOperationException("AgnosticEncoderWrapper.toRow is not supported")
+    def fromRow(row: Row): T = underlying match
+      case _: AgnosticEncoders.RowEncoder     => row.asInstanceOf[T]
+      case AgnosticEncoders.UnboundRowEncoder => row.asInstanceOf[T]
+      case _                                  => row.get(0).asInstanceOf[T]
+    def toRow(value: T): Row = underlying match
+      case _: AgnosticEncoders.RowEncoder     => value.asInstanceOf[Row]
+      case AgnosticEncoders.UnboundRowEncoder => value.asInstanceOf[Row]
+      case _                                  => Row(value)
     override def agnosticEncoder: AgnosticEncoder[?] = underlying
 
   private def wrap[T](ae: AgnosticEncoder[T]): Encoder[T] = AgnosticEncoderWrapper(ae)

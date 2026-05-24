@@ -311,21 +311,30 @@ class EncodersSuite extends AnyFunSuite with Matchers:
   }
 
   // ---------------------------------------------------------------------------
-  // AgnosticEncoderWrapper: fromRow/toRow throw
+  // AgnosticEncoderWrapper: fromRow/toRow round-trip
   // ---------------------------------------------------------------------------
 
-  test("AgnosticEncoderWrapper.fromRow throws UnsupportedOperationException") {
+  test("AgnosticEncoderWrapper.fromRow extracts row.get(0) for leaf encoders") {
     val enc = Encoders.scalaInt
-    assertThrows[UnsupportedOperationException] {
-      enc.fromRow(Row(42))
-    }
+    enc.fromRow(Row(42)) shouldBe 42
   }
 
-  test("AgnosticEncoderWrapper.toRow throws UnsupportedOperationException") {
+  test("AgnosticEncoderWrapper.toRow wraps value in single-column Row for leaf encoders") {
     val enc = Encoders.scalaInt
-    assertThrows[UnsupportedOperationException] {
-      enc.toRow(42)
-    }
+    enc.toRow(42) shouldBe Row(42)
+  }
+
+  test("AgnosticEncoderWrapper.fromRow passes Row through for unbound row encoder") {
+    val enc = Encoders.row
+    val r = Row.fromSeq(Seq("a", 1))
+    enc.fromRow(r) should be theSameInstanceAs r
+  }
+
+  test("AgnosticEncoderWrapper.fromRow passes Row through for schema-bound row encoder") {
+    val schema = StructType(Seq(StructField("id", IntegerType), StructField("name", StringType)))
+    val enc = Encoders.row(schema)
+    val r = Row.fromSeqWithSchema(Seq(7, "alice"), schema)
+    enc.fromRow(r) should be theSameInstanceAs r
   }
 
   // ---------------------------------------------------------------------------
