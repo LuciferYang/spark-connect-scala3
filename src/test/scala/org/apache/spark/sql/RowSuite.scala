@@ -287,11 +287,25 @@ class RowSuite extends AnyFunSuite with Matchers:
   // copy
   // ---------------------------------------------------------------------------
 
-  test("copy creates independent Row") {
+  test("copy returns the same instance because Row is immutable (R5/R27)") {
     val original = Row(1, "hello", 3.14)
     val copied = original.copy()
     copied shouldBe original
-    copied should not be theSameInstanceAs(original)
+    // Row is immutable, so copy() is the identity operation — matching upstream
+    // GenericRowWithSchema.copy() semantics.
+    copied should be theSameInstanceAs original
+  }
+
+  test("copy preserves schema so by-name access still works on the copy (R5/R27)") {
+    val schema = StructType(Seq(
+      StructField("id", IntegerType),
+      StructField("name", StringType)
+    ))
+    val original = Row.fromSeqWithSchema(Seq(7, "alice"), schema)
+    val copied = original.copy()
+    copied.getAs[String]("name") shouldBe "alice"
+    copied.fieldIndex("id") shouldBe 0
+    copied.json should include("alice")
   }
 
   // ---------------------------------------------------------------------------

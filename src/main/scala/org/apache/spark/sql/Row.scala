@@ -154,8 +154,15 @@ final class Row private (
       case None =>
         throw UnsupportedOperationException("prettyJson requires a Row with schema")
 
-  /** Shallow copy of this row. The schema is dropped. */
-  def copy(): Row = Row.fromSeq(toSeq)
+  /** Shallow copy of this row.
+    *
+    * `Row` is immutable (the `values` and `schema` are stored once at construction and never
+    * mutated), so the original instance is returned — matching upstream Spark's
+    * `GenericRowWithSchema.copy()` identity semantics. This preserves any attached schema, so
+    * follow-up calls like `getAs(name)`, `fieldIndex`, `json`, `prettyJson`, and `getValuesMap`
+    * keep working on the copy.
+    */
+  def copy(): Row = this
 
   /** Map from each given field name to its value. Requires a schema. */
   def getValuesMap[T](fieldNames: Seq[String]): Map[String, T] =
