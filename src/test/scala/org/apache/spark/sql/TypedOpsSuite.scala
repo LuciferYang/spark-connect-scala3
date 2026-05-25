@@ -408,6 +408,19 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     classOf[Dataset[?]].getMethod("localCheckpoint", classOf[Boolean]) should not be null
   }
 
+  test("Dataset has checkpoint/localCheckpoint(eager, storageLevel) overloads (R83)") {
+    classOf[Dataset[?]].getMethod(
+      "checkpoint",
+      classOf[Boolean],
+      classOf[org.apache.spark.sql.StorageLevel]
+    ) should not be null
+    classOf[Dataset[?]].getMethod(
+      "localCheckpoint",
+      classOf[Boolean],
+      classOf[org.apache.spark.sql.StorageLevel]
+    ) should not be null
+  }
+
   test("Dataset has tail method") {
     classOf[Dataset[?]].getMethod("tail", classOf[Int]) should not be null
   }

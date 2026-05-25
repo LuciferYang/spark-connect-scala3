@@ -1463,6 +1463,22 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     classOf[DataFrame].getMethod("localCheckpoint", classOf[Boolean]) should not be null
   }
 
+  test("checkpoint(eager, storageLevel) overload exists (R83)") {
+    classOf[DataFrame].getMethod(
+      "checkpoint",
+      classOf[Boolean],
+      classOf[SparkStorageLevel]
+    ) should not be null
+  }
+
+  test("localCheckpoint(eager, storageLevel) overload exists (R83)") {
+    classOf[DataFrame].getMethod(
+      "localCheckpoint",
+      classOf[Boolean],
+      classOf[SparkStorageLevel]
+    ) should not be null
+  }
+
   test("inputFiles method exists") {
     classOf[DataFrame].getMethod("inputFiles") should not be null
   }

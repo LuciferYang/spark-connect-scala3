@@ -403,18 +403,34 @@ final class DataFrame private[sql] (
   /** Returns a checkpointed version of this DataFrame. */
   def checkpoint(eager: Boolean = true): DataFrame = checkpointInternal(eager, local = false)
 
+  /** Returns a checkpointed version of this DataFrame at the given [[StorageLevel]]. */
+  def checkpoint(eager: Boolean, storageLevel: StorageLevel): DataFrame =
+    checkpointInternal(eager, local = false, storageLevel = Some(storageLevel))
+
   /** Returns a locally checkpointed version of this DataFrame. */
   def localCheckpoint(eager: Boolean = true): DataFrame = checkpointInternal(eager, local = true)
 
-  private def checkpointInternal(eager: Boolean, local: Boolean): DataFrame =
+  /** Returns a locally checkpointed version of this DataFrame at the given [[StorageLevel]].
+    *
+    * Matches upstream `Dataset.localCheckpoint(eager, storageLevel)` so callers can override the
+    * server-default `MEMORY_AND_DISK` for storage-level-sensitive workflows (e.g.
+    * `StorageLevel.DISK_ONLY` for memory-pressured iterative pipelines).
+    */
+  def localCheckpoint(eager: Boolean, storageLevel: StorageLevel): DataFrame =
+    checkpointInternal(eager, local = true, storageLevel = Some(storageLevel))
+
+  private def checkpointInternal(
+      eager: Boolean,
+      local: Boolean,
+      storageLevel: Option[StorageLevel] = None
+  ): DataFrame =
+    val ckBuilder = CheckpointCommand.newBuilder()
+      .setRelation(relation)
+      .setLocal(local)
+      .setEager(eager)
+    storageLevel.foreach(sl => ckBuilder.setStorageLevel(sl.toProto))
     val cmd = Command.newBuilder()
-      .setCheckpointCommand(
-        CheckpointCommand.newBuilder()
-          .setRelation(relation)
-          .setLocal(local)
-          .setEager(eager)
-          .build()
-      )
+      .setCheckpointCommand(ckBuilder.build())
       .build()
     val responses = client.executeCommandWithResponses(cmd)
     val result = responses

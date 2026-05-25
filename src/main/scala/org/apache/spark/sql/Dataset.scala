@@ -622,9 +622,17 @@ final class Dataset[T: ClassTag] private[sql] (
   /** Checkpoint this Dataset. */
   def checkpoint(eager: Boolean = true): Dataset[T] = Dataset(df.checkpoint(eager), encoder)
 
+  /** Checkpoint this Dataset at the given [[StorageLevel]]. */
+  def checkpoint(eager: Boolean, storageLevel: StorageLevel): Dataset[T] =
+    Dataset(df.checkpoint(eager, storageLevel), encoder)
+
   /** Locally checkpoint this Dataset. */
   def localCheckpoint(eager: Boolean = true): Dataset[T] =
     Dataset(df.localCheckpoint(eager), encoder)
+
+  /** Locally checkpoint this Dataset at the given [[StorageLevel]]. */
+  def localCheckpoint(eager: Boolean, storageLevel: StorageLevel): Dataset[T] =
+    Dataset(df.localCheckpoint(eager, storageLevel), encoder)
 
   /** Randomly split into multiple Datasets. */
   def randomSplit(weights: Array[Double], seed: Long = 0L): Array[Dataset[T]] =
