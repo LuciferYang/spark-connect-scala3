@@ -38,22 +38,36 @@ final class GroupedDataFrame private[sql] (
     val allCols = groupingExprs ++ pivotCol.toSeq ++ allAggs
     df.withRelation(allCols)(_.setAggregate(aggBuilder.build()))
 
+  /** Aggregate using `(columnName, functionName)` pairs.
+    *
+    * Sequence order is preserved and duplicate column keys are NOT collapsed — this matches
+    * upstream `RelationalGroupedDataset.agg(aggExpr, aggExprs*)`. The earlier `.toMap`-based
+    * implementation silently dropped earlier `(col, fn)` pairs when a later pair shared the same
+    * column name, so e.g. `agg("salary" -> "max", "salary" -> "min")` lost the max aggregate.
+    */
   def agg(aggExpr: (String, String), aggExprs: (String, String)*): DataFrame =
-    agg((aggExpr +: aggExprs).toMap)
+    val pairs = aggExpr +: aggExprs
+    val aggCols = pairs.map((colName, funcName) => buildAggCol(colName, funcName))
+    agg(aggCols.head, aggCols.tail*)
 
   def agg(exprs: Map[String, String]): DataFrame =
     val aggCols = exprs.map { (colName, funcName) =>
-      Column(Expression.newBuilder().setUnresolvedFunction(
-        Expression.UnresolvedFunction.newBuilder()
-          .setFunctionName(funcName)
-          .addArguments(Column(colName).expr)
-          .build()
-      ).build()).as(s"$funcName($colName)")
+      buildAggCol(colName, funcName)
     }.toSeq
     if aggCols.isEmpty then
       df
     else
       agg(aggCols.head, aggCols.tail*)
+
+  private def buildAggCol(colName: String, funcName: String): Column =
+    Column(
+      Expression.newBuilder().setUnresolvedFunction(
+        Expression.UnresolvedFunction.newBuilder()
+          .setFunctionName(funcName)
+          .addArguments(Column(colName).expr)
+          .build()
+      ).build()
+    ).as(s"$funcName($colName)")
 
   /** Java-friendly variant of agg using java.util.Map. */
   def agg(exprs: java.util.Map[String, String]): DataFrame =
@@ -74,23 +88,15 @@ final class GroupedDataFrame private[sql] (
   // Convenience methods
   def count(): DataFrame = agg(functions.count(functions.lit(1)).as("count"))
 
-  def mean(colNames: String*): DataFrame =
-    val cols = resolveColNames(colNames, "avg")
-    if cols.isEmpty then df else agg(cols.head, cols.tail*)
+  def mean(colNames: String*): DataFrame = aggregateNumericColumns(colNames, "avg")
 
   def avg(colNames: String*): DataFrame = mean(colNames*)
 
-  def max(colNames: String*): DataFrame =
-    val cols = resolveColNames(colNames, "max")
-    if cols.isEmpty then df else agg(cols.head, cols.tail*)
+  def max(colNames: String*): DataFrame = aggregateNumericColumns(colNames, "max")
 
-  def min(colNames: String*): DataFrame =
-    val cols = resolveColNames(colNames, "min")
-    if cols.isEmpty then df else agg(cols.head, cols.tail*)
+  def min(colNames: String*): DataFrame = aggregateNumericColumns(colNames, "min")
 
-  def sum(colNames: String*): DataFrame =
-    val cols = resolveColNames(colNames, "sum")
-    if cols.isEmpty then df else agg(cols.head, cols.tail*)
+  def sum(colNames: String*): DataFrame = aggregateNumericColumns(colNames, "sum")
 
   def pivot(pivotCol: Column): GroupedDataFrame =
     new GroupedDataFrame(
@@ -128,15 +134,27 @@ final class GroupedDataFrame private[sql] (
     import scala.jdk.CollectionConverters.*
     pivot(pivotCol, values.asScala.toSeq)
 
-  private def resolveColNames(colNames: Seq[String], funcName: String): Seq[Column] =
-    colNames.map { name =>
-      Column(Expression.newBuilder().setUnresolvedFunction(
-        Expression.UnresolvedFunction.newBuilder()
-          .setFunctionName(funcName)
-          .addArguments(Column(name).expr)
-          .build()
-      ).build()).as(s"$funcName($name)")
-    }
+  /** Aggregate one numeric function across the named columns. When `colNames` is empty, fall back
+    * to all numeric fields of `df.schema` — matching upstream's `df.groupBy(...).mean()` (no-arg)
+    * shorthand for "all numeric columns". The schema lookup triggers an `analyzePlan` RPC; pass
+    * explicit `colNames` to keep the call lazy.
+    */
+  private def aggregateNumericColumns(colNames: Seq[String], funcName: String): DataFrame =
+    val effective =
+      if colNames.nonEmpty then colNames
+      else
+        df.schema.fields.collect {
+          case f if isNumeric(f.dataType) => f.name
+        }.toSeq
+    val cols = effective.map(name => buildAggCol(name, funcName))
+    if cols.isEmpty then df else agg(cols.head, cols.tail*)
+
+  private def isNumeric(dt: org.apache.spark.sql.types.DataType): Boolean =
+    import org.apache.spark.sql.types.*
+    dt match
+      case ByteType | ShortType | IntegerType | LongType | FloatType | DoubleType => true
+      case _: DecimalType                                                         => true
+      case _                                                                      => false
 
 object GroupedDataFrame:
   enum GroupType:

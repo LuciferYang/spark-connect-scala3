@@ -840,3 +840,48 @@ class StreamingQueryListenerSuite extends AnyFunSuite with Matchers:
     val escaped = org.apache.spark.sql.internal.JsonEscaping.escape(input)
     assert(escaped == "a\\u2028b\\u2029c", s"expected escaped line separators, got: $escaped")
   }
+
+  // ---------------------------------------------------------------------------
+  // R39: registerServerSideListener loop fails fast when the server closes the
+  // stream before sending LISTENER_ADDED, so callers can roll back the local
+  // listener list.
+  // ---------------------------------------------------------------------------
+
+  private def stubBusForR39: StreamingQueryListenerBus =
+    val session =
+      org.apache.spark.sql.SparkSession.builder().remote("sc://localhost:15002").build()
+    StreamingQueryListenerBus(session)
+
+  test("awaitListenerConfirmation throws IOException when stream closes empty (R39)") {
+    val bus = stubBusForR39
+    val emptyIter = Iterator.empty[ExecutePlanResponse]
+    val ex = intercept[java.io.IOException] {
+      bus.awaitListenerConfirmation(emptyIter, deadlineNanos = Long.MaxValue)
+    }
+    ex.getMessage should include("before confirmation")
+  }
+
+  test("awaitListenerConfirmation throws TimeoutException when deadline elapses (R39)") {
+    val bus = stubBusForR39
+    val infiniteEmpty = Iterator.continually(ExecutePlanResponse.getDefaultInstance)
+    val ex = intercept[java.util.concurrent.TimeoutException] {
+      bus.awaitListenerConfirmation(infiniteEmpty, deadlineNanos = System.nanoTime() - 1L)
+    }
+    ex.getMessage should include("Timed out")
+  }
+
+  test("awaitListenerConfirmation returns the iterator on LISTENER_ADDED (R39)") {
+    val bus = stubBusForR39
+    val confirm = ExecutePlanResponse.newBuilder()
+      .setStreamingQueryListenerEventsResult(
+        StreamingQueryListenerEventsResult.newBuilder()
+          .setListenerBusListenerAdded(true)
+          .build()
+      )
+      .build()
+    val tail = ExecutePlanResponse.getDefaultInstance
+    val iter = Iterator(confirm, tail)
+    val result = bus.awaitListenerConfirmation(iter, deadlineNanos = Long.MaxValue)
+    result.hasNext shouldBe true
+    result.next() shouldBe tail
+  }

@@ -4,6 +4,8 @@ import org.apache.spark.connect.proto.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
+import scala.jdk.CollectionConverters.*
+
 class GroupedDataFrameSuite extends AnyFunSuite with Matchers:
 
   private def stubSession: SparkSession = SparkSession(null)
@@ -127,6 +129,29 @@ class GroupedDataFrameSuite extends AnyFunSuite with Matchers:
     result.relation.hasAggregate shouldBe true
     val agg = result.relation.getAggregate
     agg.getAggregateExpressionsCount shouldBe 1
+  }
+
+  test("agg((String, String)*) preserves duplicate column keys (R41)") {
+    // Two aggregations on the same column ("salary" -> "max" and "salary" -> "min")
+    // must both reach the proto. The previous .toMap path silently merged them.
+    val result = stubGrouped.agg("salary" -> "max", "salary" -> "min")
+    result.relation.hasAggregate shouldBe true
+    val agg = result.relation.getAggregate
+    agg.getAggregateExpressionsCount shouldBe 2
+    val funcs = (0 until 2)
+      .map(i => agg.getAggregateExpressions(i).getAlias.getNameList.asScala.head)
+      .toSet
+    funcs shouldBe Set("max(salary)", "min(salary)")
+  }
+
+  test("agg((String, String)*) preserves sequence order (R41)") {
+    val result = stubGrouped.agg("a" -> "sum", "b" -> "max", "a" -> "min")
+    val agg = result.relation.getAggregate
+    agg.getAggregateExpressionsCount shouldBe 3
+    val orderedNames = (0 until 3)
+      .map(i => agg.getAggregateExpressions(i).getAlias.getNameList.asScala.head)
+      .toList
+    orderedNames shouldBe List("sum(a)", "max(b)", "min(a)")
   }
 
   // ---------------------------------------------------------------------------
@@ -345,33 +370,28 @@ class GroupedDataFrameSuite extends AnyFunSuite with Matchers:
     agg.getGroupingSetsCount shouldBe 3
   }
 
-  // -- empty colNames variants --
+  // -- empty colNames variants — R70: now triggers schema RPC for numeric column auto-select.
+  // Stub session has a null client, so the schema lookup NPEs. These tests pin the new
+  // contract: empty colNames is no longer a silent no-op returning the original df.
 
-  test("mean with no column names returns original df") {
-    val result = stubGrouped.mean()
-    // When resolveColNames returns empty, mean returns the original df
-    // Since no columns are specified, cols is empty, returning df unchanged
-    result should not be null
+  test("mean with no column names triggers schema RPC (R70)") {
+    assertThrows[NullPointerException](stubGrouped.mean())
   }
 
-  test("max with no column names returns original df") {
-    val result = stubGrouped.max()
-    result should not be null
+  test("max with no column names triggers schema RPC (R70)") {
+    assertThrows[NullPointerException](stubGrouped.max())
   }
 
-  test("min with no column names returns original df") {
-    val result = stubGrouped.min()
-    result should not be null
+  test("min with no column names triggers schema RPC (R70)") {
+    assertThrows[NullPointerException](stubGrouped.min())
   }
 
-  test("sum with no column names returns original df") {
-    val result = stubGrouped.sum()
-    result should not be null
+  test("sum with no column names triggers schema RPC (R70)") {
+    assertThrows[NullPointerException](stubGrouped.sum())
   }
 
-  test("avg with no column names returns original df") {
-    val result = stubGrouped.avg()
-    result should not be null
+  test("avg with no column names triggers schema RPC (R70)") {
+    assertThrows[NullPointerException](stubGrouped.avg())
   }
 
   // -- multiple columns in convenience methods --

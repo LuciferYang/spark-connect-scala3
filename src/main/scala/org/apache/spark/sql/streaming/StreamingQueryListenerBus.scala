@@ -72,10 +72,19 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
 
     val plan = Plan.newBuilder().setCommand(cmdBuilder.build()).build()
     val iterator = session.client.execute(plan)
-    val deadline = System.nanoTime() + RegisterListenerTimeoutNanos
+    awaitListenerConfirmation(iterator, System.nanoTime() + RegisterListenerTimeoutNanos)
+
+  /** Drive a freshly-opened add-listener stream until the server confirms, times out, or the stream
+    * closes. Extracted so unit tests can drive it with a stub iterator without going through
+    * `session.client.execute`.
+    */
+  private[sql] def awaitListenerConfirmation(
+      iterator: Iterator[ExecutePlanResponse],
+      deadlineNanos: Long
+  ): Iterator[ExecutePlanResponse] =
     try
       while iterator.hasNext do
-        if System.nanoTime() > deadline then
+        if System.nanoTime() > deadlineNanos then
           (iterator: Any) match
             case c: AutoCloseable => c.close()
             case _                => ()
@@ -86,7 +95,16 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
         val result = response.getStreamingQueryListenerEventsResult
         if result.hasListenerBusListenerAdded && result.getListenerBusListenerAdded then
           return iterator
-      iterator
+      // Stream ended before the server sent LISTENER_ADDED. Returning the exhausted
+      // iterator silently would leave the caller thinking registration succeeded while
+      // the event handler exits immediately — fail loudly so the caller's `append`
+      // catches and rolls back the local listener list.
+      (iterator: Any) match
+        case c: AutoCloseable => c.close()
+        case _                => ()
+      throw java.io.IOException(
+        "Server closed listener registration stream before confirmation"
+      )
     catch
       case e: java.util.concurrent.TimeoutException => throw e
       case e: Exception                             =>
