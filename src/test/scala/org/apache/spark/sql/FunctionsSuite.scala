@@ -712,6 +712,23 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.randn(42L), "randn", 1)
   }
 
+  test("rand()/randn() draw a fresh seed per call so two columns are independent (R36)") {
+    // Two consecutive `rand()` calls should bake distinct lit seeds into the proto.
+    val c1 = functions.rand().expr.getUnresolvedFunction.getArguments(0).getLiteral.getLong
+    val c2 = functions.rand().expr.getUnresolvedFunction.getArguments(0).getLiteral.getLong
+    c1 should not equal c2
+    val n1 = functions.randn().expr.getUnresolvedFunction.getArguments(0).getLiteral.getLong
+    val n2 = functions.randn().expr.getUnresolvedFunction.getArguments(0).getLiteral.getLong
+    n1 should not equal n2
+  }
+
+  test("rand(seed)/randn(seed) preserve the explicit seed (R36)") {
+    functions.rand(7L).expr.getUnresolvedFunction.getArguments(0)
+      .getLiteral.getLong shouldBe 7L
+    functions.randn(99L).expr.getUnresolvedFunction.getArguments(0)
+      .getLiteral.getLong shouldBe 99L
+  }
+
   test("ceiling") {
     assertFn(functions.ceiling(Column("x")), "ceiling", 1)
     assertFn(functions.ceiling(Column("x"), Column("s")), "ceiling", 2)

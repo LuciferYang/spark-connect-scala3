@@ -267,7 +267,8 @@ final class DataFrame private[sql] (
         .build()
     ))
 
-  def sample(fraction: Double, withReplacement: Boolean = false, seed: Long = 0L): DataFrame =
+  /** Random sample with the given seed. */
+  def sample(fraction: Double, withReplacement: Boolean, seed: Long): DataFrame =
     withRelation(_.setSample(
       Sample.newBuilder()
         .setInput(relation)
@@ -277,6 +278,23 @@ final class DataFrame private[sql] (
         .setSeed(seed)
         .build()
     ))
+
+  /** Random sample without replacement using the given seed. */
+  def sample(fraction: Double, seed: Long): DataFrame =
+    sample(fraction, withReplacement = false, seed)
+
+  /** Random sample without replacement. A fresh seed is drawn from `scala.util.Random.nextLong()`
+    * per call so successive invocations produce non-deterministic subsets — matching upstream
+    * `sample(fraction)` semantics.
+    */
+  def sample(fraction: Double): DataFrame =
+    sample(fraction, withReplacement = false, scala.util.Random.nextLong())
+
+  /** Random sample with the given replacement flag. A fresh seed is drawn from
+    * `scala.util.Random.nextLong()` per call.
+    */
+  def sample(fraction: Double, withReplacement: Boolean): DataFrame =
+    sample(fraction, withReplacement, scala.util.Random.nextLong())
 
   def describe(colNames: String*): DataFrame =
     val descBuilder = StatDescribe.newBuilder().setInput(relation)
@@ -637,8 +655,8 @@ final class DataFrame private[sql] (
     val explainStr = client.analyzeExplain(plan, explainMode)
     println(explainStr)
 
-  /** Randomly split this DataFrame into multiple DataFrames by weights. */
-  def randomSplit(weights: Array[Double], seed: Long = 0L): Array[DataFrame] =
+  /** Randomly split this DataFrame into multiple DataFrames by weights using the given seed. */
+  def randomSplit(weights: Array[Double], seed: Long): Array[DataFrame] =
     require(weights.nonEmpty, "weights must not be empty")
     require(weights.forall(w => w >= 0 && !w.isInfinite), "weights must be non-negative and finite")
     val sum = weights.sum
@@ -659,6 +677,13 @@ final class DataFrame private[sql] (
       lowerBound = upper
       df
     }
+
+  /** Randomly split this DataFrame into multiple DataFrames by weights. A fresh seed is drawn from
+    * `scala.util.Random.nextLong()` per call so successive invocations produce non-deterministic
+    * splits — matching upstream `randomSplit(weights)` semantics.
+    */
+  def randomSplit(weights: Array[Double]): Array[DataFrame] =
+    randomSplit(weights, scala.util.Random.nextLong())
 
   /** Randomly split into multiple DataFrames, returned as a Java List. */
   def randomSplitAsList(weights: Array[Double], seed: Long): java.util.List[DataFrame] =

@@ -258,12 +258,17 @@ final class Dataset[T: ClassTag] private[sql] (
   def sample(withReplacement: Boolean, fraction: Double, seed: Long): Dataset[T] =
     Dataset(df.sample(fraction, withReplacement, seed), encoder)
 
+  /** Sample a fraction of rows. A fresh seed is drawn per call. */
   def sample(withReplacement: Boolean, fraction: Double): Dataset[T] =
-    sample(withReplacement, fraction, 0L)
+    sample(withReplacement, fraction, scala.util.Random.nextLong())
 
+  /** Sample a fraction of rows without replacement using the given seed. */
   def sample(fraction: Double, seed: Long): Dataset[T] =
-    Dataset(df.sample(fraction, seed = seed), encoder)
+    Dataset(df.sample(fraction, seed), encoder)
 
+  /** Sample a fraction of rows without replacement. A fresh seed is drawn per call so successive
+    * invocations produce non-deterministic subsets — matching upstream `sample(fraction)`.
+    */
   def sample(fraction: Double): Dataset[T] =
     Dataset(df.sample(fraction), encoder)
 
@@ -423,9 +428,11 @@ final class Dataset[T: ClassTag] private[sql] (
   def dropDuplicates(colNames: Array[String]): Dataset[T] =
     Dataset(df.dropDuplicates(colNames.toSeq), encoder)
 
-  /** Java-friendly randomSplit without seed. */
+  /** Randomly split into multiple Datasets. A fresh seed is drawn per call so successive
+    * invocations produce non-deterministic splits — matching upstream `randomSplit(weights)`.
+    */
   def randomSplit(weights: Array[Double]): Array[Dataset[T]] =
-    randomSplit(weights, 0L)
+    randomSplit(weights, scala.util.Random.nextLong())
 
   /** Select columns matching a regex pattern. */
   def colRegex(colName: String): Column = df.colRegex(colName)
@@ -634,8 +641,8 @@ final class Dataset[T: ClassTag] private[sql] (
   def localCheckpoint(eager: Boolean, storageLevel: StorageLevel): Dataset[T] =
     Dataset(df.localCheckpoint(eager, storageLevel), encoder)
 
-  /** Randomly split into multiple Datasets. */
-  def randomSplit(weights: Array[Double], seed: Long = 0L): Array[Dataset[T]] =
+  /** Randomly split into multiple Datasets using the given seed. */
+  def randomSplit(weights: Array[Double], seed: Long): Array[Dataset[T]] =
     df.randomSplit(weights, seed).map(f => Dataset(f, encoder))
 
   /** Return the last n elements. */

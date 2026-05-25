@@ -197,8 +197,24 @@ object functions:
   def least(cols: Column*): Column = callFn("least", cols*)
   def least(colName: String, colNames: String*): Column =
     least((colName +: colNames).map(Column(_))*)
-  def rand(seed: Long = 0L): Column = callFn("rand", Column.lit(seed))
-  def randn(seed: Long = 0L): Column = callFn("randn", Column.lit(seed))
+
+  /** Generates a random column with i.i.d. samples from U[0.0, 1.0] using the given seed. */
+  def rand(seed: Long): Column = callFn("rand", Column.lit(seed))
+
+  /** Generates a random column with i.i.d. samples from U[0.0, 1.0]. A fresh seed is drawn from
+    * `scala.util.Random.nextLong()` per call so independent invocations produce independent
+    * sequences — matching upstream `rand()` semantics.
+    */
+  def rand(): Column = rand(scala.util.Random.nextLong())
+
+  /** Generates a random column with i.i.d. samples from N(0.0, 1.0) using the given seed. */
+  def randn(seed: Long): Column = callFn("randn", Column.lit(seed))
+
+  /** Generates a random column with i.i.d. samples from N(0.0, 1.0). A fresh seed is drawn from
+    * `scala.util.Random.nextLong()` per call so independent invocations produce independent
+    * sequences — matching upstream `randn()` semantics.
+    */
+  def randn(): Column = randn(scala.util.Random.nextLong())
   def log1p(col: Column): Column = callFn("log1p", col)
   def log1p(colName: String): Column = log1p(Column(colName))
   def expm1(col: Column): Column = callFn("expm1", col)

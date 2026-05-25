@@ -1547,14 +1547,30 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
 
   // ---------- sample default values ----------
 
-  test("sample with defaults builds Sample proto with withReplacement=false and seed=0") {
+  test(
+    "sample with defaults builds Sample proto with withReplacement=false and a fresh seed (R37)"
+  ) {
     val df = testDf()
     val result = df.sample(0.3)
     result.relation.hasSample shouldBe true
     val s = result.relation.getSample
     s.getWithReplacement shouldBe false
-    s.getSeed shouldBe 0L
     s.getUpperBound shouldBe 0.3
+    // Two no-seed calls should bake distinct seeds (matching upstream non-deterministic semantics).
+    val s2 = df.sample(0.3).relation.getSample
+    s.getSeed should not equal s2.getSeed
+  }
+
+  test("randomSplit without seed bakes a fresh seed shared across the splits (R37)") {
+    val df = testDf()
+    val splits = df.randomSplit(Array(1.0, 1.0))
+    splits should have size 2
+    val seed0 = splits(0).relation.getSample.getSeed
+    val seed1 = splits(1).relation.getSample.getSeed
+    seed0 shouldBe seed1 // same call → same seed across the resulting Sample relations
+    // Two independent randomSplit calls should differ.
+    val splits2 = df.randomSplit(Array(1.0, 1.0))
+    splits2(0).relation.getSample.getSeed should not equal seed0
   }
 
   // ---------- withRelation subquery wrapping ----------
