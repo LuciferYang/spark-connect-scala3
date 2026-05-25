@@ -26,19 +26,42 @@ final class Row private (
   /** True iff the value at position `i` is `null`. */
   def isNullAt(i: Int): Boolean = get(i) == null
 
-  def getBoolean(i: Int): Boolean = get(i).asInstanceOf[Boolean]
+  /** Primitive accessors all reject `null` with a `NullPointerException` carrying the field index,
+    * matching upstream Spark's `getAnyValAs` contract. Without the guard, `getBoolean` silently
+    * unboxes `null` to `false` (Scala default for primitive cast) — indistinguishable from a real
+    * `false` — and the numeric accessors would NPE inside the `Number` cast with no useful field
+    * context. Use [[isNullAt]] or [[get]] for nullable fields.
+    */
+  private def requireNotNull(i: Int): Unit =
+    if isNullAt(i) then throw NullPointerException(s"Value at index $i is null")
 
-  def getByte(i: Int): Byte = get(i).asInstanceOf[Number].byteValue()
+  def getBoolean(i: Int): Boolean =
+    requireNotNull(i)
+    get(i).asInstanceOf[Boolean]
 
-  def getShort(i: Int): Short = get(i).asInstanceOf[Number].shortValue()
+  def getByte(i: Int): Byte =
+    requireNotNull(i)
+    get(i).asInstanceOf[Number].byteValue()
 
-  def getInt(i: Int): Int = get(i).asInstanceOf[Number].intValue()
+  def getShort(i: Int): Short =
+    requireNotNull(i)
+    get(i).asInstanceOf[Number].shortValue()
 
-  def getLong(i: Int): Long = get(i).asInstanceOf[Number].longValue()
+  def getInt(i: Int): Int =
+    requireNotNull(i)
+    get(i).asInstanceOf[Number].intValue()
 
-  def getFloat(i: Int): Float = get(i).asInstanceOf[Number].floatValue()
+  def getLong(i: Int): Long =
+    requireNotNull(i)
+    get(i).asInstanceOf[Number].longValue()
 
-  def getDouble(i: Int): Double = get(i).asInstanceOf[Number].doubleValue()
+  def getFloat(i: Int): Float =
+    requireNotNull(i)
+    get(i).asInstanceOf[Number].floatValue()
+
+  def getDouble(i: Int): Double =
+    requireNotNull(i)
+    get(i).asInstanceOf[Number].doubleValue()
 
   def getString(i: Int): String = get(i).asInstanceOf[String]
 

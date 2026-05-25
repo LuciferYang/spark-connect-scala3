@@ -339,3 +339,49 @@ class RowSuite extends AnyFunSuite with Matchers:
     row.getGeography(0).getSrid shouldBe 4326
     row.getGeography(0).getBytes shouldBe Array[Byte](4, 5, 6)
   }
+
+  // ---------------------------------------------------------------------------
+  // R15: primitive accessors raise a uniform NPE on null rather than silently
+  // unboxing Boolean → false (Scala primitive default) or NPE'ing inside the
+  // numeric Number cast with no field context.
+  // ---------------------------------------------------------------------------
+
+  private def expectNpeAt(i: Int)(thunk: => Any): Unit =
+    val ex = intercept[NullPointerException](thunk)
+    ex.getMessage should include(s"index $i")
+    ex.getMessage should include("null")
+
+  test("Row.getBoolean throws NPE on null instead of silently returning false (R15)") {
+    val row = Row(null)
+    expectNpeAt(0)(row.getBoolean(0))
+  }
+
+  test("Row.getByte throws NPE with field context on null (R15)") {
+    val row = Row(null)
+    expectNpeAt(0)(row.getByte(0))
+  }
+
+  test("Row.getShort throws NPE with field context on null (R15)") {
+    val row = Row(null)
+    expectNpeAt(0)(row.getShort(0))
+  }
+
+  test("Row.getInt throws NPE with field context on null (R15)") {
+    val row = Row(null)
+    expectNpeAt(0)(row.getInt(0))
+  }
+
+  test("Row.getLong throws NPE with field context on null (R15)") {
+    val row = Row(null)
+    expectNpeAt(0)(row.getLong(0))
+  }
+
+  test("Row.getFloat throws NPE with field context on null (R15)") {
+    val row = Row(null)
+    expectNpeAt(0)(row.getFloat(0))
+  }
+
+  test("Row.getDouble throws NPE with field context on null (R15)") {
+    val row = Row(null)
+    expectNpeAt(0)(row.getDouble(0))
+  }
