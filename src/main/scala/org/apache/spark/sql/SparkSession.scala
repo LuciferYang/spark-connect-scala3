@@ -185,6 +185,25 @@ final class SparkSession private[sql] (
     import scala.jdk.CollectionConverters.*
     createDataFrame(rows.asScala.toSeq, schema)
 
+  /** Create a DataFrame from a `Seq` of case-class / `Product` values, deriving the schema and row
+    * encoding at compile time.
+    *
+    * Mirrors upstream `SparkSession.createDataFrame[A &lt;: Product](data: Seq[A])` so callers can
+    * write `spark.createDataFrame(Seq(Person("a", 1)))` without hand-rolling `Row` + `StructType`.
+    *
+    * The Java-bean variant `createDataFrame(util.List[_], Class[_])` is intentionally not provided
+    * — Scala 3 client users have no idiomatic call site for it; Java users should use the upstream
+    * Scala 2.13 / Java client.
+    */
+  inline def createDataFrame[A <: Product](data: Seq[A])(
+      using
+      scala.deriving.Mirror.ProductOf[A],
+      scala.reflect.ClassTag[A]
+  ): DataFrame =
+    val enc = Encoder.derived[A]
+    val rows = data.map(enc.toRow)
+    createDataFrame(rows, enc.schema)
+
   // ---------------------------------------------------------------------------
   // createDataset (typed)
   // ---------------------------------------------------------------------------

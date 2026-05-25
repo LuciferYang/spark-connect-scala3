@@ -722,6 +722,35 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
     ds.df.relation.getLocalRelation.hasData shouldBe true
   }
 
+  // ---------------------------------------------------------------------------
+  // R90: createDataFrame[A <: Product] derives schema from a case-class Seq
+  // ---------------------------------------------------------------------------
+
+  test("createDataFrame[A <: Product] derives schema and emits LocalRelation (R90)") {
+    case class Person(name: String, age: Int)
+    val session = stubSession
+    val df = session.createDataFrame(Seq(Person("alice", 30), Person("bob", 25)))
+    df.relation.hasLocalRelation shouldBe true
+    df.relation.getLocalRelation.hasData shouldBe true
+    df.relation.getLocalRelation.hasSchema shouldBe true
+    val schemaDDL = df.relation.getLocalRelation.getSchema
+    schemaDDL should include("name")
+    schemaDDL should include("STRING")
+    schemaDDL should include("age")
+    schemaDDL should include("INT")
+  }
+
+  test("createDataFrame[A <: Product] handles an empty Seq") {
+    case class Score(subject: String, value: Double)
+    val session = stubSession
+    val df = session.createDataFrame(Seq.empty[Score])
+    df.relation.hasLocalRelation shouldBe true
+    df.relation.getLocalRelation.hasSchema shouldBe true
+    val schemaDDL = df.relation.getLocalRelation.getSchema
+    schemaDDL should include("subject")
+    schemaDDL should include("value")
+  }
+
   test("sql(query, Array) builds SQL with positional arguments") {
     val session = stubSession
     val df = session.sql("SELECT ?", Array[Any](42))
