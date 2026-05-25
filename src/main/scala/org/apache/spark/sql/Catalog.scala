@@ -164,8 +164,18 @@ final class Catalog private[sql] (private val session: SparkSession):
     session.sql(s"SHOW TBLPROPERTIES ${quoteIdent(tableName)}")
 
   def getCreateTableString(tableName: String, asSerde: Boolean = false): String =
-    val keyword = if asSerde then "SHOW CREATE TABLE AS SERDE" else "SHOW CREATE TABLE"
-    session.sql(s"$keyword ${quoteIdent(tableName)}").collect().head.getString(0)
+    session.sql(buildShowCreateTableSql(quoteIdent(tableName), asSerde))
+      .collect().head.getString(0)
+
+  /** Build the `SHOW CREATE TABLE` SQL string for the given (already-quoted) identifier.
+    *
+    * `SqlBaseParser` grammar requires `(AS SERDE)?` to follow the identifier:
+    * `SHOW CREATE TABLE identifierReference (AS SERDE)?`. Putting `AS SERDE` in front of the
+    * identifier causes `ParseException` on the server.
+    */
+  private[sql] def buildShowCreateTableSql(quotedIdent: String, asSerde: Boolean): String =
+    val suffix = if asSerde then " AS SERDE" else ""
+    s"SHOW CREATE TABLE $quotedIdent$suffix"
 
   // ---------------------------------------------------------------------------
   // Existence checks

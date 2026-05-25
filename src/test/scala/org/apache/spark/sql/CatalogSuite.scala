@@ -456,3 +456,19 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     val query = df.relation.getSql.getQuery
     query should include("path\\\\to\\\\file")
   }
+
+  // ---------------------------------------------------------------------------
+  // R47: getCreateTableString puts AS SERDE after the table name (grammar fix)
+  // ---------------------------------------------------------------------------
+
+  test("buildShowCreateTableSql places AS SERDE after the identifier (R47)") {
+    val cat = testCatalog
+    cat.buildShowCreateTableSql("`hiveTbl`", asSerde = true) shouldBe
+      "SHOW CREATE TABLE `hiveTbl` AS SERDE"
+  }
+
+  test("buildShowCreateTableSql omits AS SERDE when asSerde is false") {
+    val cat = testCatalog
+    cat.buildShowCreateTableSql("`tbl`", asSerde = false) shouldBe
+      "SHOW CREATE TABLE `tbl`"
+  }
