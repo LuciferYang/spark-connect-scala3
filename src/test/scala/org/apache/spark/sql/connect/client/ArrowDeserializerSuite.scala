@@ -26,10 +26,11 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
       writeFn(root.getFieldVectors.get(0), root)
       val baos = ByteArrayOutputStream()
       val writer = ArrowStreamWriter(root, null, baos)
-      writer.start()
-      writer.writeBatch()
-      writer.end()
-      writer.close()
+      try
+        writer.start()
+        writer.writeBatch()
+        writer.end()
+      finally writer.close()
       baos.toByteArray
     finally
       root.close()
@@ -231,10 +232,11 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
       root.setRowCount(1)
       val baos = ByteArrayOutputStream()
       val writer = ArrowStreamWriter(root, null, baos)
-      writer.start()
-      writer.writeBatch()
-      writer.end()
-      writer.close()
+      try
+        writer.start()
+        writer.writeBatch()
+        writer.end()
+      finally writer.close()
       baos.toByteArray
     finally
       root.close()
@@ -288,10 +290,11 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
       root.setRowCount(1)
       val baos = ByteArrayOutputStream()
       val writer = ArrowStreamWriter(root, null, baos)
-      writer.start()
-      writer.writeBatch()
-      writer.end()
-      writer.close()
+      try
+        writer.start()
+        writer.writeBatch()
+        writer.end()
+      finally writer.close()
 
       val (rows, _) = ArrowDeserializer.fromArrowBatchWithSchema(baos.toByteArray)
       rows should have size 1
@@ -335,10 +338,11 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
       root.setRowCount(1)
       val baos = ByteArrayOutputStream()
       val writer = ArrowStreamWriter(root, null, baos)
-      writer.start()
-      writer.writeBatch()
-      writer.end()
-      writer.close()
+      try
+        writer.start()
+        writer.writeBatch()
+        writer.end()
+      finally writer.close()
 
       val (rows, inferredSchema) = ArrowDeserializer.fromArrowBatchWithSchema(baos.toByteArray)
       rows should have size 1

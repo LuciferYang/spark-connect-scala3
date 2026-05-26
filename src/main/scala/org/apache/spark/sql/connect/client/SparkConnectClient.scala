@@ -138,10 +138,6 @@ final class SparkConnectClient private (
         }
       case cached => cached
 
-  /** For testing: override the compression state. */
-  private[client] def setPlanCompressionOptions(state: CompressionState): Unit =
-    _planCompressionOptions = state
-
   /** Try to compress the plan if it exceeds the threshold. Returns the original plan if compression
     * is disabled, not needed, or not effective.
     */

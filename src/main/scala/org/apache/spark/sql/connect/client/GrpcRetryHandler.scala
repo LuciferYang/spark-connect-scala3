@@ -12,7 +12,8 @@ import java.util.concurrent.ThreadLocalRandom
   */
 class GrpcRetryHandler(
     policy: RetryPolicy,
-    sleep: Long => Unit = Thread.sleep
+    sleep: Long => Unit = Thread.sleep,
+    nowNanos: () => Long = () => System.nanoTime()
 ):
 
   /** Execute `fn`, retrying up to `policy.maxRetries` times on retryable errors.
@@ -23,7 +24,7 @@ class GrpcRetryHandler(
   def retry[T](fn: => T): T =
     var lastException: Throwable = null
     var attempt = 0
-    val deadline = System.nanoTime() + policy.maxTotalDurationMs * 1_000_000L
+    val deadline = nowNanos() + policy.maxTotalDurationMs * 1_000_000L
     while attempt <= policy.maxRetries do
       try return fn
       catch
@@ -32,7 +33,7 @@ class GrpcRetryHandler(
           attempt += 1 // immediate retry, no backoff
         case e: Throwable if policy.canRetry(e) && attempt < policy.maxRetries =>
           lastException = e
-          if System.nanoTime() >= deadline then throw e // total duration budget exhausted
+          if nowNanos() >= deadline then throw e // total duration budget exhausted
           val backoff = math.min(
             policy.initialBackoffMs * math.pow(policy.backoffMultiplier, attempt.toDouble).toLong,
             policy.maxBackoffMs
@@ -40,7 +41,14 @@ class GrpcRetryHandler(
           val jitter =
             if policy.jitterMs > 0 then ThreadLocalRandom.current().nextLong(policy.jitterMs)
             else 0L
-          sleep(backoff + jitter)
+          try sleep(backoff + jitter)
+          catch
+            case ie: InterruptedException =>
+              // `Thread.sleep` clears the interrupt flag when it throws. Restore it so
+              // cooperative-cancellation callers (gRPC executor, structured concurrency,
+              // Future cancel) further up the stack still observe the interrupt.
+              Thread.currentThread.interrupt()
+              throw ie
           attempt += 1
         case e: Throwable =>
           throw e

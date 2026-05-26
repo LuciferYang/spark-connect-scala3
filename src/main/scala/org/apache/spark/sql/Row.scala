@@ -77,6 +77,14 @@ final class Row private (
 
   /** Get the value at position `i` as a `java.math.BigDecimal`. Accepts either Java/Scala
     * `BigDecimal` or any `Number` (lossy via `doubleValue` for non-decimal numerics).
+    *
+    * Unlike the other `getXxx` accessors which use `asInstanceOf` and surface a
+    * `ClassCastException` on a type mismatch, this method dispatches via pattern match with no
+    * fallback case — non-`Number` / non-`BigDecimal` values raise `MatchError`. Use [[get]] if you
+    * need to inspect the raw value first.
+    *
+    * @throws scala.MatchError
+    *   if the value is neither `Number` nor `BigDecimal`.
     */
   def getDecimal(i: Int): java.math.BigDecimal = get(i) match
     case d: java.math.BigDecimal => d

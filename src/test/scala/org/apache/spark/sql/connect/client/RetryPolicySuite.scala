@@ -133,8 +133,10 @@ class RetryPolicySuite extends AnyFunSuite with Matchers:
   }
 
   test("GrpcRetryHandler rethrows when maxTotalDurationMs is exhausted") {
-    // Use a sleep callback that consumes real wall time so the deadline check trips.
+    // Drive both clock and sleep counter under test control — no real wall time involved, so
+    // the deadline trips deterministically regardless of CI jitter / GC pauses.
     var attempts = 0
+    val virtualClock = new java.util.concurrent.atomic.AtomicLong(0L)
     val handler = GrpcRetryHandler(
       RetryPolicy(
         maxRetries = 100, // generous — deadline must trip first
@@ -142,7 +144,10 @@ class RetryPolicySuite extends AnyFunSuite with Matchers:
         jitterMs = 0,
         maxTotalDurationMs = 30
       ),
-      sleep = _ => Thread.sleep(50) // single sleep already exceeds the 30ms budget
+      // Each "sleep" advances the virtual clock by 50ms (50ms > 30ms budget → first deadline
+      // check after one retry already trips the bound).
+      sleep = _ => virtualClock.addAndGet(50L * 1_000_000L),
+      nowNanos = () => virtualClock.get()
     )
     val thrown = intercept[StatusRuntimeException] {
       handler.retry {
@@ -151,9 +156,26 @@ class RetryPolicySuite extends AnyFunSuite with Matchers:
       }
     }
     thrown.getStatus.getCode shouldBe Status.Code.UNAVAILABLE
-    // Expected: 1st call fails → sleep(50ms) → 2nd call fails → deadline check trips → rethrow.
-    // We do not assert exact attempt count to avoid flakiness on slow CI, but it must be < 100
-    // (the deadline path, not the maxRetries path).
-    attempts should be < 100
-    attempts should be >= 2
+    // 1st fn call fails → sleep(advances clock by 50ms) → 2nd fn call fails → deadline
+    // check sees `now >= deadline` → rethrow. Upper bound guards against accidentally
+    // taking the maxRetries path if the deadline is silently ignored.
+    attempts shouldBe 2
+  }
+
+  test("GrpcRetryHandler restores interrupt flag when sleep throws InterruptedException (R18)") {
+    val handler = GrpcRetryHandler(
+      RetryPolicy(maxRetries = 5, initialBackoffMs = 1, jitterMs = 0),
+      sleep = _ => throw java.lang.InterruptedException("simulated cancellation")
+    )
+    // Make sure we start with a clean interrupt flag.
+    Thread.interrupted()
+    val thrown = intercept[InterruptedException] {
+      handler.retry {
+        throw StatusRuntimeException(Status.UNAVAILABLE)
+      }
+    }
+    thrown.getMessage shouldBe "simulated cancellation"
+    // The handler must have re-asserted the interrupt status before rethrowing — read the flag
+    // and clear it so test isolation is preserved.
+    Thread.interrupted() shouldBe true
   }
