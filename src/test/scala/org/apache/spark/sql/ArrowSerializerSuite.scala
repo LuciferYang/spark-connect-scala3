@@ -1,5 +1,6 @@
 package org.apache.spark.sql
 
+import org.apache.spark.sql.connect.client.ArrowDeserializer
 import org.apache.spark.sql.types.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -163,6 +164,78 @@ class ArrowSerializerSuite extends AnyFunSuite with Matchers:
     val rows = Seq(Row("42.00"))
     val bytes = ArrowSerializer.encodeRows(rows, schema)
     bytes should not be empty
+  }
+
+  // R23: BigDecimal scale must be rescaled to the schema's scale before Arrow accepts it.
+  test("encodeRows rescales lower-scale BigDecimal up to schema scale (R23)") {
+    val schema = StructType(Seq(StructField("d", DecimalType(10, 2))))
+    // scale=0 against DecimalType(10, 2) — rescale should round to "99.00".
+    val bytes = ArrowSerializer.encodeRows(Seq(Row(java.math.BigDecimal("99"))), schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decoded.head.get(0).asInstanceOf[java.math.BigDecimal] shouldBe
+      new java.math.BigDecimal("99.00")
+  }
+
+  test("encodeRows rescales higher-scale BigDecimal down to schema scale (R23)") {
+    val schema = StructType(Seq(StructField("d", DecimalType(10, 2))))
+    // scale=3 against DecimalType(10, 2) — rescale (HALF_UP) → "100.00".
+    val bytes = ArrowSerializer.encodeRows(Seq(Row(java.math.BigDecimal("99.999"))), schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decoded.head.get(0).asInstanceOf[java.math.BigDecimal] shouldBe
+      new java.math.BigDecimal("100.00")
+  }
+
+  test("encodeRows rescales scala BigDecimal with mismatched scale (R23)") {
+    val schema = StructType(Seq(StructField("d", DecimalType(10, 2))))
+    val bytes = ArrowSerializer.encodeRows(Seq(Row(BigDecimal("99.9"))), schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decoded.head.get(0).asInstanceOf[java.math.BigDecimal] shouldBe
+      new java.math.BigDecimal("99.90")
+  }
+
+  test("encodeRows rescales String fallback path against DecimalType (R23)") {
+    val schema = StructType(Seq(StructField("d", DecimalType(10, 2))))
+    val bytes = ArrowSerializer.encodeRows(Seq(Row("100")), schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decoded.head.get(0).asInstanceOf[java.math.BigDecimal] shouldBe
+      new java.math.BigDecimal("100.00")
+  }
+
+  test("encodeRows nulls out BigDecimal exceeding schema precision (R23)") {
+    val schema = StructType(Seq(StructField("d", DecimalType(4, 2)))) // max value 99.99
+    val bytes = ArrowSerializer.encodeRows(Seq(Row(java.math.BigDecimal("12345.67"))), schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decoded.head.isNullAt(0) shouldBe true
+  }
+
+  // R24: setArrowValue must dispatch DayTimeIntervalType / YearMonthIntervalType / TimeType
+  // through DurationVector / IntervalYearVector / TimeMicroVector — sparkTypeToArrow maps
+  // them but the previous case list omitted these branches.
+
+  test("encodeRows round-trips java.time.Duration via DurationVector (R24)") {
+    val schema = StructType(Seq(StructField("d", DayTimeIntervalType, nullable = false)))
+    val input = java.time.Duration.ofSeconds(7).plusNanos(123_456_000L) // 7s + 123ms 456us
+    val bytes = ArrowSerializer.encodeRows(Seq(Row(input)), schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    val out = decoded.head.get(0).asInstanceOf[java.time.Duration]
+    out.toNanos shouldBe input.toNanos // microsecond precision matches Arrow vector unit
+  }
+
+  test("encodeRows round-trips java.time.Period via IntervalYearVector (R24)") {
+    val schema = StructType(Seq(StructField("p", YearMonthIntervalType, nullable = false)))
+    val input = java.time.Period.of(3, 4, 0) // 40 months total — Period.ofMonths normalizes
+    val bytes = ArrowSerializer.encodeRows(Seq(Row(input)), schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    // R42: decoder now surfaces a normalized Period rather than the raw int.
+    decoded.head.get(0).asInstanceOf[java.time.Period] shouldBe java.time.Period.of(3, 4, 0)
+  }
+
+  test("encodeRows round-trips java.time.LocalTime via TimeMicroVector (R24)") {
+    val schema = StructType(Seq(StructField("t", TimeType(), nullable = false)))
+    val input = java.time.LocalTime.of(13, 45, 7, 999_000_000) // 13:45:07.999_000 (microsecond)
+    val bytes = ArrowSerializer.encodeRows(Seq(Row(input)), schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decoded.head.get(0).asInstanceOf[java.time.LocalTime] shouldBe input
   }
 
   // ---------------------------------------------------------------------------

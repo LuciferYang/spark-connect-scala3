@@ -92,6 +92,98 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
     resultMicros shouldBe inputMicros
   }
 
+  test("TimeStampNanoVector preserves full nanosecond precision (R21)") {
+    val field = Field(
+      "ts",
+      FieldType.nullable(
+        new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.NANOSECOND, null)
+      ),
+      java.util.Collections.emptyList()
+    )
+
+    // 1_592_197_200_000_000_999L = wall-clock time with 999 nanoseconds tail.
+    val inputNanos = 1_592_197_200_000_000_999L
+
+    val bytes = encodeArrowBatch(field) { (vec, root) =>
+      val tv = vec.asInstanceOf[TimeStampNanoVector]
+      tv.setSafe(0, inputNanos)
+      tv.setValueCount(1)
+      root.setRowCount(1)
+    }
+
+    val (rows, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    rows should have size 1
+    val ts = rows.head.get(0).asInstanceOf[java.sql.Timestamp]
+    val resultNanos = ts.getTime * 1_000_000L + ts.getNanos % 1_000_000L
+    resultNanos shouldBe inputNanos
+    // Full nanosecond tail must survive the round-trip.
+    ts.getNanos % 1000 shouldBe 999
+  }
+
+  // R26: the three TZ variants previously fell through to `getObject` (Long) and then
+  // Row.getTimestamp ClassCastExceptioned. Mirror the non-TZ paths so each unit decodes to
+  // a real `java.sql.Timestamp`.
+
+  test("TimeStampMilliTZVector decodes to Timestamp (R26)") {
+    val field = Field(
+      "ts",
+      FieldType.nullable(
+        new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.MILLISECOND, "UTC")
+      ),
+      java.util.Collections.emptyList()
+    )
+    val inputMillis = 1_700_000_000_123L
+    val bytes = encodeArrowBatch(field) { (vec, root) =>
+      val tv = vec.asInstanceOf[TimeStampMilliTZVector]
+      tv.setSafe(0, inputMillis)
+      tv.setValueCount(1)
+      root.setRowCount(1)
+    }
+    val (rows, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    rows.head.get(0).asInstanceOf[java.sql.Timestamp].getTime shouldBe inputMillis
+  }
+
+  test("TimeStampSecTZVector decodes to Timestamp (R26)") {
+    val field = Field(
+      "ts",
+      FieldType.nullable(
+        new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.SECOND, "UTC")
+      ),
+      java.util.Collections.emptyList()
+    )
+    val inputSeconds = 1_700_000_000L
+    val bytes = encodeArrowBatch(field) { (vec, root) =>
+      val tv = vec.asInstanceOf[TimeStampSecTZVector]
+      tv.setSafe(0, inputSeconds)
+      tv.setValueCount(1)
+      root.setRowCount(1)
+    }
+    val (rows, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    rows.head.get(0).asInstanceOf[java.sql.Timestamp].getTime shouldBe inputSeconds * 1000L
+  }
+
+  test("TimeStampNanoTZVector preserves full nanosecond precision (R26)") {
+    val field = Field(
+      "ts",
+      FieldType.nullable(
+        new ArrowType.Timestamp(org.apache.arrow.vector.types.TimeUnit.NANOSECOND, "UTC")
+      ),
+      java.util.Collections.emptyList()
+    )
+    val inputNanos = 1_592_197_200_000_000_999L
+    val bytes = encodeArrowBatch(field) { (vec, root) =>
+      val tv = vec.asInstanceOf[TimeStampNanoTZVector]
+      tv.setSafe(0, inputNanos)
+      tv.setValueCount(1)
+      root.setRowCount(1)
+    }
+    val (rows, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    val ts = rows.head.get(0).asInstanceOf[java.sql.Timestamp]
+    val resultNanos = ts.getTime * 1_000_000L + ts.getNanos % 1_000_000L
+    resultNanos shouldBe inputNanos
+    ts.getNanos % 1000 shouldBe 999
+  }
+
   // ---------------------------------------------------------------------------
   // LargeVarChar
   // ---------------------------------------------------------------------------
@@ -349,6 +441,51 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
       // Should be a regular Row, not a VariantVal
       rows.head.get(0) shouldBe a[org.apache.spark.sql.Row]
       inferredSchema.get.fields.head.dataType shouldBe a[StructType]
+    finally
+      root.close()
+      allocator.close()
+  }
+
+  test("nested struct rows preserve schema for getAs(name) / json (R30)") {
+    // schema: outer { inner: { name: String } }
+    val innerName = Field(
+      "name",
+      FieldType.nullable(ArrowType.Utf8.INSTANCE),
+      java.util.Collections.emptyList()
+    )
+    val inner = Field(
+      "inner",
+      FieldType.nullable(ArrowType.Struct.INSTANCE),
+      java.util.Collections.singletonList(innerName)
+    )
+    val outerSchema = ArrowSchema(java.util.Collections.singletonList(inner))
+
+    val allocator = RootAllocator(Long.MaxValue)
+    val root = VectorSchemaRoot.create(outerSchema, allocator)
+    try
+      val innerVec = root.getFieldVectors.get(0).asInstanceOf[StructVector]
+      val nameVec = innerVec.getChild("name").asInstanceOf[VarCharVector]
+      nameVec.setSafe(0, "alice".getBytes("UTF-8"))
+      nameVec.setValueCount(1)
+      innerVec.setIndexDefined(0)
+      innerVec.setValueCount(1)
+      root.setRowCount(1)
+
+      val baos = ByteArrayOutputStream()
+      val writer = ArrowStreamWriter(root, null, baos)
+      try
+        writer.start()
+        writer.writeBatch()
+        writer.end()
+      finally writer.close()
+
+      val (rows, _) = ArrowDeserializer.fromArrowBatchWithSchema(baos.toByteArray)
+      rows should have size 1
+      val innerRow = rows.head.getStruct(0)
+      // Schema-bound access — would have raised UnsupportedOperationException before R30.
+      innerRow.getAs[String]("name") shouldBe "alice"
+      innerRow.fieldIndex("name") shouldBe 0
+      innerRow.json should include("alice")
     finally
       root.close()
       allocator.close()

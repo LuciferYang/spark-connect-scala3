@@ -6,11 +6,14 @@ import org.apache.arrow.vector.{
   BitVector,
   DateDayVector,
   DecimalVector,
+  DurationVector,
   FieldVector,
   Float4Vector,
   Float8Vector,
+  IntervalYearVector,
   IntVector,
   SmallIntVector,
+  TimeMicroVector,
   TimeStampMicroTZVector,
   TimeStampMicroVector,
   TinyIntVector,
@@ -207,11 +210,43 @@ private[sql] object ArrowSerializer:
         case v: TimeStampMicroVector =>
           v.setSafe(idx, toMicros(value))
         case v: DecimalVector =>
-          val bd = value match
+          val bd0 = value match
             case d: BigDecimal           => d.underlying()
             case d: java.math.BigDecimal => d
             case _                       => java.math.BigDecimal(value.toString)
-          v.setSafe(idx, bd)
+          // Match upstream ArrowWriter.DecimalWriter: rescale to the vector's declared scale
+          // (HALF_UP), then null out values that overflow the declared precision. Arrow's
+          // DecimalVector.setSafe would otherwise raise UnsupportedOperationException on any
+          // mismatched scale (e.g. BigDecimal("99") against DecimalType(10,2)).
+          val rescaled = bd0.setScale(v.getScale, java.math.RoundingMode.HALF_UP)
+          if rescaled.precision <= v.getPrecision then v.setSafe(idx, rescaled)
+          else v.setNull(idx)
+        case v: DurationVector =>
+          // sparkTypeToArrow maps DayTimeIntervalType -> Duration(MICROSECOND), so the value is
+          // serialized as microseconds (not raw nanoseconds). Number values are passed through.
+          value match
+            case d: java.time.Duration =>
+              v.setSafe(idx, d.getSeconds * 1_000_000L + d.getNano / 1_000L)
+            case n: Number =>
+              v.setSafe(idx, n.longValue())
+            case _ =>
+              v.setSafe(idx, value.toString.toLong)
+        case v: IntervalYearVector =>
+          value match
+            case p: java.time.Period =>
+              v.setSafe(idx, p.toTotalMonths.toInt)
+            case n: Number =>
+              v.setSafe(idx, n.intValue())
+            case _ =>
+              v.setSafe(idx, value.toString.toInt)
+        case v: TimeMicroVector =>
+          value match
+            case t: java.time.LocalTime =>
+              v.setSafe(idx, t.toNanoOfDay / 1_000L)
+            case n: Number =>
+              v.setSafe(idx, n.longValue())
+            case _ =>
+              v.setSafe(idx, value.toString.toLong)
         case v: VarBinaryVector =>
           val bytes = value.asInstanceOf[Array[Byte]]
           v.setSafe(idx, bytes, 0, bytes.length)

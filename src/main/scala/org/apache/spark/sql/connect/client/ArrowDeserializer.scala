@@ -16,10 +16,16 @@ import scala.jdk.CollectionConverters.*
 /** Deserializes Arrow IPC batches into Row sequences. */
 object ArrowDeserializer:
 
-  /** Cached metadata for a StructVector: whether it's a Variant struct, and its child field
-    * vectors.
+  /** Cached metadata for a StructVector: whether it's a Variant struct, its child field vectors,
+    * and the inner [[StructType]] (used so nested rows preserve their schema and `getAs(name)` /
+    * `fieldIndex` / `json` keep working — without the schema the inner Row would only support
+    * positional access).
     */
-  private case class StructVectorMeta(isVariant: Boolean, children: Seq[FieldVector])
+  private case class StructVectorMeta(
+      isVariant: Boolean,
+      children: Seq[FieldVector],
+      schema: StructType
+  )
 
   /** Maximum bytes the Arrow allocator may reserve (256 GB). */
   private val MaxAllocatorBytes: Long = 256L * 1024 * 1024 * 1024
@@ -98,10 +104,31 @@ object ArrowDeserializer:
       case v: TimeStampMilliVector =>
         java.sql.Timestamp(v.get(index))
 
+      case v: TimeStampMilliTZVector =>
+        java.sql.Timestamp(v.get(index))
+
       case v: TimeStampNanoVector =>
-        java.sql.Timestamp(v.get(index) / 1000000L)
+        // Preserve full nanosecond precision: split the epoch nanos into (seconds, nanoOfSecond)
+        // and build an Instant — `new Timestamp(nanos / 1_000_000L)` would silently drop the
+        // sub-millisecond tail. floorDiv/floorMod handles pre-epoch (negative) nanos correctly.
+        val n = v.get(index)
+        val sec = Math.floorDiv(n, 1_000_000_000L)
+        val rem = Math.floorMod(n, 1_000_000_000L).toInt
+        java.sql.Timestamp.from(java.time.Instant.ofEpochSecond(sec, rem.toLong))
+
+      case v: TimeStampNanoTZVector =>
+        // Same nanosecond-preserving pattern as the non-TZ variant — Arrow's TZ here only
+        // documents the wall-clock timezone of the producer; the actual epoch-nanos value the
+        // vector stores is identical in shape.
+        val n = v.get(index)
+        val sec = Math.floorDiv(n, 1_000_000_000L)
+        val rem = Math.floorMod(n, 1_000_000_000L).toInt
+        java.sql.Timestamp.from(java.time.Instant.ofEpochSecond(sec, rem.toLong))
 
       case v: TimeStampSecVector =>
+        java.sql.Timestamp(v.get(index) * 1000L)
+
+      case v: TimeStampSecTZVector =>
         java.sql.Timestamp(v.get(index) * 1000L)
 
       case v: MapVector =>
@@ -124,7 +151,10 @@ object ArrowDeserializer:
         val meta = structMetaCache.getOrElseUpdate(
           v, {
             val children = v.getChildrenFromFields.asScala.toSeq
-            StructVectorMeta(isVariantStruct(v), children)
+            val structSchema = StructType(children.map(c =>
+              StructField(c.getName, arrowTypeToSparkType(c.getField), c.getField.isNullable)
+            ))
+            StructVectorMeta(isVariantStruct(v), children, structSchema)
           }
         )
         if meta.isVariant then
@@ -135,13 +165,25 @@ object ArrowDeserializer:
             extractValue(metadataVec, index, structMetaCache).asInstanceOf[Array[Byte]]
           )
         else
-          Row.fromSeq(meta.children.map(f => extractValue(f, index, structMetaCache)))
+          Row.fromSeqWithSchema(
+            meta.children.map(f => extractValue(f, index, structMetaCache)),
+            meta.schema
+          )
 
       case v: DurationVector =>
         v.getObject(index)
 
       case v: IntervalYearVector =>
-        v.get(index)
+        // Schema is YearMonthIntervalType — surface a `java.time.Period` (matching upstream's
+        // `IntervalYearVectorReader.getPeriod`). Returning the raw int would CCE typed
+        // accessors like `row.getAs[Period](0)`.
+        if v.isNull(index) then null
+        else java.time.Period.ofMonths(v.get(index)).normalized()
+
+      case v: TimeMicroVector =>
+        // TimeType <-> ArrowType.Time(MICROSECOND, 64): the encoder writes microseconds since
+        // midnight; reverse via toNanoOfDay = micros * 1000.
+        java.time.LocalTime.ofNanoOfDay(v.get(index) * 1_000L)
 
       case v: LargeVarCharVector =>
         v.getObject(index).toString
@@ -221,8 +263,11 @@ object ArrowDeserializer:
               valueContainsNull = true
             )
           else MapType(NullType, NullType, valueContainsNull = true)
-      case _: ArrowType.Duration    => DayTimeIntervalType
-      case _: ArrowType.Interval    => YearMonthIntervalType
+      case _: ArrowType.Duration => DayTimeIntervalType
+      case _: ArrowType.Interval => YearMonthIntervalType
+      case _: ArrowType.Time     =>
+        // Match the encoder: ArrowType.Time(MICROSECOND, 64) ↔ TimeType.
+        TimeType()
       case _: ArrowType.LargeUtf8   => StringType
       case _: ArrowType.LargeBinary => BinaryType
       case _                        => StringType
