@@ -29,3 +29,7 @@ docs/SC3-COMPLETE-API.md
 spark-official-api-signatures.txt
 code-review-todo.md
 code-review-round2.md
+
+# Local tool state (codegraph MCP, cursor rules) — not part of the project.
+.codegraph/
+.cursor/
