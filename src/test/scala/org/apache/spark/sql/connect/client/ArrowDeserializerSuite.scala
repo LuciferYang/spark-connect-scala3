@@ -490,3 +490,59 @@ class ArrowDeserializerSuite extends AnyFunSuite with Matchers:
       root.close()
       allocator.close()
   }
+
+  // ---------------------------------------------------------------------------
+  // R32: ArrayType / MapType propagate the Arrow child's isNullable flag instead
+  // of hardcoding containsNull / valueContainsNull = true.
+  // ---------------------------------------------------------------------------
+
+  test("arrowTypeToSparkType: ArrayType honours non-nullable child element (R32)") {
+    val elem = Field(
+      "element",
+      new FieldType(false, new ArrowType.Int(32, true), null), // not nullable
+      java.util.Collections.emptyList()
+    )
+    val list = Field(
+      "arr",
+      FieldType.nullable(ArrowType.List.INSTANCE),
+      java.util.Collections.singletonList(elem)
+    )
+    val bytes = encodeArrowBatch(list) { (vec, root) =>
+      vec.asInstanceOf[ListVector].setValueCount(0)
+      root.setRowCount(0)
+    }
+    // The decoder must reflect the source's non-null element guarantee.
+    val (_, schema) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    val arr = schema.get.fields.head.dataType.asInstanceOf[ArrayType]
+    arr.containsNull shouldBe false
+  }
+
+  test("arrowTypeToSparkType: MapType honours non-nullable value child (R32)") {
+    val keyChild = Field(
+      "key",
+      new FieldType(false, ArrowType.Utf8.INSTANCE, null),
+      java.util.Collections.emptyList()
+    )
+    val valChild = Field(
+      "value",
+      new FieldType(false, new ArrowType.Int(32, true), null), // not nullable
+      java.util.Collections.emptyList()
+    )
+    val entries = Field(
+      "entries",
+      new FieldType(false, ArrowType.Struct.INSTANCE, null),
+      java.util.Arrays.asList(keyChild, valChild)
+    )
+    val map = Field(
+      "m",
+      FieldType.nullable(new ArrowType.Map(false)),
+      java.util.Collections.singletonList(entries)
+    )
+    val bytes = encodeArrowBatch(map) { (vec, root) =>
+      vec.asInstanceOf[MapVector].setValueCount(0)
+      root.setRowCount(0)
+    }
+    val (_, schema) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    val m = schema.get.fields.head.dataType.asInstanceOf[MapType]
+    m.valueContainsNull shouldBe false
+  }

@@ -153,12 +153,7 @@ final class Row private (
     schema match
       case Some(s) =>
         val fields = s.fields.zipWithIndex.map { (f, i) =>
-          val v =
-            if isNullAt(i) then "null"
-            else
-              get(i) match
-                case s: String => s"\"${Row.escapeJson(s)}\""
-                case other     => other.toString
+          val v = if isNullAt(i) then "null" else Row.encodeJsonValue(get(i))
           s"\"${Row.escapeJson(f.name)}\":$v"
         }
         s"{${fields.mkString(",")}}"
@@ -173,12 +168,7 @@ final class Row private (
     schema match
       case Some(s) =>
         val fields = s.fields.zipWithIndex.map { (f, i) =>
-          val v =
-            if isNullAt(i) then "null"
-            else
-              get(i) match
-                case s: String => s"\"${Row.escapeJson(s)}\""
-                case other     => other.toString
+          val v = if isNullAt(i) then "null" else Row.encodeJsonValue(get(i))
           s"  \"${Row.escapeJson(f.name)}\" : $v"
         }
         s"{\n${fields.mkString(",\n")}\n}"
@@ -217,16 +207,122 @@ final class Row private (
   override def toString: String =
     values.map(v => if v == null then "null" else v.toString).mkString("[", ",", "]")
 
+  /** Element-wise equality that handles JVM `Array[_]` reference semantics — two rows with
+    * content-equal binary or array fields must compare equal. Without this, `Set[Row]` /
+    * `Map[Row, _]` silently fail to deduplicate any row containing a `BinaryType` column.
+    */
   override def equals(other: Any): Boolean = other match
-    case that: Row => this.values == that.values
-    case _         => false
+    case that: Row =>
+      val n = values.size
+      if n != that.values.size then false
+      else
+        var i = 0
+        while i < n do
+          if !Row.elementEquals(values(i), that.values(i)) then return false
+          i += 1
+        true
+    case _ => false
 
-  override def hashCode(): Int = values.hashCode()
+  override def hashCode(): Int =
+    val n = values.size
+    var h = 1
+    var i = 0
+    while i < n do
+      h = 31 * h + Row.elementHash(values(i))
+      i += 1
+    h
 
 object Row:
   /** Escape a string for safe inclusion in JSON output. */
   private def escapeJson(s: String): String =
     org.apache.spark.sql.internal.JsonEscaping.escape(s)
+
+  /** Type-aware JSON encoding for a single field value. Produces parseable JSON for the common
+    * Spark/Java types — quoted strings for textual values, ISO-8601 for dates / timestamps, base64
+    * for binary, recursive arrays / objects for collections, and bare JSON numbers for numerics /
+    * booleans. The previous `other.toString` fallback emitted invalid JSON for `Date` / `Timestamp`
+    * (no quotes), `Array[Byte]` (`[B@...`), nested rows, `Seq` / `Map`.
+    *
+    * `null` is handled by the call site so it is not part of this dispatch.
+    */
+  private def encodeJsonValue(v: Any): String = v match
+    case null                         => "null"
+    case b: Boolean                   => b.toString
+    case n: Byte                      => n.toString
+    case n: Short                     => n.toString
+    case n: Int                       => n.toString
+    case n: Long                      => n.toString
+    case n: Float                     => n.toString
+    case n: Double                    => n.toString
+    case bd: java.math.BigDecimal     => bd.toPlainString
+    case bd: BigDecimal               => bd.bigDecimal.toPlainString
+    case n: Number                    => n.toString
+    case s: String                    => s"\"${escapeJson(s)}\""
+    case d: java.sql.Date             => s"\"${d.toLocalDate.toString}\""
+    case ld: java.time.LocalDate      => s"\"${ld.toString}\""
+    case ts: java.sql.Timestamp       => s"\"${ts.toInstant.toString}\""
+    case inst: java.time.Instant      => s"\"${inst.toString}\""
+    case lt: java.time.LocalTime      => s"\"${lt.toString}\""
+    case ldt: java.time.LocalDateTime => s"\"${ldt.toString}\""
+    case d: java.time.Duration        => s"\"${d.toString}\""
+    case p: java.time.Period          => s"\"${p.toString}\""
+    case u: java.util.UUID            => s"\"${u.toString}\""
+    case bytes: Array[Byte]           =>
+      s"\"${java.util.Base64.getEncoder.encodeToString(bytes)}\""
+    case row: Row    => row.json
+    case seq: Seq[?] =>
+      seq.map(elem => if elem == null then "null" else encodeJsonValue(elem))
+        .mkString("[", ",", "]")
+    case arr: Array[?] =>
+      arr.iterator
+        .map(elem => if elem == null then "null" else encodeJsonValue(elem))
+        .mkString("[", ",", "]")
+    case m: scala.collection.Map[?, ?] =>
+      m.iterator.map { case (k, vv) =>
+        val key = k match
+          case s: String => escapeJson(s)
+          case other     => escapeJson(String.valueOf(other))
+        val value = if vv == null then "null" else encodeJsonValue(vv)
+        s"\"$key\":$value"
+      }.mkString("{", ",", "}")
+    case jl: java.util.List[?] =>
+      import scala.jdk.CollectionConverters.*
+      encodeJsonValue(jl.asScala.toSeq)
+    case jm: java.util.Map[?, ?] =>
+      import scala.jdk.CollectionConverters.*
+      encodeJsonValue(jm.asScala.toMap)
+    case other =>
+      // Last-resort fallback: stringify and quote, so we still emit *parseable* JSON.
+      s"\"${escapeJson(String.valueOf(other))}\""
+
+  /** Element-wise equality used by [[Row.equals]]. Handles `Array[_]` reference semantics
+    * (delegating to `java.util.Arrays.equals`) and recurses into nested `Row` values.
+    */
+  private def elementEquals(a: Any, b: Any): Boolean = (a, b) match
+    case (null, null)                     => true
+    case (null, _) | (_, null)            => false
+    case (x: Array[Byte], y: Array[Byte]) => java.util.Arrays.equals(x, y)
+    case (x: Array[?], y: Array[?])       =>
+      x.length == y.length &&
+      x.zip(y).forall((xi, yi) => elementEquals(xi, yi))
+    case (x: Row, y: Row) => x == y
+    case _                => a == b
+
+  /** Element-wise hash used by [[Row.hashCode]]. Mirrors [[elementEquals]]'s `Array` handling via
+    * `java.util.Arrays.hashCode` so the equals/hashCode contract holds.
+    */
+  private def elementHash(a: Any): Int = a match
+    case null           => 0
+    case x: Array[Byte] => java.util.Arrays.hashCode(x)
+    case x: Array[?]    =>
+      var h = 1
+      val n = x.length
+      var i = 0
+      while i < n do
+        h = 31 * h + elementHash(x(i))
+        i += 1
+      h
+    case other => other.hashCode()
 
   def fromSeq(values: Seq[Any]): Row = values match
     case idx: IndexedSeq[Any @unchecked] => new Row(idx)

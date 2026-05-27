@@ -239,7 +239,9 @@ object ArrowDeserializer:
       case _: ArrowType.List    =>
         val children = field.getChildren.asScala
         if children.nonEmpty then
-          ArrayType(arrowTypeToSparkType(children.head), containsNull = true)
+          // Propagate the element's `isNullable` flag — hardcoding `containsNull = true` would
+          // erase the non-null guarantee an Arrow producer declared on its element type.
+          ArrayType(arrowTypeToSparkType(children.head), containsNull = children.head.isNullable)
         else ArrayType(NullType, containsNull = true)
       case _: ArrowType.Struct =>
         // Detect Variant struct pattern: children "value" (binary) + "metadata" (binary with
@@ -257,10 +259,12 @@ object ArrowDeserializer:
           val entriesField = mapChildren.head
           val children = entriesField.getChildren.asScala
           if children.size == 2 then
+            // Same fidelity fix as the List branch: surface the value child's nullability
+            // rather than always claiming the map permits null values.
             MapType(
               arrowTypeToSparkType(children(0)),
               arrowTypeToSparkType(children(1)),
-              valueContainsNull = true
+              valueContainsNull = children(1).isNullable
             )
           else MapType(NullType, NullType, valueContainsNull = true)
       case _: ArrowType.Duration => DayTimeIntervalType

@@ -370,3 +370,33 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
     a shouldBe b
     a should not be c
   }
+
+  // ---------------------------------------------------------------------------
+  // R35: StructType.sql renders the full field list (was bare "STRUCT")
+  // ---------------------------------------------------------------------------
+
+  test("StructType.sql renders fields with type (R35)") {
+    val st = StructType(Seq(
+      StructField("a", IntegerType),
+      StructField("b", StringType)
+    ))
+    st.sql shouldBe "STRUCT<a: INT, b: STRING>"
+  }
+
+  test("MapType.sql with StructType value preserves struct fields (R35)") {
+    val st = StructType(Seq(StructField("x", DoubleType)))
+    val mt = MapType(StringType, st, valueContainsNull = true)
+    mt.sql shouldBe "MAP<STRING,STRUCT<x: DOUBLE>>"
+  }
+
+  test("ArrayType.sql with StructType element preserves struct fields (R35)") {
+    val st = StructType(Seq(StructField("name", StringType)))
+    val arr = ArrayType(st, containsNull = true)
+    arr.sql shouldBe "ARRAY<STRUCT<name: STRING>>"
+  }
+
+  test("StructType.toDDL preserves nested struct fields (R35)") {
+    val nested = StructType(Seq(StructField("inner", IntegerType)))
+    val outer = StructType(Seq(StructField("nested", nested)))
+    outer.toDDL should include("STRUCT<inner: INT>")
+  }

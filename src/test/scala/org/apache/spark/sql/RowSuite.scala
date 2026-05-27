@@ -385,3 +385,97 @@ class RowSuite extends AnyFunSuite with Matchers:
     val row = Row(null)
     expectNpeAt(0)(row.getDouble(0))
   }
+
+  // ---------------------------------------------------------------------------
+  // R7: equals/hashCode handle Array[Byte] and other arrays by content
+  // ---------------------------------------------------------------------------
+
+  test("Row.equals returns true for content-equal Array[Byte] fields (R7)") {
+    val a = Row(Array[Byte](1, 2, 3))
+    val b = Row(Array[Byte](1, 2, 3))
+    a shouldBe b
+  }
+
+  test("Row.equals returns false for differing Array[Byte] fields (R7)") {
+    val a = Row(Array[Byte](1, 2, 3))
+    val b = Row(Array[Byte](1, 2, 4))
+    a should not be b
+  }
+
+  test("Row.hashCode matches for content-equal Array[Byte] fields (R7)") {
+    val a = Row(Array[Byte](9, 8, 7))
+    val b = Row(Array[Byte](9, 8, 7))
+    a.hashCode shouldBe b.hashCode
+  }
+
+  test("Row works as a Set element with binary fields (R7)") {
+    val a = Row("k", Array[Byte](1, 2))
+    val b = Row("k", Array[Byte](1, 2))
+    val set = Set(a)
+    set.contains(b) shouldBe true
+  }
+
+  test("Row.equals recurses into nested Row (R7)") {
+    val inner1 = Row(Array[Byte](1, 2))
+    val inner2 = Row(Array[Byte](1, 2))
+    Row("x", inner1) shouldBe Row("x", inner2)
+  }
+
+  test("Row.equals handles null array fields (R7)") {
+    val a = Row(null.asInstanceOf[Array[Byte]])
+    val b = Row(null.asInstanceOf[Array[Byte]])
+    a shouldBe b
+  }
+
+  // ---------------------------------------------------------------------------
+  // R9: type-aware json/prettyJson encoding for non-String values
+  // ---------------------------------------------------------------------------
+
+  test("json quotes Date as ISO-8601 (R9)") {
+    val schema = StructType(Seq(StructField("d", DateType)))
+    val row = Row.fromSeqWithSchema(Seq(java.sql.Date.valueOf("2024-06-15")), schema)
+    row.json shouldBe """{"d":"2024-06-15"}"""
+  }
+
+  test("json quotes Timestamp as ISO-8601 instant (R9)") {
+    val schema = StructType(Seq(StructField("ts", TimestampType)))
+    val ts = java.sql.Timestamp.from(java.time.Instant.parse("2024-01-15T10:30:00Z"))
+    val row = Row.fromSeqWithSchema(Seq(ts), schema)
+    row.json shouldBe """{"ts":"2024-01-15T10:30:00Z"}"""
+  }
+
+  test("json base64-encodes Array[Byte] (R9)") {
+    val schema = StructType(Seq(StructField("b", BinaryType)))
+    val row = Row.fromSeqWithSchema(Seq(Array[Byte](1, 2, 3)), schema)
+    row.json shouldBe """{"b":"AQID"}"""
+  }
+
+  test("json recurses into nested Row (R9)") {
+    val innerSchema = StructType(Seq(StructField("name", StringType)))
+    val outerSchema = StructType(Seq(StructField("inner", innerSchema)))
+    val inner = Row.fromSeqWithSchema(Seq("alice"), innerSchema)
+    val outer = Row.fromSeqWithSchema(Seq(inner), outerSchema)
+    outer.json shouldBe """{"inner":{"name":"alice"}}"""
+  }
+
+  test("json renders Seq as JSON array (R9)") {
+    val schema = StructType(Seq(
+      StructField("a", ArrayType(IntegerType, containsNull = true))
+    ))
+    val row = Row.fromSeqWithSchema(Seq(Seq(1, 2, 3)), schema)
+    row.json shouldBe """{"a":[1,2,3]}"""
+  }
+
+  test("json renders Map as JSON object (R9)") {
+    val schema = StructType(Seq(
+      StructField("m", MapType(StringType, IntegerType, valueContainsNull = true))
+    ))
+    val row = Row.fromSeqWithSchema(Seq(Map("x" -> 1)), schema)
+    row.json shouldBe """{"m":{"x":1}}"""
+  }
+
+  test("json keeps BigDecimal as plain number (R9)") {
+    val schema = StructType(Seq(StructField("bd", DecimalType(10, 2))))
+    val row = Row.fromSeqWithSchema(Seq(new java.math.BigDecimal("1234567890.12")), schema)
+    row.json shouldBe """{"bd":1234567890.12}"""
+  }

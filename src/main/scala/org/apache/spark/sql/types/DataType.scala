@@ -130,6 +130,16 @@ final case class StructField(name: String, dataType: DataType, nullable: Boolean
 final case class StructType(fields: Seq[StructField]) extends DataType:
   def typeName = "struct"
 
+  /** Render this struct as a Spark DDL string, e.g. `STRUCT<a: INT, b: STRING>`.
+    *
+    * Without this override the inherited default returns just `"STRUCT"`, dropping every field —
+    * and because [[ArrayType.sql]] / [[MapType.sql]] recurse into `elementType.sql` /
+    * `valueType.sql`, that loss propagates through any outer composite type (`ARRAY<STRUCT<...>>`,
+    * `MAP<STRING, STRUCT<...>>`).
+    */
+  override def sql: String =
+    s"STRUCT<${fields.map(f => s"${f.name}: ${f.dataType.sql}").mkString(", ")}>"
+
   def apply(name: String): StructField =
     // Use the lazy name→field map instead of a linear `fields.find` — O(1) regardless of the
     // underlying Seq type (avoids O(n) `fields(i)` on List-backed schemas).
