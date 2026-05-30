@@ -438,7 +438,7 @@ The Arrow allocators in [`ArrowSerializer`](src/main/scala/org/apache/spark/sql/
 - [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
 - [x] Window functions
 - [x] Unit tests (2374 tests)
-- [x] Integration tests (Spark 4.1.1)
+- [x] Integration tests (Spark 4.1.2)
 - [x] Error handling (retry policies, gRPC exception conversion, reattachable execution, enriched error details via FetchErrorDetails RPC)
 - [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)
 - [x] Publish to Maven Central (0.1, 0.2)
