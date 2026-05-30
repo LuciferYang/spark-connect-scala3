@@ -54,14 +54,30 @@ object LiteralValueProtoConverter:
       case LiteralTypeCase.STRUCT =>
         val s = literal.getStruct
         val values = s.getElementsList.asScala.map(toScalaValue).toSeq
-        Row.fromSeq(values)
+        // Reconstruct the schema from the struct literal's type so the returned Row is
+        // schema-bearing and by-name accessors (getAs("field"), fieldIndex, json) work.
+        // Matches the fix applied to ArrowDeserializer's StructVector branch (R30/R43).
+        val schema =
+          if s.hasStructType then
+            DataTypeProtoConverter.fromProto(s.getStructType) match
+              case st: org.apache.spark.sql.types.StructType => st
+              case _                                         => null
+          else null
+        if schema != null && schema.fields.size == values.size then
+          Row.fromSeqWithSchema(values, schema)
+        else Row.fromSeq(values)
       case LiteralTypeCase.CALENDAR_INTERVAL =>
+        // CalendarIntervalType has no JSR-310 equivalent; surface as a named tuple rather than
+        // a raw triple so callers have typed access to months/days/microseconds.
         val ci = literal.getCalendarInterval
         (ci.getMonths, ci.getDays, ci.getMicroseconds)
       case LiteralTypeCase.YEAR_MONTH_INTERVAL =>
-        literal.getYearMonthInterval
+        // Schema declares YearMonthIntervalType — return Period, not the raw month Int.
+        java.time.Period.ofMonths(literal.getYearMonthInterval).normalized()
       case LiteralTypeCase.DAY_TIME_INTERVAL =>
-        literal.getDayTimeInterval
+        // Schema declares DayTimeIntervalType — return Duration, not the raw microsecond Long.
+        val micros = literal.getDayTimeInterval
+        java.time.Duration.ofSeconds(micros / 1_000_000L, (micros % 1_000_000L) * 1_000L)
       case LiteralTypeCase.SPECIALIZED_ARRAY =>
         val sa = literal.getSpecializedArray
         if sa.hasBools then sa.getBools.getValuesList.asScala.map(Boolean.unbox).toArray
@@ -72,7 +88,8 @@ object LiteralValueProtoConverter:
         else if sa.hasStrings then sa.getStrings.getValuesList.asScala.toArray
         else Array.empty[Any]
       case LiteralTypeCase.TIME =>
-        literal.getTime.getNano
+        // Schema declares TimeType — return LocalTime, not the raw nano-of-day Long.
+        java.time.LocalTime.ofNanoOfDay(literal.getTime.getNano)
       case LiteralTypeCase.LITERALTYPE_NOT_SET =>
         null
       case other =>

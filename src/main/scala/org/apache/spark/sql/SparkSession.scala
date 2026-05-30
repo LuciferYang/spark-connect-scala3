@@ -239,7 +239,15 @@ final class SparkSession private[sql] (
 
   def readStream: DataStreamReader = DataStreamReader(this)
 
-  lazy val streams: StreamingQueryManager = StreamingQueryManager(this)
+  lazy val streams: StreamingQueryManager =
+    _streamsInitialised = true
+    StreamingQueryManager(this)
+
+  /** Tracks whether [[streams]] was ever accessed so `close()` only shuts down the listener bus
+    * when it is actually live — avoids forcing a `StreamingQueryManager` into existence just to
+    * tear it down.
+    */
+  private var _streamsInitialised = false
 
   // ---------------------------------------------------------------------------
   // Catalog
@@ -344,8 +352,16 @@ final class SparkSession private[sql] (
 
   def stop(): Unit = close()
 
-  /** Implements `java.io.Closeable`. Releases session resources. */
+  /** Implements `java.io.Closeable`. Releases session resources.
+    *
+    * Shuts down the streaming query listener bus before closing the gRPC channel so the daemon
+    * event-handler thread can observe the closed channel cleanly and no stale listener
+    * registrations are left on the server side.
+    */
   override def close(): Unit =
+    // Close the listener bus only if `streams` was already materialised — accessing the lazy val
+    // here would create a StreamingQueryManager just to immediately tear it down.
+    if _streamsInitialised then streams.streamingQueryListenerBus.close()
     client.close()
     if SparkSession.getActiveSession.contains(this) then SparkSession.clearActiveSession()
     if SparkSession.getDefaultSession.contains(this) then SparkSession.clearDefaultSession()

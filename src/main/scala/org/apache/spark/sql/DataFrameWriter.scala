@@ -130,6 +130,22 @@ final class DataFrameWriter private[sql] (private val df: DataFrame)
   def xml(path: String): Unit = format("xml").save(path)
 
   def jdbc(url: String, table: String, connectionProperties: java.util.Properties): Unit =
+    // JDBC sinks do not consume partitionBy / bucketBy / clusterBy state. Fail fast rather
+    // than silently building a proto that the server would either ignore or reject with a
+    // confusing AnalysisException — matching upstream's assertNotPartitioned / assertNotBucketed
+    // / assertNotClustered guards.
+    if partitionCols.nonEmpty then
+      throw UnsupportedOperationException(
+        "partitionBy is not supported by the JDBC data source. Use partitionColumn instead."
+      )
+    if numBuckets > 0 || bucketColNames.nonEmpty then
+      throw UnsupportedOperationException(
+        "bucketBy is not supported by the JDBC data source."
+      )
+    if clusteringCols.nonEmpty then
+      throw UnsupportedOperationException(
+        "clusterBy is not supported by the JDBC data source."
+      )
     import scala.jdk.CollectionConverters.*
     val propsMap = connectionProperties.asScala.toMap
     format("jdbc")

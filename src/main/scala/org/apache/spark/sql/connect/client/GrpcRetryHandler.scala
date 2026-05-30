@@ -39,7 +39,12 @@ class GrpcRetryHandler(
       try return fn
       catch
         case re: GrpcRetryHandler.RetryException if attempt < policy.maxRetries =>
-          if re.getCause != null then lastException = re.getCause
+          // Always record a usable last exception so the "exhausted" fallback has something to
+          // rethrow. Prefer the wrapped cause when present; fall back to re itself.
+          lastException = if re.getCause != null then re.getCause else re
+          // RetryException also respects the deadline so repeated immediate retries cannot
+          // spin inside the budget indefinitely — matches the canRetry branch below.
+          if nowNanos() >= deadline then throw lastException
           attempt += 1 // immediate retry, no backoff
         case e: Throwable if policy.canRetry(e) && attempt < policy.maxRetries =>
           lastException = e

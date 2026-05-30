@@ -97,6 +97,11 @@ class ExecutePlanResponseReattachableIterator private[client] (
 
   override def next(): ExecutePlanResponse =
     if closed then throw java.util.NoSuchElementException("Iterator is closed")
+    // Mirror the hasNext gate: once we have seen ResultComplete, the underlying resources have
+    // been released. A second next() would trigger a spurious ReattachExecute RPC and surface a
+    // confusing OPERATION_NOT_FOUND error rather than the expected "exhausted" signal.
+    if resultComplete then
+      throw java.util.NoSuchElementException("Iterator already exhausted (ResultComplete received)")
     retryHandler.retry {
       val resp = callIter(_.next())
       lastReturnedResponseId = Some(resp.getResponseId)
