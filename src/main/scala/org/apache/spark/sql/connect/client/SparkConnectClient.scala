@@ -510,15 +510,18 @@ object SparkConnectClient:
               (UrlEncoding.decode(k), UrlEncoding.decode(v))
             catch
               case e: IllegalArgumentException =>
+                // Redact the raw value to prevent token/credential leakage in error messages.
+                val redacted = s"${k.take(20)}=<redacted>"
                 throw IllegalArgumentException(
-                  s"Invalid URL-encoded value in Spark Connect URL parameter '$p': " +
+                  s"Invalid URL-encoded value in Spark Connect URL parameter '$redacted': " +
                     s"${e.getMessage}",
                   e
                 )
           val trimmedKey = decodedKey.trim
           require(
             trimmedKey.nonEmpty,
-            s"Invalid Spark Connect URL parameter '$p': key must be non-empty"
+            // Don't echo the raw value — the key alone is enough context.
+            s"Invalid Spark Connect URL parameter (key must be non-empty)"
           )
           // Store the trimmed key so e.g. ` user_id =bob` matches paramMap.get("user_id")
           // later in `create()`. Values are kept verbatim — users may legitimately need
@@ -526,7 +529,8 @@ object SparkConnectClient:
           Some(trimmedKey -> decodedValue)
         case _ =>
           throw IllegalArgumentException(
-            s"Invalid Spark Connect URL parameter '$p': expected 'key=value' format"
+            // Include only the key part, not the value, to avoid credential leakage.
+            s"Invalid Spark Connect URL parameter '${p.takeWhile(_ != '=')}': expected 'key=value' format"
           )
     }
     (host, port, params)

@@ -267,8 +267,8 @@ class SparkConnectClientParserSuite extends AnyFunSuite:
     val ex = intercept[IllegalArgumentException] {
       SparkConnectClient.parseUrl("sc://h:15002;k=%ZZ")
     }
-    assert(ex.getMessage.contains("%ZZ") || ex.getMessage.contains("k=%ZZ"))
-    // Cause should be preserved for debugging
+    // R10: value is redacted; the key is still present and cause preserved for debugging.
+    assert(ex.getMessage.contains("k=<redacted>"))
     assert(ex.getCause.isInstanceOf[IllegalArgumentException])
   }
 

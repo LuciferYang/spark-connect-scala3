@@ -260,6 +260,11 @@ private[sql] object ArrowSerializer:
             case m: Map[?, ?] =>
               var i = 0
               m.foreach { (key, valu) =>
+                // Arrow Map keys must not be null — a null key violates the Arrow IPC invariant
+                // (the key child vector is declared non-nullable). Fail fast here to match
+                // upstream ArrowWriter.extractKey(Objects.requireNonNull(key)).
+                if key == null then
+                  throw NullPointerException("Map keys must not be null in Arrow serialization")
                 setArrowValue(keyVec, offset + i, key, mt.keyType)
                 setArrowValue(valVec, offset + i, valu, mt.valueType)
                 i += 1
@@ -268,6 +273,8 @@ private[sql] object ArrowSerializer:
             case m: java.util.Map[?, ?] =>
               var i = 0
               m.forEach { (key, valu) =>
+                if key == null then
+                  throw NullPointerException("Map keys must not be null in Arrow serialization")
                 setArrowValue(keyVec, offset + i, key, mt.keyType)
                 setArrowValue(valVec, offset + i, valu, mt.valueType)
                 i += 1

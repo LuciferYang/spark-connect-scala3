@@ -328,9 +328,14 @@ object Row:
     case idx: IndexedSeq[Any @unchecked] => new Row(idx)
     case _                               => new Row(values.toIndexedSeq)
 
-  def fromSeqWithSchema(values: Seq[Any], schema: StructType): Row = values match
-    case idx: IndexedSeq[Any @unchecked] => new Row(idx, Some(schema))
-    case _                               => new Row(values.toIndexedSeq, Some(schema))
+  def fromSeqWithSchema(values: Seq[Any], schema: StructType): Row =
+    require(
+      values.size == schema.fields.size,
+      s"values.size (${values.size}) must equal schema.fields.size (${schema.fields.size})"
+    )
+    values match
+      case idx: IndexedSeq[Any @unchecked] => new Row(idx, Some(schema))
+      case _                               => new Row(values.toIndexedSeq, Some(schema))
 
   def apply(values: Any*): Row = fromSeq(values)
 

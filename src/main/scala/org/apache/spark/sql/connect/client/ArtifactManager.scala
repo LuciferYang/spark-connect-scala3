@@ -125,6 +125,13 @@ final class ArtifactManager private[client] (
     val responseHandler = new StreamObserver[AddArtifactsResponse]:
       private val summaries = mutable.Buffer.empty[AddArtifactsResponse.ArtifactSummary]
       override def onNext(v: AddArtifactsResponse): Unit =
+        // Validate the session ID on every server response to guard against accidental
+        // session swaps on the wire — matches upstream's ResponseValidator guard.
+        if v.getSessionId.nonEmpty && v.getSessionId != sessionId then
+          throw IllegalStateException(
+            s"ArtifactManager: server returned session id '${v.getSessionId}' " +
+              s"but expected '$sessionId'. Discarding response."
+          )
         v.getArtifactsList.forEach(s => summaries += s)
       override def onError(throwable: Throwable): Unit =
         promise.failure(throwable)

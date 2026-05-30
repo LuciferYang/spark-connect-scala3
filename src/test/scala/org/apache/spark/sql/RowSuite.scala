@@ -479,3 +479,19 @@ class RowSuite extends AnyFunSuite with Matchers:
     val row = Row.fromSeqWithSchema(Seq(new java.math.BigDecimal("1234567890.12")), schema)
     row.json shouldBe """{"bd":1234567890.12}"""
   }
+
+  // ---------------------------------------------------------------------------
+  // R19: fromSeqWithSchema rejects size mismatches at construction time
+  // ---------------------------------------------------------------------------
+
+  test("Row.fromSeqWithSchema rejects too-many values (R19)") {
+    val schema = StructType(Seq(StructField("a", IntegerType), StructField("b", StringType)))
+    an[IllegalArgumentException] should be thrownBy
+      Row.fromSeqWithSchema(Seq(1, "x", "extra"), schema)
+  }
+
+  test("Row.fromSeqWithSchema rejects too-few values (R19)") {
+    val schema = StructType(Seq(StructField("a", IntegerType), StructField("b", StringType)))
+    an[IllegalArgumentException] should be thrownBy
+      Row.fromSeqWithSchema(Seq(1), schema)
+  }

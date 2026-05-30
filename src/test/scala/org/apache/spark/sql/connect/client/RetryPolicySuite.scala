@@ -179,3 +179,37 @@ class RetryPolicySuite extends AnyFunSuite with Matchers:
     // and clear it so test isolation is preserved.
     Thread.interrupted() shouldBe true
   }
+
+  test("GrpcRetryHandler: zero maxTotalDurationMs gets Long.MaxValue deadline (R11)") {
+    // A non-positive budget must not fire the deadline on the first check.
+    var attempts = 0
+    val handler = GrpcRetryHandler(
+      RetryPolicy(maxRetries = 3, initialBackoffMs = 1, jitterMs = 0, maxTotalDurationMs = 0),
+      sleep = _ => ()
+    )
+    intercept[StatusRuntimeException] {
+      handler.retry {
+        attempts += 1
+        throw StatusRuntimeException(Status.UNAVAILABLE)
+      }
+    }
+    attempts shouldBe 4 // 1 initial + 3 retries — deadline did NOT fire early
+  }
+
+  test("GrpcRetryHandler: large backoffMultiplier is clamped to maxBackoffMs (R11)") {
+    val sleeps = scala.collection.mutable.ArrayBuffer[Long]()
+    val handler = GrpcRetryHandler(
+      RetryPolicy(
+        maxRetries = 3,
+        initialBackoffMs = 1,
+        backoffMultiplier = 1e100, // would overflow Long without the guard
+        maxBackoffMs = 500,
+        jitterMs = 0
+      ),
+      sleep = ms => sleeps += ms
+    )
+    intercept[StatusRuntimeException] {
+      handler.retry(throw StatusRuntimeException(Status.UNAVAILABLE))
+    }
+    sleeps.foreach(ms => ms should be <= 500L)
+  }

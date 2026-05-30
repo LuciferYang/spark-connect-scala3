@@ -24,7 +24,17 @@ class GrpcRetryHandler(
   def retry[T](fn: => T): T =
     var lastException: Throwable = null
     var attempt = 0
-    val deadline = nowNanos() + policy.maxTotalDurationMs * 1_000_000L
+    // Guard against non-positive budget (would make deadline fire immediately) and
+    // overflow (2^63 ns ≈ 292 years). Use Math.addExact so overflow surfaces as
+    // ArithmeticException rather than producing a silent negative deadline.
+    val budgetNs =
+      if policy.maxTotalDurationMs <= 0 then Long.MaxValue
+      else
+        try Math.multiplyExact(policy.maxTotalDurationMs, 1_000_000L)
+        catch case _: ArithmeticException => Long.MaxValue
+    val deadline =
+      try Math.addExact(nowNanos(), budgetNs)
+      catch case _: ArithmeticException => Long.MaxValue
     while attempt <= policy.maxRetries do
       try return fn
       catch
@@ -34,10 +44,16 @@ class GrpcRetryHandler(
         case e: Throwable if policy.canRetry(e) && attempt < policy.maxRetries =>
           lastException = e
           if nowNanos() >= deadline then throw e // total duration budget exhausted
-          val backoff = math.min(
-            policy.initialBackoffMs * math.pow(policy.backoffMultiplier, attempt.toDouble).toLong,
-            policy.maxBackoffMs
-          )
+          // Guard backoff arithmetic against overflow: pow(...).toLong can overflow Long.MaxValue
+          // when backoffMultiplier is large and attempt is high; clamp to maxBackoffMs before
+          // multiplying to prevent the resulting negative value from being passed to Thread.sleep.
+          val rawBackoff =
+            val scaled = math.pow(policy.backoffMultiplier, attempt.toDouble)
+            if scaled.isInfinite ||
+              scaled >= (Long.MaxValue / math.max(1L, policy.initialBackoffMs)).toDouble
+            then policy.maxBackoffMs
+            else math.min(policy.initialBackoffMs * scaled.toLong, policy.maxBackoffMs)
+          val backoff = math.max(0L, rawBackoff)
           val jitter =
             if policy.jitterMs > 0 then ThreadLocalRandom.current().nextLong(policy.jitterMs)
             else 0L

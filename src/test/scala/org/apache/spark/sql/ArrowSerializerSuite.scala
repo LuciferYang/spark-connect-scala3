@@ -385,3 +385,15 @@ class ArrowSerializerSuite extends AnyFunSuite with Matchers:
     val bytes = ArrowSerializer.encodeRows(rows, schema)
     bytes should not be empty
   }
+
+  test("encodeRows throws on null Map key (R25)") {
+    val schema = StructType(Seq(
+      StructField("m", MapType(StringType, IntegerType, valueContainsNull = true))
+    ))
+    val nullKeyMap = new java.util.HashMap[String, Int]()
+    nullKeyMap.put(null, 1)
+    import scala.jdk.CollectionConverters.*
+    assertThrows[NullPointerException] {
+      ArrowSerializer.encodeRows(Seq(Row(nullKeyMap.asScala.toMap)), schema)
+    }
+  }
