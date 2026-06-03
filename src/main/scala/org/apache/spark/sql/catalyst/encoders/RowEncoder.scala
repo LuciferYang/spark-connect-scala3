@@ -73,7 +73,7 @@ object RowEncoder:
             field.name,
             encoderForDataType(field.dataType, lenient),
             field.nullable,
-            Metadata.empty
+            AgnosticEncoders.Metadata.empty
           )
         }.toIndexedSeq
       )

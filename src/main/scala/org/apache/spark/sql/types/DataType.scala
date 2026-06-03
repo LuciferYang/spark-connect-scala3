@@ -125,7 +125,12 @@ final case class MapType(keyType: DataType, valueType: DataType, valueContainsNu
   override def simpleString = s"map<${keyType.simpleString},${valueType.simpleString}>"
   override def sql = s"MAP<${keyType.sql},${valueType.sql}>"
 
-final case class StructField(name: String, dataType: DataType, nullable: Boolean = true)
+final case class StructField(
+    name: String,
+    dataType: DataType,
+    nullable: Boolean = true,
+    metadata: Metadata = Metadata.empty
+)
 
 final case class StructType(fields: Seq[StructField]) extends DataType:
   def typeName = "struct"
@@ -217,6 +222,12 @@ final case class StructType(fields: Seq[StructField]) extends DataType:
 
 object StructType:
   val empty: StructType = StructType(Seq.empty)
+
+  def apply(fields: Array[StructField]): StructType = StructType(fields.toIndexedSeq)
+
+  def apply(fields: java.util.List[StructField]): StructType =
+    import scala.jdk.CollectionConverters.*
+    StructType(fields.asScala.toSeq)
 
 /** Represents an unparsed data type returned by the server as a raw type string.
   *

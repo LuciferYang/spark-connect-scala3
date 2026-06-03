@@ -213,7 +213,7 @@ object Encoder:
         val name = constValue[l].toString
         val enc = agnosticEncoderOf[t]
         val nullable = isOption[t]
-        EncoderField(name, enc, nullable, Metadata.empty) ::
+        EncoderField(name, enc, nullable, AgnosticEncoders.Metadata.empty) ::
           encoderFieldsOf[ts, ls]
 
   /** Build field list from a product's element types and labels at compile time. */

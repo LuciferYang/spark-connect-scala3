@@ -1,6 +1,7 @@
 package org.apache.spark.sql.catalyst.encoders
 
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.*
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.{Metadata as EncoderMetadata}
 import org.apache.spark.sql.types.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -354,8 +355,8 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
     val enc = ProductEncoder[Any](
       ClassTag(classOf[Any]),
       fields = Seq(
-        EncoderField("name", StringEncoder, nullable = true, Metadata.empty),
-        EncoderField("age", PrimitiveIntEncoder, nullable = false, Metadata.empty)
+        EncoderField("name", StringEncoder, nullable = true, EncoderMetadata.empty),
+        EncoderField("age", PrimitiveIntEncoder, nullable = false, EncoderMetadata.empty)
       )
     )
     val proxy = invokeWriteReplace(enc)
@@ -373,7 +374,7 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
           "x",
           PrimitiveLongEncoder,
           nullable = false,
-          Metadata.empty,
+          EncoderMetadata.empty,
           Some("getX"),
           Some("setX")
         )
@@ -400,7 +401,7 @@ class EncoderProxySerializationSuite extends AnyFunSuite with Matchers:
     val enc = ProductEncoder[Any](
       ClassTag(classOf[Any]),
       fields = Seq(
-        EncoderField("id", PrimitiveIntEncoder, nullable = false, Metadata.empty)
+        EncoderField("id", PrimitiveIntEncoder, nullable = false, EncoderMetadata.empty)
       )
     )
     val proxy = invokeWriteReplace(enc).asInstanceOf[ProductEncoderProxy]

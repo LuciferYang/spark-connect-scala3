@@ -289,6 +289,6 @@ object Encoders:
 
   private def tupleProductEncoder[T: ClassTag](encoders: AgnosticEncoder[?]*): ProductEncoder[T] =
     val fields = encoders.zipWithIndex.map { (enc, i) =>
-      EncoderField(s"_${i + 1}", enc, enc.nullable, Metadata.empty)
+      EncoderField(s"_${i + 1}", enc, enc.nullable, AgnosticEncoders.Metadata.empty)
     }.toSeq
     ProductEncoder[T](summon[ClassTag[T]], fields)

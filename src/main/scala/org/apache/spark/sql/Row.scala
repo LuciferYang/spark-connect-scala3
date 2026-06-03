@@ -328,6 +328,8 @@ object Row:
     case idx: IndexedSeq[Any @unchecked] => new Row(idx)
     case _                               => new Row(values.toIndexedSeq)
 
+  def fromArray(values: Array[Object]): Row = fromSeq(values.toIndexedSeq)
+
   def fromSeqWithSchema(values: Seq[Any], schema: StructType): Row =
     require(
       values.size == schema.fields.size,

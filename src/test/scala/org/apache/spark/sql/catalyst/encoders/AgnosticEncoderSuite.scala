@@ -1,6 +1,7 @@
 package org.apache.spark.sql.catalyst.encoders
 
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.*
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.{Metadata as EncoderMetadata}
 import org.apache.spark.sql.types.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -330,8 +331,8 @@ class AgnosticEncoderSuite extends AnyFunSuite with Matchers:
     val enc = ProductEncoder[Any](
       ClassTag(classOf[Any]),
       fields = Seq(
-        EncoderField("name", StringEncoder, nullable = true, Metadata.empty),
-        EncoderField("age", PrimitiveIntEncoder, nullable = false, Metadata.empty)
+        EncoderField("name", StringEncoder, nullable = true, EncoderMetadata.empty),
+        EncoderField("age", PrimitiveIntEncoder, nullable = false, EncoderMetadata.empty)
       )
     )
     enc.dataType shouldBe StructType(Seq(
@@ -354,7 +355,7 @@ class AgnosticEncoderSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("EncoderField default values") {
-    val field = EncoderField("x", PrimitiveIntEncoder, nullable = false, Metadata.empty)
+    val field = EncoderField("x", PrimitiveIntEncoder, nullable = false, EncoderMetadata.empty)
     field.readMethod shouldBe None
     field.writeMethod shouldBe None
   }
@@ -364,7 +365,7 @@ class AgnosticEncoderSuite extends AnyFunSuite with Matchers:
       "x",
       PrimitiveIntEncoder,
       nullable = false,
-      Metadata.empty,
+      EncoderMetadata.empty,
       readMethod = Some("getX"),
       writeMethod = Some("setX")
     )
@@ -377,11 +378,11 @@ class AgnosticEncoderSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("Metadata.empty has default json") {
-    Metadata.empty.json shouldBe "{}"
+    EncoderMetadata.empty.json shouldBe "{}"
   }
 
   test("Metadata with custom json") {
-    val m = Metadata("""{"key":"value"}""")
+    val m = EncoderMetadata("""{"key":"value"}""")
     m.json shouldBe """{"key":"value"}"""
   }
 
@@ -536,7 +537,7 @@ class AgnosticEncoderSuite extends AnyFunSuite with Matchers:
     val enc = ProductEncoder[Any](
       ClassTag(classOf[Any]),
       fields = Seq(
-        EncoderField("value", PrimitiveLongEncoder, nullable = false, Metadata.empty)
+        EncoderField("value", PrimitiveLongEncoder, nullable = false, EncoderMetadata.empty)
       )
     )
     enc.dataType shouldBe StructType(Seq(
@@ -548,9 +549,9 @@ class AgnosticEncoderSuite extends AnyFunSuite with Matchers:
     val enc = ProductEncoder[Any](
       ClassTag(classOf[Any]),
       fields = Seq(
-        EncoderField("id", PrimitiveIntEncoder, nullable = false, Metadata.empty),
-        EncoderField("name", StringEncoder, nullable = true, Metadata.empty),
-        EncoderField("score", PrimitiveDoubleEncoder, nullable = false, Metadata.empty)
+        EncoderField("id", PrimitiveIntEncoder, nullable = false, EncoderMetadata.empty),
+        EncoderField("name", StringEncoder, nullable = true, EncoderMetadata.empty),
+        EncoderField("score", PrimitiveDoubleEncoder, nullable = false, EncoderMetadata.empty)
       )
     )
     val dt = enc.dataType.asInstanceOf[StructType]
@@ -707,14 +708,14 @@ class AgnosticEncoderSuite extends AnyFunSuite with Matchers:
   // --- Metadata ---
 
   test("Metadata default constructor") {
-    val m = Metadata()
+    val m = EncoderMetadata()
     m.json shouldBe "{}"
   }
 
   test("Metadata equality") {
-    Metadata.empty shouldBe Metadata("{}")
-    Metadata("a") shouldBe Metadata("a")
-    Metadata("a") should not be Metadata("b")
+    EncoderMetadata.empty shouldBe EncoderMetadata("{}")
+    EncoderMetadata("a") shouldBe EncoderMetadata("a")
+    EncoderMetadata("a") should not be EncoderMetadata("b")
   }
 
   // --- EncoderField ---
@@ -724,7 +725,7 @@ class AgnosticEncoderSuite extends AnyFunSuite with Matchers:
       "field1",
       PrimitiveLongEncoder,
       nullable = true,
-      Metadata("{\"key\":\"val\"}"),
+      EncoderMetadata("{\"key\":\"val\"}"),
       readMethod = Some("getField1"),
       writeMethod = Some("setField1")
     )

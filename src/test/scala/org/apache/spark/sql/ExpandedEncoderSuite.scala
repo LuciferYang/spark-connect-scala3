@@ -317,8 +317,18 @@ class ExpandedEncoderSuite extends AnyFunSuite with Matchers:
     val enc = ProductEncoder[Person](
       ClassTag(classOf[Person]),
       fields = Seq(
-        EncoderField("name", StringEncoder, nullable = true, Metadata.empty),
-        EncoderField("age", PrimitiveIntEncoder, nullable = false, Metadata.empty)
+        EncoderField(
+          "name",
+          StringEncoder,
+          nullable = true,
+          org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.Metadata.empty
+        ),
+        EncoderField(
+          "age",
+          PrimitiveIntEncoder,
+          nullable = false,
+          org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.Metadata.empty
+        )
       )
     )
     enc.dataType shouldBe StructType(Seq(
