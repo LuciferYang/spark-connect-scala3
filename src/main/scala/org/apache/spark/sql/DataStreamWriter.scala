@@ -5,22 +5,18 @@ import org.apache.spark.connect.proto.*
 import org.apache.spark.sql.catalyst.encoders.{AgnosticEncoder, AgnosticEncoders}
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.ForeachWriterPacket
+import org.apache.spark.sql.execution.streaming.*
 import org.apache.spark.sql.streaming.StreamingQueryListener.QueryStartedEvent
+import org.apache.spark.sql.streaming.{Trigger as StreamingTrigger}
 import org.apache.spark.sql.types.NullType
 
 import java.util.Locale
 
-/** Trigger types for structured streaming queries. */
-sealed trait Trigger
-object Trigger:
-  case class ProcessingTime(intervalMs: Long) extends Trigger
-  case object AvailableNow extends Trigger
-  case object Once extends Trigger
-  case class Continuous(intervalMs: Long) extends Trigger
-
 /** Writer for starting streaming queries from a streaming DataFrame.
   *
   * {{{
+  *   import org.apache.spark.sql.streaming.Trigger
+  *
   *   df.writeStream
   *     .format("console")
   *     .trigger(Trigger.ProcessingTime(1000))
@@ -33,7 +29,7 @@ final class DataStreamWriter[T] private[sql] (
 ):
   private var source: String = ""
   private var mode: String = ""
-  private var triggerOpt: Option[Trigger] = None
+  private var triggerOpt: Option[StreamingTrigger] = None
   private var name: String = ""
   private var opts: Map[String, String] = Map.empty
   private var partitionCols: Seq[String] = Seq.empty
@@ -52,9 +48,24 @@ final class DataStreamWriter[T] private[sql] (
   def outputMode(outputMode: streaming.OutputMode): DataStreamWriter[T] =
     this.outputMode(outputMode.toString.toLowerCase(Locale.ROOT))
 
-  def trigger(t: Trigger): DataStreamWriter[T] =
-    triggerOpt = Some(t)
-    this
+  def trigger(t: StreamingTrigger): this.type =
+    t match
+      case _: RealTimeTrigger =>
+        throw new MatchError(t)
+      case _: ProcessingTimeTrigger =>
+        triggerOpt = Some(t)
+        this
+      case AvailableNowTrigger =>
+        triggerOpt = Some(t)
+        this
+      case OneTimeTrigger =>
+        triggerOpt = Some(t)
+        this
+      case _: ContinuousTrigger =>
+        triggerOpt = Some(t)
+        this
+      case _ =>
+        throw new MatchError(t)
 
   def queryName(qn: String): DataStreamWriter[T] =
     name = qn
@@ -158,16 +169,22 @@ final class DataStreamWriter[T] private[sql] (
     }
     builder
 
-  private def setTrigger(builder: WriteStreamOperationStart.Builder, t: Trigger): Unit =
+  private def setTrigger(builder: WriteStreamOperationStart.Builder, t: StreamingTrigger): Unit =
     t match
-      case Trigger.ProcessingTime(ms) =>
-        builder.setProcessingTimeInterval(s"$ms milliseconds")
-      case Trigger.AvailableNow =>
+      case ProcessingTimeTrigger(intervalMs) =>
+        builder.setProcessingTimeInterval(s"$intervalMs milliseconds")
+      case AvailableNowTrigger =>
         builder.setAvailableNow(true)
-      case Trigger.Once =>
+      case OneTimeTrigger =>
         builder.setOnce(true)
-      case Trigger.Continuous(ms) =>
-        builder.setContinuousCheckpointInterval(s"$ms milliseconds")
+      case ContinuousTrigger(intervalMs) =>
+        builder.setContinuousCheckpointInterval(s"$intervalMs milliseconds")
+      case _: RealTimeTrigger =>
+        throw UnsupportedOperationException(
+          "Trigger.RealTime is not supported by the Spark Connect write stream proto"
+        )
+      case _ =>
+        throw new MatchError(t)
 
 private[sql] object DataStreamWriter:
   /** Convenience constructor: untyped writer over a DataFrame, defaults to Row encoder. */

@@ -2,6 +2,7 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.*
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
+import org.apache.spark.sql.execution.streaming.{ProcessingTimeTrigger, RealTimeTrigger}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -71,11 +72,75 @@ class DataStreamWriterSuite extends AnyFunSuite with Matchers:
     proto.getOnce shouldBe true
   }
 
+  test("streaming.Trigger AvailableNow paren call maps correctly") {
+    val writer = DataStreamWriter(dummyStreamDf)
+    val proto = writer
+      .trigger(org.apache.spark.sql.streaming.Trigger.AvailableNow())
+      .buildWriteStreamOp().build()
+    proto.hasAvailableNow shouldBe true
+    proto.getAvailableNow shouldBe true
+  }
+
+  test("streaming.Trigger Once paren call maps correctly") {
+    val writer = DataStreamWriter(dummyStreamDf)
+    val proto = writer
+      .trigger(org.apache.spark.sql.streaming.Trigger.Once())
+      .buildWriteStreamOp().build()
+    proto.hasOnce shouldBe true
+    proto.getOnce shouldBe true
+  }
+
   test("trigger Continuous maps correctly") {
     val writer = DataStreamWriter(dummyStreamDf)
     val proto = writer.trigger(Trigger.Continuous(1000)).buildWriteStreamOp().build()
     proto.hasContinuousCheckpointInterval shouldBe true
     proto.getContinuousCheckpointInterval shouldBe "1000 milliseconds"
+  }
+
+  test("streaming.Trigger ProcessingTime string maps correctly") {
+    val writer = DataStreamWriter(dummyStreamDf)
+    val proto = writer
+      .trigger(org.apache.spark.sql.streaming.Trigger.ProcessingTime("10 seconds"))
+      .buildWriteStreamOp().build()
+    proto.hasProcessingTimeInterval shouldBe true
+    proto.getProcessingTimeInterval shouldBe "10000 milliseconds"
+  }
+
+  test("streaming.Trigger ProcessingTime TimeUnit maps correctly") {
+    val writer = DataStreamWriter(dummyStreamDf)
+    val proto = writer
+      .trigger(org.apache.spark.sql.streaming.Trigger.ProcessingTime(
+        2,
+        java.util.concurrent.TimeUnit.SECONDS
+      ))
+      .buildWriteStreamOp().build()
+    proto.getProcessingTimeInterval shouldBe "2000 milliseconds"
+  }
+
+  test("streaming.Trigger ProcessingTime Duration maps correctly") {
+    val writer = DataStreamWriter(dummyStreamDf)
+    val proto = writer
+      .trigger(org.apache.spark.sql.streaming.Trigger.ProcessingTime(
+        scala.concurrent.duration.Duration(3, "seconds")
+      ))
+      .buildWriteStreamOp().build()
+    proto.getProcessingTimeInterval shouldBe "3000 milliseconds"
+  }
+
+  test("streaming.Trigger Continuous string maps correctly") {
+    val writer = DataStreamWriter(dummyStreamDf)
+    val proto = writer
+      .trigger(org.apache.spark.sql.streaming.Trigger.Continuous("1 minute"))
+      .buildWriteStreamOp().build()
+    proto.hasContinuousCheckpointInterval shouldBe true
+    proto.getContinuousCheckpointInterval shouldBe "60000 milliseconds"
+  }
+
+  test("streaming.Trigger RealTime is exposed but not supported by Connect proto") {
+    val writer = DataStreamWriter(dummyStreamDf)
+    an[MatchError] shouldBe thrownBy {
+      writer.trigger(org.apache.spark.sql.streaming.Trigger.RealTime())
+    }
   }
 
   test("buildWriteStreamOp sets input relation") {
@@ -244,6 +309,83 @@ class DataStreamWriterSuite extends AnyFunSuite with Matchers:
   test("Trigger.ProcessingTime stores interval") {
     val t = Trigger.ProcessingTime(5000)
     t.intervalMs shouldBe 5000
+  }
+
+  test("streaming.Trigger.ProcessingTime stores string interval and exposes millis") {
+    val t = org.apache.spark.sql.streaming.Trigger
+      .ProcessingTime("2 seconds")
+      .asInstanceOf[ProcessingTimeTrigger]
+    t.intervalMs shouldBe 2000
+  }
+
+  test("streaming.Trigger parses upstream-style interval strings") {
+    org.apache.spark.sql.streaming.Trigger
+      .ProcessingTime("interval 1 second")
+      .asInstanceOf[ProcessingTimeTrigger].intervalMs shouldBe 1000
+    org.apache.spark.sql.streaming.Trigger
+      .ProcessingTime("1 second 500 milliseconds")
+      .asInstanceOf[ProcessingTimeTrigger].intervalMs shouldBe 1500
+    org.apache.spark.sql.streaming.Trigger
+      .ProcessingTime("1.5 seconds")
+      .asInstanceOf[ProcessingTimeTrigger].intervalMs shouldBe 1500
+    org.apache.spark.sql.streaming.Trigger
+      .ProcessingTime("1 week")
+      .asInstanceOf[ProcessingTimeTrigger].intervalMs shouldBe 604800000
+    org.apache.spark.sql.streaming.Trigger
+      .ProcessingTime("1000 microseconds")
+      .asInstanceOf[ProcessingTimeTrigger].intervalMs shouldBe 1
+    org.apache.spark.sql.streaming.Trigger
+      .ProcessingTime("interval - 1 second + 2 seconds")
+      .asInstanceOf[ProcessingTimeTrigger].intervalMs shouldBe 1000
+    org.apache.spark.sql.streaming.Trigger
+      .ProcessingTime("1 month -1 month 5 seconds")
+      .asInstanceOf[ProcessingTimeTrigger].intervalMs shouldBe 5000
+  }
+
+  test("streaming.Trigger validates interval bounds") {
+    an[IllegalArgumentException] shouldBe thrownBy {
+      org.apache.spark.sql.streaming.Trigger.ProcessingTime(-1)
+    }
+    an[IllegalArgumentException] shouldBe thrownBy {
+      org.apache.spark.sql.streaming.Trigger.Continuous(-1)
+    }
+    an[IllegalArgumentException] shouldBe thrownBy {
+      org.apache.spark.sql.streaming.Trigger.RealTime(0)
+    }
+    an[IllegalArgumentException] shouldBe thrownBy {
+      org.apache.spark.sql.streaming.Trigger.ProcessingTime("10 s")
+    }
+    an[IllegalArgumentException] shouldBe thrownBy {
+      org.apache.spark.sql.streaming.Trigger.ProcessingTime("1.5 minutes")
+    }
+    an[IllegalArgumentException] shouldBe thrownBy {
+      org.apache.spark.sql.streaming.Trigger.ProcessingTime("1e3 seconds")
+    }
+    an[IllegalArgumentException] shouldBe thrownBy {
+      org.apache.spark.sql.streaming.Trigger.ProcessingTime("0.123456789123 seconds")
+    }
+    an[IllegalArgumentException] shouldBe thrownBy {
+      org.apache.spark.sql.streaming.Trigger.ProcessingTime("1 month")
+    }
+    an[IllegalArgumentException] shouldBe thrownBy {
+      org.apache.spark.sql.streaming.Trigger.ProcessingTime(s"${Long.MaxValue} days")
+    }
+  }
+
+  test("streaming.Trigger RealTime exposes batchDurationMs") {
+    val default = org.apache.spark.sql.streaming.Trigger.RealTime().asInstanceOf[RealTimeTrigger]
+    val fromString = org.apache.spark.sql.streaming.Trigger
+      .RealTime("2 seconds")
+      .asInstanceOf[RealTimeTrigger]
+
+    default.batchDurationMs shouldBe 300000
+    fromString.batchDurationMs shouldBe 2000
+  }
+
+  test("root Trigger facade exposes compatibility helpers") {
+    Trigger.processingTime("2 seconds").intervalMs shouldBe 2000
+    Trigger.continuous("1 second").intervalMs shouldBe 1000
+    Trigger.realTime("3 seconds").batchDurationMs shouldBe 3000
   }
 
   test("Trigger.Continuous stores interval") {
