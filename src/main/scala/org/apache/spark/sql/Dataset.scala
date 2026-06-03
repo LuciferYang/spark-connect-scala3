@@ -20,6 +20,7 @@ import org.apache.spark.sql.connect.common.{
   MapPartitionsAdaptor,
   UdfPacket
 }
+import org.apache.spark.sql.types.Metadata
 
 import scala.annotation.nowarn
 import scala.reflect.ClassTag
@@ -752,6 +753,10 @@ final class Dataset[T: ClassTag] private[sql] (
 
   /** Attach metadata (as JSON string) to a column. */
   def withMetadata(columnName: String, metadata: String): DataFrame =
+    df.withMetadata(columnName, metadata)
+
+  /** Attach metadata to a column. */
+  def withMetadata(columnName: String, metadata: Metadata): DataFrame =
     df.withMetadata(columnName, metadata)
 
   /** Randomly split into multiple Datasets, returned as a Java List. */

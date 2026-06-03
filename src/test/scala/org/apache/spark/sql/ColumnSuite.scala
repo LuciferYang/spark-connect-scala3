@@ -1,6 +1,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.Expression
+import org.apache.spark.sql.types.MetadataBuilder
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -636,6 +637,21 @@ class ColumnSuite extends AnyFunSuite with Matchers:
 
   test("as with alias and metadata") {
     val c = Column("x").as("renamed", """{"key":"value"}""")
+    c.expr.hasAlias shouldBe true
+    val alias = c.expr.getAlias
+    alias.getNameList.asScala.toSeq shouldBe Seq("renamed")
+    alias.getMetadata shouldBe """{"key":"value"}"""
+  }
+
+  test("as with Symbol alias") {
+    val c = Column("x").as(Symbol("renamed"))
+    c.expr.hasAlias shouldBe true
+    c.expr.getAlias.getNameList.asScala.toSeq shouldBe Seq("renamed")
+  }
+
+  test("as with Metadata") {
+    val metadata = new MetadataBuilder().putString("key", "value").build()
+    val c = Column("x").as("renamed", metadata)
     c.expr.hasAlias shouldBe true
     val alias = c.expr.getAlias
     alias.getNameList.asScala.toSeq shouldBe Seq("renamed")

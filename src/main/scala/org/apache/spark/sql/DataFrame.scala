@@ -9,7 +9,7 @@ import org.apache.spark.sql.connect.client.{
 import org.apache.spark.sql.connect.common.LiteralValueProtoConverter
 import org.apache.spark.sql.internal.StringEnumParser
 import org.apache.spark.sql.types.{
-  GeographyType, GeometryType, StructField, StructType, VariantType, VariantVal
+  GeographyType, GeometryType, Metadata, StructField, StructType, VariantType, VariantVal
 }
 
 import scala.collection.immutable.ArraySeq
@@ -1039,6 +1039,10 @@ final class DataFrame private[sql] (
           .build())
         .build()
     ))
+
+  /** Attach metadata to a column. */
+  def withMetadata(columnName: String, metadata: Metadata): DataFrame =
+    withMetadata(columnName, metadata.json)
 
   // ---------------------------------------------------------------------------
   // Helpers

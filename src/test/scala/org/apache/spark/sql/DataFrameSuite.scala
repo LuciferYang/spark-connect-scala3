@@ -2,6 +2,7 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.{StorageLevel as _, *}
 import org.apache.spark.sql.StorageLevel as SparkStorageLevel
+import org.apache.spark.sql.types.MetadataBuilder
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -438,6 +439,16 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     aliases should have size 1
     aliases.head.getNameList.asScala.head shouldBe "col1"
     aliases.head.getMetadata shouldBe """{"key": "value"}"""
+  }
+
+  test("withMetadata accepts Metadata") {
+    val df = testDf()
+    val metadata = new MetadataBuilder().putString("key", "value").build()
+    val result = df.withMetadata("col1", metadata)
+    val aliases = result.relation.getWithColumns.getAliasesList.asScala
+    aliases should have size 1
+    aliases.head.getNameList.asScala.head shouldBe "col1"
+    aliases.head.getMetadata shouldBe """{"key":"value"}"""
   }
 
   // ---------- isLocal ----------

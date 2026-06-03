@@ -6,6 +6,7 @@ import org.apache.spark.connect.proto.{
   DataType as ProtoDataType
 }
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
+import org.apache.spark.sql.types.Metadata
 
 /** A column expression in a DataFrame.
   *
@@ -336,6 +337,8 @@ class Column private[sql] (
 
   def name(n: String): Column = as(n)
 
+  def as(alias: Symbol): Column = as(alias.name)
+
   /** Assign multiple aliases (for tuple/struct columns). */
   def as(aliases: Seq[String]): Column =
     val aliasBuilder = Expression.Alias.newBuilder().setExpr(expr)
@@ -354,6 +357,10 @@ class Column private[sql] (
         .setMetadata(metadata)
         .build()
     ).build())
+
+  /** Assign an alias with metadata. */
+  def as(alias: String, metadata: Metadata): Column =
+    as(alias, metadata.json)
 
   /** Provide a type hint to generate a TypedColumn for Dataset operations. */
   def as[U: Encoder]: TypedColumn[Any, U] =
