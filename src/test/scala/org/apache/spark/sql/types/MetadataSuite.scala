@@ -25,12 +25,16 @@ class MetadataSuite extends AnyFunSuite with Matchers:
     val nested = new MetadataBuilder().putString("inner", "value").build()
     val metadata = new MetadataBuilder()
       .putLongArray("ids", Array(1L, 2L))
+      .putDoubleArray("scores", Array(1.5, 2.5))
+      .putBooleanArray("flags", Array(true, false))
       .putStringArray("names", Array("a", "b"))
       .putMetadata("nested", nested)
       .putMetadataArray("nestedArray", Array(nested))
       .build()
 
     metadata.getLongArray("ids") shouldBe Array(1L, 2L)
+    metadata.getDoubleArray("scores") shouldBe Array(1.5, 2.5)
+    metadata.getBooleanArray("flags") shouldBe Array(true, false)
     metadata.getStringArray("names") shouldBe Array("a", "b")
     metadata.getMetadata("nested").getString("inner") shouldBe "value"
     metadata.getMetadataArray("nestedArray").head shouldBe nested
@@ -48,6 +52,26 @@ class MetadataSuite extends AnyFunSuite with Matchers:
     parsed.getMetadata("nested").getBoolean("ok") shouldBe true
   }
 
+  test("Metadata fromJson parses supported arrays and nulls") {
+    val parsed = Metadata.fromJson(
+      """{"empty":[],"nullValue":null,"longs":[1,2],"doubles":[1.5,2.5],"bools":[true,false],"strings":["a","b"],"nestedArray":[{"x":1}]}"""
+    )
+
+    parsed.getLongArray("empty") shouldBe empty
+    parsed.contains("nullValue") shouldBe true
+    parsed.getLongArray("longs") shouldBe Array(1L, 2L)
+    parsed.getDoubleArray("doubles") shouldBe Array(1.5, 2.5)
+    parsed.getBooleanArray("bools") shouldBe Array(true, false)
+    parsed.getStringArray("strings") shouldBe Array("a", "b")
+    parsed.getMetadataArray("nestedArray").head.getLong("x") shouldBe 1L
+  }
+
+  test("Metadata rejects unsupported JSON arrays") {
+    an[IllegalArgumentException] shouldBe thrownBy {
+      Metadata.fromJson("""{"bad":[null]}""")
+    }
+  }
+
   test("Metadata supports key removal and empty singleton") {
     Metadata.empty.isEmpty shouldBe true
 
@@ -57,7 +81,47 @@ class MetadataSuite extends AnyFunSuite with Matchers:
       .build()
 
     metadata.withKeyRemoved("a").contains("a") shouldBe false
+    metadata.withKeyRemoved("missing") shouldBe metadata
+    metadata.withKeysRemoved(Seq.empty) shouldBe metadata
     metadata.withKeysRemoved(Seq("a", "b")).isEmpty shouldBe true
+  }
+
+  test("MetadataBuilder merges and removes entries") {
+    val base = new MetadataBuilder()
+      .putString("a", "x")
+      .putString("b", "y")
+      .build()
+    val metadata = new MetadataBuilder()
+      .withMetadata(base)
+      .remove("b")
+      .putLong("c", 3L)
+      .build()
+
+    metadata.getString("a") shouldBe "x"
+    metadata.contains("b") shouldBe false
+    metadata.getLong("c") shouldBe 3L
+  }
+
+  test("Metadata equality and hashCode handle arrays by content") {
+    val left = new MetadataBuilder()
+      .putLongArray("longs", Array(1L, 2L))
+      .putDoubleArray("doubles", Array(1.0, 2.0))
+      .putBooleanArray("bools", Array(true, false))
+      .putStringArray("strings", Array("a", "b"))
+      .putMetadataArray("nested", Array(new MetadataBuilder().putString("x", "y").build()))
+      .build()
+    val right = new MetadataBuilder()
+      .putLongArray("longs", Array(1L, 2L))
+      .putDoubleArray("doubles", Array(1.0, 2.0))
+      .putBooleanArray("bools", Array(true, false))
+      .putStringArray("strings", Array("a", "b"))
+      .putMetadataArray("nested", Array(new MetadataBuilder().putString("x", "y").build()))
+      .build()
+
+    left shouldBe right
+    left.hashCode() shouldBe right.hashCode()
+    left.equals("not metadata") shouldBe false
+    left.toString shouldBe left.json
   }
 
   test("StructField carries metadata with upstream-compatible default") {
