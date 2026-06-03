@@ -1,7 +1,7 @@
 package org.apache.spark.sql.catalyst.encoders
 
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.*
-import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.{Metadata as EncoderMetadata}
+import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.Metadata as EncoderMetadata
 import org.apache.spark.sql.types.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers

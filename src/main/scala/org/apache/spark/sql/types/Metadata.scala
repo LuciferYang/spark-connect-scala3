@@ -42,7 +42,7 @@ final class Metadata private[types] (private[types] val map: Map[String, Any])
   override def equals(other: Any): Boolean = other match
     case that: Metadata =>
       map.size == that.map.size &&
-        map.keysIterator.forall(key => that.map.get(key).exists(Metadata.valueEquals(map(key), _)))
+      map.keysIterator.forall(key => that.map.get(key).exists(Metadata.valueEquals(map(key), _)))
     case _ => false
 
   override def hashCode(): Int = Metadata.valueHash(map)
@@ -110,7 +110,7 @@ object Metadata:
       throw IllegalArgumentException(s"Unsupported metadata value type: ${other.getClass.getName}")
 
   private def convertObject(value: Any): Any = value match
-    case null => null
+    case null                   => null
     case m: java.util.Map[?, ?] =>
       Metadata(convertMap(m))
     case l: java.util.List[?] =>
@@ -123,7 +123,7 @@ object Metadata:
     case n: java.lang.Float   => n.doubleValue()
     case n: java.lang.Double  => n.doubleValue()
     case s: String            => s
-    case other =>
+    case other                =>
       throw IllegalArgumentException(s"Unsupported metadata JSON value: ${other.getClass.getName}")
 
   private def convertArray(values: Seq[Any]): Any =
@@ -152,22 +152,22 @@ object Metadata:
     }.toMap
 
   private[types] def normalizeValue(value: Any): Any = value match
-    case null                 => null
-    case v: Boolean          => v
-    case v: Byte             => v.toLong
-    case v: Short            => v.toLong
-    case v: Int              => v.toLong
-    case v: Long             => v
-    case v: Float            => v.toDouble
-    case v: Double           => v
-    case v: String           => v
-    case v: Metadata         => v
-    case v: Array[Long]      => v
-    case v: Array[Double]    => v
-    case v: Array[Boolean]   => v
-    case v: Array[String]    => v
-    case v: Array[Metadata]  => v
-    case v: Array[Int]       => v.map(_.toLong)
+    case null                     => null
+    case v: Boolean               => v
+    case v: Byte                  => v.toLong
+    case v: Short                 => v.toLong
+    case v: Int                   => v.toLong
+    case v: Long                  => v
+    case v: Float                 => v.toDouble
+    case v: Double                => v
+    case v: String                => v
+    case v: Metadata              => v
+    case v: Array[Long]           => v
+    case v: Array[Double]         => v
+    case v: Array[Boolean]        => v
+    case v: Array[String]         => v
+    case v: Array[Metadata]       => v
+    case v: Array[Int]            => v.map(_.toLong)
     case v: Array[java.lang.Long] =>
       v.map(_.longValue())
     case v: Array[java.lang.Double] =>
@@ -178,14 +178,14 @@ object Metadata:
       throw IllegalArgumentException(s"Unsupported metadata value type: ${other.getClass.getName}")
 
   private def valueEquals(left: Any, right: Any): Boolean = (left, right) match
-    case (a: Array[Long], b: Array[Long])         => java.util.Arrays.equals(a, b)
-    case (a: Array[Double], b: Array[Double])     => java.util.Arrays.equals(a, b)
-    case (a: Array[Boolean], b: Array[Boolean])   => java.util.Arrays.equals(a, b)
-    case (a: Array[String], b: Array[String]) =>
+    case (a: Array[Long], b: Array[Long])       => java.util.Arrays.equals(a, b)
+    case (a: Array[Double], b: Array[Double])   => java.util.Arrays.equals(a, b)
+    case (a: Array[Boolean], b: Array[Boolean]) => java.util.Arrays.equals(a, b)
+    case (a: Array[String], b: Array[String])   =>
       java.util.Arrays.equals(a.asInstanceOf[Array[Object]], b.asInstanceOf[Array[Object]])
     case (a: Array[Metadata], b: Array[Metadata]) =>
       java.util.Arrays.equals(a.asInstanceOf[Array[Object]], b.asInstanceOf[Array[Object]])
-    case _                                        => left == right
+    case _ => left == right
 
   private def valueHash(value: Any): Int = value match
     case null               => 0

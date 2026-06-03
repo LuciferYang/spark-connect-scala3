@@ -7,7 +7,7 @@ import org.apache.spark.sql.connect.client.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.ForeachWriterPacket
 import org.apache.spark.sql.execution.streaming.*
 import org.apache.spark.sql.streaming.StreamingQueryListener.QueryStartedEvent
-import org.apache.spark.sql.streaming.{Trigger as StreamingTrigger}
+import org.apache.spark.sql.streaming.Trigger as StreamingTrigger
 import org.apache.spark.sql.types.NullType
 
 import java.util.Locale
