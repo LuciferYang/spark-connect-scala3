@@ -20,7 +20,9 @@ private object Triggers:
   def convert(interval: String): Long =
     val parsed = parseInterval(interval)
     if parsed.months != 0 then
-      throw IllegalArgumentException(s"Intervals with year-month fields are not supported: $interval")
+      throw IllegalArgumentException(
+        s"Intervals with year-month fields are not supported: $interval"
+      )
     Math.floorDiv(parsed.microseconds, 1000L)
 
   def convert(interval: Duration): Long =
