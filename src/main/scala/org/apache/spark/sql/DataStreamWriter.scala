@@ -52,8 +52,7 @@ final class DataStreamWriter[T] private[sql] (
     t match
       case _: RealTimeTrigger =>
         throw new MatchError(t)
-      case _: ProcessingTimeTrigger | AvailableNowTrigger | OneTimeTrigger |
-          _: ContinuousTrigger =>
+      case _: ProcessingTimeTrigger | AvailableNowTrigger | OneTimeTrigger | _: ContinuousTrigger =>
         triggerOpt = Some(t)
         this
       case _ =>
