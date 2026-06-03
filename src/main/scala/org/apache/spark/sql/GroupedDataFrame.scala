@@ -7,10 +7,10 @@ import scala.reflect.ClassTag
 /** Returned by `DataFrame.groupBy`, `rollup`, or `cube`. Use `.agg(...)` to specify aggregate
   * expressions.
   */
-final class GroupedDataFrame private[sql] (
+class RelationalGroupedDataset private[sql] (
     private val df: DataFrame,
     private val groupingExprs: Seq[Column],
-    private val groupType: GroupedDataFrame.GroupType,
+    private val groupType: RelationalGroupedDataset.GroupType,
     private val groupingSetsProto: Option[Seq[Aggregate.GroupingSets]] = None,
     private val pivotCol: Option[Column] = None,
     private val pivotValues: Seq[Expression.Literal] = Seq.empty
@@ -21,11 +21,11 @@ final class GroupedDataFrame private[sql] (
     val aggBuilder = Aggregate.newBuilder()
       .setInput(df.relation)
       .setGroupType(groupType match
-        case GroupedDataFrame.GroupType.GroupBy      => Aggregate.GroupType.GROUP_TYPE_GROUPBY
-        case GroupedDataFrame.GroupType.Rollup       => Aggregate.GroupType.GROUP_TYPE_ROLLUP
-        case GroupedDataFrame.GroupType.Cube         => Aggregate.GroupType.GROUP_TYPE_CUBE
-        case GroupedDataFrame.GroupType.Pivot        => Aggregate.GroupType.GROUP_TYPE_PIVOT
-        case GroupedDataFrame.GroupType.GroupingSets =>
+        case RelationalGroupedDataset.GroupType.GroupBy => Aggregate.GroupType.GROUP_TYPE_GROUPBY
+        case RelationalGroupedDataset.GroupType.Rollup  => Aggregate.GroupType.GROUP_TYPE_ROLLUP
+        case RelationalGroupedDataset.GroupType.Cube    => Aggregate.GroupType.GROUP_TYPE_CUBE
+        case RelationalGroupedDataset.GroupType.Pivot   => Aggregate.GroupType.GROUP_TYPE_PIVOT
+        case RelationalGroupedDataset.GroupType.GroupingSets =>
           Aggregate.GroupType.GROUP_TYPE_GROUPING_SETS)
     groupingExprs.foreach(c => aggBuilder.addGroupingExpressions(c.expr))
     allAggs.foreach(c => aggBuilder.addAggregateExpressions(c.expr))
@@ -98,39 +98,39 @@ final class GroupedDataFrame private[sql] (
 
   def sum(colNames: String*): DataFrame = aggregateNumericColumns(colNames, "sum")
 
-  def pivot(pivotCol: Column): GroupedDataFrame =
-    new GroupedDataFrame(
+  def pivot(pivotCol: Column): RelationalGroupedDataset =
+    new RelationalGroupedDataset(
       df,
       groupingExprs,
-      GroupedDataFrame.GroupType.Pivot,
+      RelationalGroupedDataset.GroupType.Pivot,
       groupingSetsProto,
       pivotCol = Some(pivotCol)
     )
 
-  def pivot(pivotCol: Column, values: Seq[Any]): GroupedDataFrame =
+  def pivot(pivotCol: Column, values: Seq[Any]): RelationalGroupedDataset =
     val litValues = values.map { v =>
       Column.lit(v).expr.getLiteral
     }
-    new GroupedDataFrame(
+    new RelationalGroupedDataset(
       df,
       groupingExprs,
-      GroupedDataFrame.GroupType.Pivot,
+      RelationalGroupedDataset.GroupType.Pivot,
       groupingSetsProto,
       pivotCol = Some(pivotCol),
       pivotValues = litValues
     )
 
-  def pivot(pivotColumn: String): GroupedDataFrame =
+  def pivot(pivotColumn: String): RelationalGroupedDataset =
     pivot(Column(pivotColumn))
 
-  def pivot(pivotColumn: String, values: Seq[Any]): GroupedDataFrame =
+  def pivot(pivotColumn: String, values: Seq[Any]): RelationalGroupedDataset =
     pivot(Column(pivotColumn), values)
 
-  def pivot(pivotColumn: String, values: java.util.List[Any]): GroupedDataFrame =
+  def pivot(pivotColumn: String, values: java.util.List[Any]): RelationalGroupedDataset =
     import scala.jdk.CollectionConverters.*
     pivot(Column(pivotColumn), values.asScala.toSeq)
 
-  def pivot(pivotCol: Column, values: java.util.List[Any]): GroupedDataFrame =
+  def pivot(pivotCol: Column, values: java.util.List[Any]): RelationalGroupedDataset =
     import scala.jdk.CollectionConverters.*
     pivot(pivotCol, values.asScala.toSeq)
 
@@ -156,9 +156,52 @@ final class GroupedDataFrame private[sql] (
       case _: DecimalType                                                         => true
       case _                                                                      => false
 
-object GroupedDataFrame:
+object RelationalGroupedDataset:
   enum GroupType:
     case GroupBy, Rollup, Cube, Pivot, GroupingSets
+
+  private[sql] def apply(
+      df: DataFrame,
+      groupingExprs: Seq[Column],
+      groupType: GroupType
+  ): RelationalGroupedDataset =
+    new RelationalGroupedDataset(df, groupingExprs, groupType)
+
+  private[sql] def apply(
+      df: DataFrame,
+      groupingExprs: Seq[Column],
+      groupType: GroupType,
+      groupingSetsProto: Option[Seq[Aggregate.GroupingSets]]
+  ): RelationalGroupedDataset =
+    new RelationalGroupedDataset(
+      df,
+      groupingExprs,
+      groupType,
+      groupingSetsProto = groupingSetsProto
+    )
+
+/** Backward-compatible name retained for code written against this client before the Spark
+  * `RelationalGroupedDataset` name was added.
+  */
+final class GroupedDataFrame private[sql] (
+    df: DataFrame,
+    groupingExprs: Seq[Column],
+    groupType: RelationalGroupedDataset.GroupType,
+    groupingSetsProto: Option[Seq[Aggregate.GroupingSets]] = None,
+    pivotCol: Option[Column] = None,
+    pivotValues: Seq[Expression.Literal] = Seq.empty
+) extends RelationalGroupedDataset(
+      df,
+      groupingExprs,
+      groupType,
+      groupingSetsProto,
+      pivotCol,
+      pivotValues
+    )
+
+object GroupedDataFrame:
+  type GroupType = RelationalGroupedDataset.GroupType
+  val GroupType: RelationalGroupedDataset.GroupType.type = RelationalGroupedDataset.GroupType
 
   private[sql] def apply(
       df: DataFrame,

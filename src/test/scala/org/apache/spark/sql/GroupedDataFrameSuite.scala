@@ -18,7 +18,7 @@ class GroupedDataFrameSuite extends AnyFunSuite with Matchers:
       .build()
     DataFrame(session, rel)
 
-  private def stubGrouped: GroupedDataFrame =
+  private def stubGrouped: RelationalGroupedDataset =
     stubDf.groupBy(Column("key"))
 
   // ---------------------------------------------------------------------------
@@ -240,6 +240,35 @@ class GroupedDataFrameSuite extends AnyFunSuite with Matchers:
     val groupExpr = agg.getGroupingExpressions(0)
     groupExpr.hasUnresolvedAttribute shouldBe true
     groupExpr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "key"
+  }
+
+  test("RelationalGroupedDataset companion creates a standard grouped dataset") {
+    val grouped: RelationalGroupedDataset = RelationalGroupedDataset(
+      stubDf,
+      Seq(Column("key")),
+      RelationalGroupedDataset.GroupType.GroupBy
+    )
+
+    val result = grouped.count()
+    result.relation.getAggregate.getGroupType shouldBe Aggregate.GroupType.GROUP_TYPE_GROUPBY
+    result.relation.getAggregate.getGroupingExpressionsCount shouldBe 1
+  }
+
+  test("RelationalGroupedDataset companion creates grouping sets") {
+    val groupingSet = Aggregate.GroupingSets.newBuilder()
+      .addGroupingSet(Column("key").expr)
+      .build()
+    val grouped: RelationalGroupedDataset = RelationalGroupedDataset(
+      stubDf,
+      Seq(Column("key")),
+      RelationalGroupedDataset.GroupType.GroupingSets,
+      Some(Seq(groupingSet))
+    )
+
+    val result = grouped.count()
+    result.relation.getAggregate.getGroupType shouldBe
+      Aggregate.GroupType.GROUP_TYPE_GROUPING_SETS
+    result.relation.getAggregate.getGroupingSetsCount shouldBe 1
   }
 
   test("groupBy with multiple columns has matching grouping expressions") {

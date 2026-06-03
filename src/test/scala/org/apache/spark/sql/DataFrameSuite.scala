@@ -707,11 +707,23 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
     grouped shouldBe a[GroupedDataFrame]
   }
 
+  test("groupBy(Column*) can be annotated as RelationalGroupedDataset") {
+    val df = testDf()
+    val grouped: RelationalGroupedDataset = df.groupBy(Column("a"), Column("b"))
+    grouped shouldBe a[GroupedDataFrame]
+  }
+
   // ---------- groupBy(String*) ----------
 
   test("groupBy(String*) returns GroupedDataFrame") {
     val df = testDf()
     val grouped = df.groupBy("a", "b")(using summon[DummyImplicit])
+    grouped shouldBe a[GroupedDataFrame]
+  }
+
+  test("groupBy(String*) can be annotated as RelationalGroupedDataset") {
+    val df = testDf()
+    val grouped: RelationalGroupedDataset = df.groupBy("a", "b")(using summon[DummyImplicit])
     grouped shouldBe a[GroupedDataFrame]
   }
 

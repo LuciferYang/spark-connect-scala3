@@ -294,9 +294,9 @@ final class Dataset[T: ClassTag] private[sql] (
   def sortWithinPartitions(colNames: String*)(using DummyImplicit): Dataset[T] =
     Dataset(df.sortWithinPartitions(colNames*), encoder)
 
-  def groupBy(cols: Column*): GroupedDataFrame = df.groupBy(cols*)
+  def groupBy(cols: Column*): RelationalGroupedDataset = df.groupBy(cols*)
 
-  def groupBy(col1: String, cols: String*): GroupedDataFrame =
+  def groupBy(col1: String, cols: String*): RelationalGroupedDataset =
     df.groupBy((col1 +: cols).map(Column(_))*)
 
   def agg(aggExpr: Column, aggExprs: Column*): DataFrame = df.agg(aggExpr, aggExprs*)
@@ -306,16 +306,16 @@ final class Dataset[T: ClassTag] private[sql] (
 
   def agg(exprs: Map[String, String]): DataFrame = df.groupBy(Seq.empty[Column]*).agg(exprs)
 
-  def rollup(cols: Column*): GroupedDataFrame = df.rollup(cols*)
+  def rollup(cols: Column*): RelationalGroupedDataset = df.rollup(cols*)
 
-  def rollup(col1: String, cols: String*): GroupedDataFrame = df.rollup(col1, cols*)
+  def rollup(col1: String, cols: String*): RelationalGroupedDataset = df.rollup(col1, cols*)
 
-  def cube(cols: Column*): GroupedDataFrame = df.cube(cols*)
+  def cube(cols: Column*): RelationalGroupedDataset = df.cube(cols*)
 
-  def cube(col1: String, cols: String*): GroupedDataFrame = df.cube(col1, cols*)
+  def cube(col1: String, cols: String*): RelationalGroupedDataset = df.cube(col1, cols*)
 
   /** Group by grouping sets. */
-  def groupingSets(groupingSets: Seq[Seq[Column]], cols: Column*): GroupedDataFrame =
+  def groupingSets(groupingSets: Seq[Seq[Column]], cols: Column*): RelationalGroupedDataset =
     df.groupingSets(groupingSets, cols*)
 
   def offset(n: Int): Dataset[T] = Dataset(df.offset(n), encoder)

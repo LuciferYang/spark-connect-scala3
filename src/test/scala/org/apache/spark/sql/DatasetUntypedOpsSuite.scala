@@ -55,6 +55,12 @@ class DatasetUntypedOpsSuite extends AnyFunSuite with Matchers:
     gdf shouldBe a[GroupedDataFrame]
   }
 
+  test("groupBy(String, String*) can be annotated as RelationalGroupedDataset") {
+    val ds = testDs()
+    val gdf: RelationalGroupedDataset = ds.groupBy("value")
+    gdf shouldBe a[GroupedDataFrame]
+  }
+
   test("agg(Column, Column*) delegates to DataFrame") {
     val ds = testDs()
     val result = ds.agg(functions.count(Column("value")))

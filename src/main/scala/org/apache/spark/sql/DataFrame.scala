@@ -76,22 +76,22 @@ final class DataFrame private[sql] (
   def orderBy(sortCol: String, sortCols: String*): DataFrame =
     orderBy((sortCol +: sortCols).map(Column(_))*)
 
-  def groupBy(cols: Column*): GroupedDataFrame =
+  def groupBy(cols: Column*): RelationalGroupedDataset =
     GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.GroupBy)
 
-  def groupBy(colNames: String*)(using DummyImplicit): GroupedDataFrame =
+  def groupBy(colNames: String*)(using DummyImplicit): RelationalGroupedDataset =
     groupBy(colNames.map(Column(_))*)
 
-  def rollup(cols: Column*): GroupedDataFrame =
+  def rollup(cols: Column*): RelationalGroupedDataset =
     GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.Rollup)
 
-  def rollup(col1: String, cols: String*): GroupedDataFrame =
+  def rollup(col1: String, cols: String*): RelationalGroupedDataset =
     rollup((col1 +: cols).map(Column(_))*)
 
-  def cube(cols: Column*): GroupedDataFrame =
+  def cube(cols: Column*): RelationalGroupedDataset =
     GroupedDataFrame(this, cols.toSeq, GroupedDataFrame.GroupType.Cube)
 
-  def cube(col1: String, cols: String*): GroupedDataFrame =
+  def cube(col1: String, cols: String*): RelationalGroupedDataset =
     cube((col1 +: cols).map(Column(_))*)
 
   def agg(aggExpr: Column, aggExprs: Column*): DataFrame =
@@ -507,7 +507,7 @@ final class DataFrame private[sql] (
         )
 
   /** Group by grouping sets. */
-  def groupingSets(groupingSets: Seq[Seq[Column]], cols: Column*): GroupedDataFrame =
+  def groupingSets(groupingSets: Seq[Seq[Column]], cols: Column*): RelationalGroupedDataset =
     val gsProtos = groupingSets.map { gs =>
       val b = Aggregate.GroupingSets.newBuilder()
       gs.foreach(c => b.addGroupingSet(c.expr))
