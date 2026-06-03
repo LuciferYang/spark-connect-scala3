@@ -37,6 +37,14 @@ class ImplicitsSuite extends AnyFunSuite with Matchers:
     c.expr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "age"
   }
 
+  test("spark.implicits exposes column helpers") {
+    val spark = SparkSession(null)
+    import spark.implicits.*
+
+    val c: Column = $"id"
+    c.expr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "id"
+  }
+
   // ---------------------------------------------------------------------------
   // ColumnName StructField helpers
   // ---------------------------------------------------------------------------
@@ -131,6 +139,14 @@ class ImplicitsSuite extends AnyFunSuite with Matchers:
     import org.apache.spark.sql.implicits.*
 
     given spark: SparkSession = SparkSession.builder().remote("sc://localhost:15002").build()
+
+    val ds = Seq(1, 2, 3).toDS
+    ds.toDF().relation.hasLocalRelation shouldBe true
+  }
+
+  test("spark.implicits exposes session-scoped Seq.toDS") {
+    val spark = SparkSession(null)
+    import spark.implicits.*
 
     val ds = Seq(1, 2, 3).toDS
     ds.toDF().relation.hasLocalRelation shouldBe true

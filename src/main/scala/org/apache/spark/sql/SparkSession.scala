@@ -32,6 +32,13 @@ final class SparkSession private[sql] (
 
   private[sql] def nextPlanId(): Long = planIdCounter.getAndIncrement()
 
+  // scalastyle:off
+  /** Scala 3 imports bound to this session, matching `import spark.implicits.*`. */
+  object implicits:
+    implicit val sparkSession: SparkSession = SparkSession.this
+    export _root_.org.apache.spark.sql.implicits.*
+  // scalastyle:on
+
   // ---------------------------------------------------------------------------
   // SQL
   // ---------------------------------------------------------------------------
@@ -346,6 +353,16 @@ final class SparkSession private[sql] (
     println(f"Time taken: $elapsed%.0f ms")
     result
 
+  /** Execute a block with this session set as active, restoring the previous active session. */
+  def withActive[T](block: => T): T =
+    val previous = SparkSession.getActiveSession
+    SparkSession.setActiveSession(this)
+    try block
+    finally
+      previous match
+        case Some(session) => SparkSession.setActiveSession(session)
+        case None          => SparkSession.clearActiveSession()
+
   // ---------------------------------------------------------------------------
   // Stop
   // ---------------------------------------------------------------------------
@@ -505,6 +522,15 @@ object SparkSession:
     def config(map: java.util.Map[String, Any]): Builder =
       import scala.jdk.CollectionConverters.*
       config(map.asScala.toMap)
+
+    /** Set the application name config for API compatibility with upstream Spark. */
+    def appName(name: String): Builder = config("spark.app.name", name)
+
+    /** Set the classic Spark master config for API compatibility; use `remote` for Connect. */
+    def master(master: String): Builder = config("spark.master", master)
+
+    /** Set the Hive catalog implementation config for API compatibility. */
+    def enableHiveSupport(): Builder = config("spark.sql.catalogImplementation", "hive")
 
     def build(): SparkSession =
       require(

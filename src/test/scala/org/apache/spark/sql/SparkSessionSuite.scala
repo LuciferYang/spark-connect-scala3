@@ -46,6 +46,32 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
     an[IllegalStateException] should be thrownBy SparkSession.active
   }
 
+  test("withActive sets this session and restores the previous active session") {
+    val previous = SparkSession(null)
+    val current = SparkSession(null)
+    SparkSession.setActiveSession(previous)
+
+    val result = current.withActive {
+      SparkSession.getActiveSession shouldBe Some(current)
+      42
+    }
+
+    result shouldBe 42
+    SparkSession.getActiveSession shouldBe Some(previous)
+    SparkSession.clearActiveSession()
+  }
+
+  test("withActive clears active session when there was no previous active session") {
+    val current = SparkSession(null)
+    SparkSession.clearActiveSession()
+
+    current.withActive {
+      SparkSession.getActiveSession shouldBe Some(current)
+    }
+
+    SparkSession.getActiveSession shouldBe None
+  }
+
   // ---------- cloneSession API ----------
 
   test("cloneSession method exists on SparkSession") {
@@ -117,6 +143,11 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
   // ---------- Coverage boost: proto-only relation building ----------
 
   private def stubSession: SparkSession = SparkSession(null)
+
+  private def builderConfigs(builder: SparkSession.Builder): Map[String, String] =
+    val field = classOf[SparkSession.Builder].getDeclaredField("configs")
+    field.setAccessible(true)
+    field.get(builder).asInstanceOf[Map[String, String]]
 
   // ---------- sql ----------
 
@@ -414,6 +445,31 @@ class SparkSessionSuite extends AnyFunSuite with Matchers:
       .getMethod("interceptor", classOf[io.grpc.ClientInterceptor])
     method should not be null
     method.getReturnType shouldBe classOf[SparkSession.Builder]
+  }
+
+  test("Builder.appName sets spark.app.name config") {
+    val builder = SparkSession.builder().appName("connect-app")
+    builderConfigs(builder).get("spark.app.name") shouldBe Some("connect-app")
+  }
+
+  test("Builder.master sets spark.master config") {
+    val builder = SparkSession.builder().master("local[2]")
+    builderConfigs(builder).get("spark.master") shouldBe Some("local[2]")
+  }
+
+  test("Builder.enableHiveSupport sets hive catalog implementation config") {
+    val builder = SparkSession.builder().enableHiveSupport()
+    builderConfigs(builder).get("spark.sql.catalogImplementation") shouldBe Some("hive")
+  }
+
+  test("Builder appName/master/enableHiveSupport return Builder for chaining") {
+    val builder = SparkSession.builder()
+      .appName("connect-app")
+      .master("local")
+      .enableHiveSupport()
+      .remote("sc://host:1234")
+
+    builder shouldBe a[SparkSession.Builder]
   }
 
   // ---------- Closeable / stop ----------
