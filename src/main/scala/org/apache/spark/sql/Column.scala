@@ -1,5 +1,6 @@
 package org.apache.spark.sql
 
+import com.google.protobuf.ByteString
 import org.apache.spark.connect.proto.{
   Expression,
   Relation,
@@ -506,15 +507,17 @@ object Column:
             .setNull(ProtoDataType.newBuilder()
               .setNull(ProtoDataType.NULL.getDefaultInstance).build())
             .build()
-        case v: Boolean => Expression.Literal.newBuilder().setBoolean(v).build()
-        case v: Byte    => Expression.Literal.newBuilder().setByte(v.toInt).build()
-        case v: Short   => Expression.Literal.newBuilder().setShort(v.toInt).build()
-        case v: Int     => Expression.Literal.newBuilder().setInteger(v).build()
-        case v: Long    => Expression.Literal.newBuilder().setLong(v).build()
-        case v: Float   => Expression.Literal.newBuilder().setFloat(v).build()
-        case v: Double  => Expression.Literal.newBuilder().setDouble(v).build()
-        case v: String  => Expression.Literal.newBuilder().setString(v).build()
-        case v          => Expression.Literal.newBuilder().setString(v.toString).build()
+        case v: Boolean     => Expression.Literal.newBuilder().setBoolean(v).build()
+        case v: Byte        => Expression.Literal.newBuilder().setByte(v.toInt).build()
+        case v: Short       => Expression.Literal.newBuilder().setShort(v.toInt).build()
+        case v: Int         => Expression.Literal.newBuilder().setInteger(v).build()
+        case v: Long        => Expression.Literal.newBuilder().setLong(v).build()
+        case v: Float       => Expression.Literal.newBuilder().setFloat(v).build()
+        case v: Double      => Expression.Literal.newBuilder().setDouble(v).build()
+        case v: String      => Expression.Literal.newBuilder().setString(v).build()
+        case v: Array[Byte] =>
+          Expression.Literal.newBuilder().setBinary(ByteString.copyFrom(v)).build()
+        case v => Expression.Literal.newBuilder().setString(v.toString).build()
       Column(Expression.newBuilder().setLiteral(literal).build())
 
 /** WindowSpec with partition, order, and frame specifications. */
