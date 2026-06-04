@@ -98,6 +98,685 @@ class UserDefinedFunctionSuite extends AnyFunSuite with Matchers:
     f.inputTypes shouldBe Seq(StringType, IntegerType, DoubleType)
   }
 
+  test("udf overloads from Function4 through Function21 have correct arity") {
+    def verify(f: UserDefinedFunction, inputCount: Int): Unit =
+      f.returnType shouldBe IntegerType
+      f.inputTypes shouldBe Seq.fill(inputCount)(IntegerType)
+
+    verify(functions.udf((_: Int, _: Int, _: Int, _: Int) => 0), 4)
+    verify(functions.udf((_: Int, _: Int, _: Int, _: Int, _: Int) => 0), 5)
+    verify(functions.udf((_: Int, _: Int, _: Int, _: Int, _: Int, _: Int) => 0), 6)
+    verify(functions.udf((_: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int) => 0), 7)
+    verify(functions.udf((_: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int) => 0), 8)
+    verify(
+      functions.udf((_: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int) => 0),
+      9
+    )
+    verify(
+      functions.udf(
+        (_: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int) => 0
+      ),
+      10
+    )
+    verify(
+      functions.udf(
+        (_: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int, _: Int) =>
+          0
+      ),
+      11
+    )
+    verify(
+      functions.udf(
+        (
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int
+        ) => 0
+      ),
+      12
+    )
+    verify(
+      functions.udf(
+        (
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int
+        ) => 0
+      ),
+      13
+    )
+    verify(
+      functions.udf(
+        (
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int
+        ) => 0
+      ),
+      14
+    )
+    verify(
+      functions.udf(
+        (
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int
+        ) => 0
+      ),
+      15
+    )
+    verify(
+      functions.udf(
+        (
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int
+        ) => 0
+      ),
+      16
+    )
+    verify(
+      functions.udf(
+        (
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int
+        ) => 0
+      ),
+      17
+    )
+    verify(
+      functions.udf(
+        (
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int
+        ) => 0
+      ),
+      18
+    )
+    verify(
+      functions.udf(
+        (
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int
+        ) => 0
+      ),
+      19
+    )
+    verify(
+      functions.udf(
+        (
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int
+        ) => 0
+      ),
+      20
+    )
+    verify(
+      functions.udf(
+        (
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int,
+            _: Int
+        ) => 0
+      ),
+      21
+    )
+  }
+
+  test("udf with Function22 has correct types") {
+    val f = functions.udf(
+      (
+          a1: Int,
+          a2: Int,
+          a3: Int,
+          a4: Int,
+          a5: Int,
+          a6: Int,
+          a7: Int,
+          a8: Int,
+          a9: Int,
+          a10: Int,
+          a11: Int,
+          a12: Int,
+          a13: Int,
+          a14: Int,
+          a15: Int,
+          a16: Int,
+          a17: Int,
+          a18: Int,
+          a19: Int,
+          a20: Int,
+          a21: Int,
+          a22: Int
+      ) =>
+        a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 +
+          a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22
+    )
+
+    f.returnType shouldBe IntegerType
+    f.inputTypes shouldBe Seq.fill(22)(IntegerType)
+  }
+
+  test("Java UDF overloads from UDF0 through UDF21 keep explicit return type") {
+    def verify(f: UserDefinedFunction): Unit =
+      f.returnType shouldBe IntegerType
+      f.inputTypes shouldBe empty
+
+    verify(functions.udf(null.asInstanceOf[org.apache.spark.sql.api.java.UDF0[Int]], IntegerType))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF1[Int, Int]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF2[Int, Int, Int]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF3[Int, Int, Int, Int]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF4[Int, Int, Int, Int, Int]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF5[Int, Int, Int, Int, Int, Int]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF6[Int, Int, Int, Int, Int, Int, Int]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF7[Int, Int, Int, Int, Int, Int, Int, Int]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF8[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF9[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF10[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF11[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF12[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF13[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF14[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF15[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF16[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF17[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF18[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF19[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF20[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+    verify(functions.udf(
+      null.asInstanceOf[org.apache.spark.sql.api.java.UDF21[
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int,
+        Int
+      ]],
+      IntegerType
+    ))
+  }
+
+  test("Java UDF22 factory keeps explicit return type") {
+    val udf22 = new org.apache.spark.sql.api.java.UDF22[
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int,
+      Int
+    ]:
+      override def call(
+          t1: Int,
+          t2: Int,
+          t3: Int,
+          t4: Int,
+          t5: Int,
+          t6: Int,
+          t7: Int,
+          t8: Int,
+          t9: Int,
+          t10: Int,
+          t11: Int,
+          t12: Int,
+          t13: Int,
+          t14: Int,
+          t15: Int,
+          t16: Int,
+          t17: Int,
+          t18: Int,
+          t19: Int,
+          t20: Int,
+          t21: Int,
+          t22: Int
+      ): Int =
+        t1 + t2 + t3 + t4 + t5 + t6 + t7 + t8 + t9 + t10 + t11 + t12 + t13 +
+          t14 + t15 + t16 + t17 + t18 + t19 + t20 + t21 + t22
+
+    val f = functions.udf(udf22, IntegerType)
+    f.returnType shouldBe IntegerType
+    f.inputTypes shouldBe empty
+  }
+
   // ---------------------------------------------------------------------------
   // UserDefinedFunction API tests
   // ---------------------------------------------------------------------------
@@ -198,6 +877,12 @@ class UserDefinedFunctionSuite extends AnyFunSuite with Matchers:
       val f0 = functions.udf(() => 42)
       val f1 = functions.udf((x: Int) => x + 1)
       val f2 = functions.udf((a: Int, b: Int) => a + b)
+      val f22 = functions.udf((
+        a1: Int, a2: Int, a3: Int, a4: Int, a5: Int, a6: Int, a7: Int, a8: Int,
+        a9: Int, a10: Int, a11: Int, a12: Int, a13: Int, a14: Int, a15: Int,
+        a16: Int, a17: Int, a18: Int, a19: Int, a20: Int, a21: Int, a22: Int
+      ) => a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 +
+        a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22)
     """)
   }
 

@@ -1866,12 +1866,555 @@ object functions:
       )
     )
 
+  /** Create a UDF from a Function11. */
+  inline def udf[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, R](
+      f: (T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11]
+      )
+    )
+
+  /** Create a UDF from a Function12. */
+  inline def udf[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, R](
+      f: (T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12]
+      )
+    )
+
+  /** Create a UDF from a Function13. */
+  inline def udf[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, R](
+      f: (T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12],
+        Encoder.sparkTypeOf[T13]
+      )
+    )
+
+  /** Create a UDF from a Function14. */
+  inline def udf[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, R](
+      f: (T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12],
+        Encoder.sparkTypeOf[T13],
+        Encoder.sparkTypeOf[T14]
+      )
+    )
+
+  /** Create a UDF from a Function15. */
+  inline def udf[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, R](
+      f: (T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12],
+        Encoder.sparkTypeOf[T13],
+        Encoder.sparkTypeOf[T14],
+        Encoder.sparkTypeOf[T15]
+      )
+    )
+
+  /** Create a UDF from a Function16. */
+  inline def udf[
+      T1,
+      T2,
+      T3,
+      T4,
+      T5,
+      T6,
+      T7,
+      T8,
+      T9,
+      T10,
+      T11,
+      T12,
+      T13,
+      T14,
+      T15,
+      T16,
+      R
+  ](
+      f: (T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12],
+        Encoder.sparkTypeOf[T13],
+        Encoder.sparkTypeOf[T14],
+        Encoder.sparkTypeOf[T15],
+        Encoder.sparkTypeOf[T16]
+      )
+    )
+
+  /** Create a UDF from a Function17. */
+  inline def udf[
+      T1,
+      T2,
+      T3,
+      T4,
+      T5,
+      T6,
+      T7,
+      T8,
+      T9,
+      T10,
+      T11,
+      T12,
+      T13,
+      T14,
+      T15,
+      T16,
+      T17,
+      R
+  ](
+      f: (T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12],
+        Encoder.sparkTypeOf[T13],
+        Encoder.sparkTypeOf[T14],
+        Encoder.sparkTypeOf[T15],
+        Encoder.sparkTypeOf[T16],
+        Encoder.sparkTypeOf[T17]
+      )
+    )
+
+  /** Create a UDF from a Function18. */
+  inline def udf[
+      T1,
+      T2,
+      T3,
+      T4,
+      T5,
+      T6,
+      T7,
+      T8,
+      T9,
+      T10,
+      T11,
+      T12,
+      T13,
+      T14,
+      T15,
+      T16,
+      T17,
+      T18,
+      R
+  ](
+      f: (T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12],
+        Encoder.sparkTypeOf[T13],
+        Encoder.sparkTypeOf[T14],
+        Encoder.sparkTypeOf[T15],
+        Encoder.sparkTypeOf[T16],
+        Encoder.sparkTypeOf[T17],
+        Encoder.sparkTypeOf[T18]
+      )
+    )
+
+  /** Create a UDF from a Function19. */
+  inline def udf[
+      T1,
+      T2,
+      T3,
+      T4,
+      T5,
+      T6,
+      T7,
+      T8,
+      T9,
+      T10,
+      T11,
+      T12,
+      T13,
+      T14,
+      T15,
+      T16,
+      T17,
+      T18,
+      T19,
+      R
+  ](
+      f: (T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12],
+        Encoder.sparkTypeOf[T13],
+        Encoder.sparkTypeOf[T14],
+        Encoder.sparkTypeOf[T15],
+        Encoder.sparkTypeOf[T16],
+        Encoder.sparkTypeOf[T17],
+        Encoder.sparkTypeOf[T18],
+        Encoder.sparkTypeOf[T19]
+      )
+    )
+
+  /** Create a UDF from a Function20. */
+  inline def udf[
+      T1,
+      T2,
+      T3,
+      T4,
+      T5,
+      T6,
+      T7,
+      T8,
+      T9,
+      T10,
+      T11,
+      T12,
+      T13,
+      T14,
+      T15,
+      T16,
+      T17,
+      T18,
+      T19,
+      T20,
+      R
+  ](
+      f: (
+          T1,
+          T2,
+          T3,
+          T4,
+          T5,
+          T6,
+          T7,
+          T8,
+          T9,
+          T10,
+          T11,
+          T12,
+          T13,
+          T14,
+          T15,
+          T16,
+          T17,
+          T18,
+          T19,
+          T20
+      ) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12],
+        Encoder.sparkTypeOf[T13],
+        Encoder.sparkTypeOf[T14],
+        Encoder.sparkTypeOf[T15],
+        Encoder.sparkTypeOf[T16],
+        Encoder.sparkTypeOf[T17],
+        Encoder.sparkTypeOf[T18],
+        Encoder.sparkTypeOf[T19],
+        Encoder.sparkTypeOf[T20]
+      )
+    )
+
+  /** Create a UDF from a Function21. */
+  inline def udf[
+      T1,
+      T2,
+      T3,
+      T4,
+      T5,
+      T6,
+      T7,
+      T8,
+      T9,
+      T10,
+      T11,
+      T12,
+      T13,
+      T14,
+      T15,
+      T16,
+      T17,
+      T18,
+      T19,
+      T20,
+      T21,
+      R
+  ](
+      f: (
+          T1,
+          T2,
+          T3,
+          T4,
+          T5,
+          T6,
+          T7,
+          T8,
+          T9,
+          T10,
+          T11,
+          T12,
+          T13,
+          T14,
+          T15,
+          T16,
+          T17,
+          T18,
+          T19,
+          T20,
+          T21
+      ) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12],
+        Encoder.sparkTypeOf[T13],
+        Encoder.sparkTypeOf[T14],
+        Encoder.sparkTypeOf[T15],
+        Encoder.sparkTypeOf[T16],
+        Encoder.sparkTypeOf[T17],
+        Encoder.sparkTypeOf[T18],
+        Encoder.sparkTypeOf[T19],
+        Encoder.sparkTypeOf[T20],
+        Encoder.sparkTypeOf[T21]
+      )
+    )
+
+  /** Create a UDF from a Function22. */
+  inline def udf[
+      T1,
+      T2,
+      T3,
+      T4,
+      T5,
+      T6,
+      T7,
+      T8,
+      T9,
+      T10,
+      T11,
+      T12,
+      T13,
+      T14,
+      T15,
+      T16,
+      T17,
+      T18,
+      T19,
+      T20,
+      T21,
+      T22,
+      R
+  ](
+      f: (
+          T1,
+          T2,
+          T3,
+          T4,
+          T5,
+          T6,
+          T7,
+          T8,
+          T9,
+          T10,
+          T11,
+          T12,
+          T13,
+          T14,
+          T15,
+          T16,
+          T17,
+          T18,
+          T19,
+          T20,
+          T21,
+          T22
+      ) => R
+  ): UserDefinedFunction =
+    UserDefinedFunction(
+      func = f,
+      returnType = Encoder.sparkTypeOf[R],
+      inputTypes = Seq(
+        Encoder.sparkTypeOf[T1],
+        Encoder.sparkTypeOf[T2],
+        Encoder.sparkTypeOf[T3],
+        Encoder.sparkTypeOf[T4],
+        Encoder.sparkTypeOf[T5],
+        Encoder.sparkTypeOf[T6],
+        Encoder.sparkTypeOf[T7],
+        Encoder.sparkTypeOf[T8],
+        Encoder.sparkTypeOf[T9],
+        Encoder.sparkTypeOf[T10],
+        Encoder.sparkTypeOf[T11],
+        Encoder.sparkTypeOf[T12],
+        Encoder.sparkTypeOf[T13],
+        Encoder.sparkTypeOf[T14],
+        Encoder.sparkTypeOf[T15],
+        Encoder.sparkTypeOf[T16],
+        Encoder.sparkTypeOf[T17],
+        Encoder.sparkTypeOf[T18],
+        Encoder.sparkTypeOf[T19],
+        Encoder.sparkTypeOf[T20],
+        Encoder.sparkTypeOf[T21],
+        Encoder.sparkTypeOf[T22]
+      )
+    )
+
   // ---------------------------------------------------------------------------
   // User-Defined Aggregate Functions (UDAF)
   // ---------------------------------------------------------------------------
 
   // ---------------------------------------------------------------------------
-  // Java UDF overloads (UDF0–UDF9 with explicit DataType)
+  // Java UDF overloads (UDF0–UDF22 with explicit DataType)
   // ---------------------------------------------------------------------------
 
   /** Create a UDF from a Java UDF0 with explicit return type. */
@@ -1940,6 +2483,207 @@ object functions:
   /** Create a UDF from a Java UDF9 with explicit return type. */
   def udf(
       f: org.apache.spark.sql.api.java.UDF9[?, ?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF10 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF10[?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF11 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF11[?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF12 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF12[?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF13 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF13[?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF14 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF14[?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF15 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF15[?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF16 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF16[?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF17 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF17[?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF18 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF18[
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      ],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF19 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF19[
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      ],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF20 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF20[
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      ],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF21 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF21[
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      ],
+      returnType: types.DataType
+  ): UserDefinedFunction =
+    UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
+
+  /** Create a UDF from a Java UDF22 with explicit return type. */
+  def udf(
+      f: org.apache.spark.sql.api.java.UDF22[
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      ],
       returnType: types.DataType
   ): UserDefinedFunction =
     UserDefinedFunction(func = f, returnType = returnType, inputTypes = Seq.empty)
