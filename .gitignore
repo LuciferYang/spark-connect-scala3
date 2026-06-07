@@ -20,6 +20,7 @@ metals.sbt
 
 # Local analysis docs
 API-GAP-*.md
+API_REVIEW_V4_1_2.md
 
 # Local agent state (claude-code)
 .claude/

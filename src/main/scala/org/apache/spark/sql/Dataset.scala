@@ -86,6 +86,16 @@ final class Dataset[T: ClassTag] private[sql] (
     val newDf = DataFrame(sparkSession, relation)
     Dataset(newDf, outEnc)
 
+  def mapPartitions[U](
+      func: org.apache.spark.api.java.function.MapPartitionsFunction[T, U],
+      encoder: Encoder[U]
+  ): Dataset[U] =
+    import scala.jdk.CollectionConverters.*
+    mapPartitions((iter: Iterator[T]) => func.call(iter.asJava).asScala)(using
+      encoder,
+      classTagFromEncoder(encoder)
+    )
+
   /** Return a new Dataset containing only rows matching the predicate.
     *
     * Wraps `func` in a top-level [[FilterAdaptor]] (rather than an inner anonymous lambda) so the
@@ -94,12 +104,19 @@ final class Dataset[T: ClassTag] private[sql] (
   def filter(func: T => Boolean): Dataset[T] =
     mapPartitions(new FilterAdaptor(func))(using encoder, summon[ClassTag[T]])
 
+  def filter(func: org.apache.spark.api.java.function.FilterFunction[T]): Dataset[T] =
+    filter((value: T) => func.call(value))
+
   /** Return a new Dataset by applying a function to each element.
     *
     * Wraps `func` in a top-level [[MapPartitionsAdaptor]] for serialization stability.
     */
   def map[U: Encoder: ClassTag](func: T => U): Dataset[U] =
     mapPartitions(new MapPartitionsAdaptor(func))
+
+  def map[U](func: org.apache.spark.api.java.function.MapFunction[T, U], encoder: Encoder[U])
+      : Dataset[U] =
+    map((value: T) => func.call(value))(using encoder, classTagFromEncoder(encoder))
 
   /** Return a new Dataset by applying a function that returns a sequence.
     *
@@ -108,9 +125,19 @@ final class Dataset[T: ClassTag] private[sql] (
   def flatMap[U: Encoder: ClassTag](func: T => IterableOnce[U]): Dataset[U] =
     mapPartitions(new FlatMapAdaptor(func))
 
+  def flatMap[U](
+      func: org.apache.spark.api.java.function.FlatMapFunction[T, U],
+      encoder: Encoder[U]
+  ): Dataset[U] =
+    import scala.jdk.CollectionConverters.*
+    flatMap((value: T) => func.call(value).asScala)(using encoder, classTagFromEncoder(encoder))
+
   /** Apply a function to each element. */
   def foreach(func: T => Unit): Unit =
     collect().foreach(func)
+
+  def foreach(func: org.apache.spark.api.java.function.ForeachFunction[T]): Unit =
+    foreach((value: T) => func.call(value))
 
   /** Apply a function to each partition.
     *
@@ -122,6 +149,12 @@ final class Dataset[T: ClassTag] private[sql] (
     */
   def foreachPartition(func: Iterator[T] => Unit): Unit =
     func(collect().iterator)
+
+  def foreachPartition(
+      func: org.apache.spark.api.java.function.ForeachPartitionFunction[T]
+  ): Unit =
+    import scala.jdk.CollectionConverters.*
+    foreachPartition((iter: Iterator[T]) => func.call(iter.asJava))
 
   /** Return a new Dataset with distinct elements. */
   def distinct(): Dataset[T] = Dataset(df.distinct(), encoder)
@@ -159,6 +192,12 @@ final class Dataset[T: ClassTag] private[sql] (
       summon[ClassTag[T]]
     )
 
+  def groupByKey[K](
+      func: org.apache.spark.api.java.function.MapFunction[T, K],
+      encoder: Encoder[K]
+  ): KeyValueGroupedDataset[K, T] =
+    groupByKey((value: T) => func.call(value))(using encoder, classTagFromEncoder(encoder))
+
   // ---------------------------------------------------------------------------
   // Java Functional Interface Overloads
   //
@@ -169,9 +208,7 @@ final class Dataset[T: ClassTag] private[sql] (
   // ---------------------------------------------------------------------------
 
   /** Reduce using a Java ReduceFunction. */
-  def reduce(func: org.apache.spark.api.java.function.ReduceFunction[T])(using
-      DummyImplicit
-  ): T =
+  def reduce(func: org.apache.spark.api.java.function.ReduceFunction[T]): T =
     reduce((a: T, b: T) => func.call(a, b))
 
   // ---------------------------------------------------------------------------
@@ -776,6 +813,11 @@ final class Dataset[T: ClassTag] private[sql] (
     val rows = data.map(outEnc.toRow)
     val newDf = sparkSession.createDataFrame(rows, outEnc.schema)
     Dataset(newDf, outEnc)
+
+  private def classTagFromEncoder[U](encoder: Encoder[U]): ClassTag[U] =
+    Option(encoder.agnosticEncoder)
+      .map(_.clsTag.asInstanceOf[ClassTag[U]])
+      .getOrElse(ClassTag(classOf[Object]).asInstanceOf[ClassTag[U]])
 
   /** Build a CommonInlineUserDefinedFunction proto for MapPartitions. */
   private def buildMapPartitionsUdf(

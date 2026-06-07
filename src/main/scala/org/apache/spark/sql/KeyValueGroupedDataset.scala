@@ -117,6 +117,12 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     )(using keyEncoder, summon[ClassTag[K]], summon[Encoder[W]], summon[ClassTag[W]])
     newKvgd
 
+  def mapValues[W](
+      func: org.apache.spark.api.java.function.MapFunction[V, W],
+      encoder: Encoder[W]
+  ): KeyValueGroupedDataset[K, W] =
+    mapValues((value: V) => func.call(value))(using encoder, classTagFromEncoder(encoder))
+
   /** Return a Dataset of the unique keys. */
   def keys: Dataset[K] =
     groupingColumnExprs match
@@ -135,6 +141,16 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     */
   def mapGroups[U: Encoder: ClassTag](func: (K, Iterator[V]) => U): Dataset[U] =
     flatMapGroups(new MapGroupsAdaptor(func))
+
+  def mapGroups[U](
+      func: org.apache.spark.api.java.function.MapGroupsFunction[K, V, U],
+      encoder: Encoder[U]
+  ): Dataset[U] =
+    import scala.jdk.CollectionConverters.*
+    mapGroups((key: K, values: Iterator[V]) => func.call(key, values.asJava))(using
+      encoder,
+      classTagFromEncoder(encoder)
+    )
 
   /** Apply a function to each group, returning an iterator of results per group. */
   def flatMapGroups[U: Encoder: ClassTag](
@@ -183,6 +199,16 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val newDf = DataFrame(ds.sparkSession, relation)
     Dataset(newDf, outEnc)
 
+  def flatMapGroups[U](
+      func: org.apache.spark.api.java.function.FlatMapGroupsFunction[K, V, U],
+      encoder: Encoder[U]
+  ): Dataset[U] =
+    import scala.jdk.CollectionConverters.*
+    flatMapGroups((key: K, values: Iterator[V]) => func.call(key, values.asJava).asScala)(using
+      encoder,
+      classTagFromEncoder(encoder)
+    )
+
   /** Reduce the values in each group using an associative binary operator.
     *
     * Returns a Dataset of (key, reduced_value) pairs. When AgnosticEncoder is available, uses a
@@ -197,6 +223,12 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       val reducer = ReduceAggregator[V](func)(using valueEncoder)
       agg(reducer.toColumn)
     else mapGroups(new ReduceGroupsAdaptor(func))
+
+  def reduceGroups(func: org.apache.spark.api.java.function.ReduceFunction[V]): Dataset[(K, V)] =
+    reduceGroups((left: V, right: V) => func.call(left, right))(using
+      Encoders.tuple(keyEncoder, valueEncoder),
+      summon[ClassTag[(K, V)]]
+    )
 
   /** Count the number of elements in each group.
     *
@@ -258,6 +290,16 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       .build()
     val newDf = DataFrame(ds.sparkSession, relation)
     Dataset(newDf, outEnc)
+
+  def flatMapSortedGroups[U](
+      sortExprs: Array[Column],
+      func: org.apache.spark.api.java.function.FlatMapGroupsFunction[K, V, U],
+      encoder: Encoder[U]
+  ): Dataset[U] =
+    import scala.jdk.CollectionConverters.*
+    flatMapSortedGroups(sortExprs.toSeq*)((key: K, values: Iterator[V]) =>
+      func.call(key, values.asJava).asScala
+    )(using encoder, classTagFromEncoder(encoder))
 
   /** Co-group with another KeyValueGroupedDataset and apply a function. */
   @nowarn("msg=unused.*parameter")
@@ -615,6 +657,11 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     * single output value per group invocation. Output mode is implicitly "Update".
     */
   def mapGroupsWithState[S: Encoder: ClassTag, U: Encoder: ClassTag](
+      func: (K, Iterator[V], GroupState[S]) => U
+  ): Dataset[U] =
+    mapGroupsWithState(GroupStateTimeout.NoTimeout)(func)
+
+  def mapGroupsWithState[S: Encoder: ClassTag, U: Encoder: ClassTag](
       timeoutConf: GroupStateTimeout
   )(func: (K, Iterator[V], GroupState[S]) => U): Dataset[U] =
     val flatMapFunc: (K, Iterator[V], GroupState[S]) => Iterator[U] =
@@ -668,6 +715,87 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       timeoutConf = timeoutConf,
       initialState = Some(initialState)
     )(func)
+
+  def mapGroupsWithState[S, U](
+      func: org.apache.spark.api.java.function.MapGroupsWithStateFunction[K, V, S, U],
+      stateEncoder: Encoder[S],
+      outputEncoder: Encoder[U]
+  ): Dataset[U] =
+    import scala.jdk.CollectionConverters.*
+    mapGroupsWithState[S, U]((key, values, state) => func.call(key, values.asJava, state))(using
+      stateEncoder,
+      classTagFromEncoder(stateEncoder),
+      outputEncoder,
+      classTagFromEncoder(outputEncoder)
+    )
+
+  def mapGroupsWithState[S, U](
+      func: org.apache.spark.api.java.function.MapGroupsWithStateFunction[K, V, S, U],
+      stateEncoder: Encoder[S],
+      outputEncoder: Encoder[U],
+      timeoutConf: GroupStateTimeout
+  ): Dataset[U] =
+    import scala.jdk.CollectionConverters.*
+    mapGroupsWithState[S, U](timeoutConf)((key, values, state) =>
+      func.call(key, values.asJava, state)
+    )(using
+      stateEncoder,
+      classTagFromEncoder(stateEncoder),
+      outputEncoder,
+      classTagFromEncoder(outputEncoder)
+    )
+
+  def mapGroupsWithState[S, U](
+      func: org.apache.spark.api.java.function.MapGroupsWithStateFunction[K, V, S, U],
+      stateEncoder: Encoder[S],
+      outputEncoder: Encoder[U],
+      timeoutConf: GroupStateTimeout,
+      initialState: KeyValueGroupedDataset[K, S]
+  ): Dataset[U] =
+    import scala.jdk.CollectionConverters.*
+    mapGroupsWithState[S, U](timeoutConf, initialState)((key, values, state) =>
+      func.call(key, values.asJava, state)
+    )(using
+      stateEncoder,
+      classTagFromEncoder(stateEncoder),
+      outputEncoder,
+      classTagFromEncoder(outputEncoder)
+    )
+
+  def flatMapGroupsWithState[S, U](
+      func: org.apache.spark.api.java.function.FlatMapGroupsWithStateFunction[K, V, S, U],
+      outputMode: OutputMode,
+      stateEncoder: Encoder[S],
+      outputEncoder: Encoder[U],
+      timeoutConf: GroupStateTimeout
+  ): Dataset[U] =
+    import scala.jdk.CollectionConverters.*
+    flatMapGroupsWithState[S, U](outputMode, timeoutConf)((key, values, state) =>
+      func.call(key, values.asJava, state).asScala
+    )(using
+      stateEncoder,
+      classTagFromEncoder(stateEncoder),
+      outputEncoder,
+      classTagFromEncoder(outputEncoder)
+    )
+
+  def flatMapGroupsWithState[S, U](
+      func: org.apache.spark.api.java.function.FlatMapGroupsWithStateFunction[K, V, S, U],
+      outputMode: OutputMode,
+      stateEncoder: Encoder[S],
+      outputEncoder: Encoder[U],
+      timeoutConf: GroupStateTimeout,
+      initialState: KeyValueGroupedDataset[K, S]
+  ): Dataset[U] =
+    import scala.jdk.CollectionConverters.*
+    flatMapGroupsWithState[S, U](outputMode, timeoutConf, initialState)((key, values, state) =>
+      func.call(key, values.asJava, state).asScala
+    )(using
+      stateEncoder,
+      classTagFromEncoder(stateEncoder),
+      outputEncoder,
+      classTagFromEncoder(outputEncoder)
+    )
 
   /** Apply a stateful processor to each group (transformWithState). */
   def transformWithState[U: Encoder: ClassTag](
@@ -935,6 +1063,11 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val rows = results.map(outEnc.toRow)
     val newDf = ds.sparkSession.createDataFrame(rows, outEnc.schema)
     Dataset(newDf, outEnc)
+
+  private def classTagFromEncoder[T](encoder: Encoder[T]): ClassTag[T] =
+    Option(encoder.agnosticEncoder)
+      .map(_.clsTag.asInstanceOf[ClassTag[T]])
+      .getOrElse(ClassTag(classOf[Object]).asInstanceOf[ClassTag[T]])
 
   /** Build the grouping key UDF proto.
     *
