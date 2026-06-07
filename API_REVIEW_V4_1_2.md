@@ -1,6 +1,7 @@
 # Spark Connect Scala 3 API Review Against Upstream Spark Connect v4.1.2
 
 Review date: 2026-06-01
+Last updated: 2026-06-04
 
 Reference project:
 
@@ -12,7 +13,7 @@ Current project:
 
 - `/Users/yangjie01/SourceCode/git/spark-connect-scala3`
 - Observed branch: `main`
-- Observed commit: `c757d19`
+- Observed commit: `965c6ef`
 
 ## Scope
 
@@ -38,13 +39,12 @@ users. APIs that only make sense for classic execution are called out as lower p
 
 ## Conclusion
 
-The current project still has several user-visible API gaps compared with upstream Spark Connect in
-Spark v4.1.2. Most remaining gaps are not deep engine features; they are compatibility facades,
-package-name compatibility, Java helper classes, metadata/schema APIs, and higher-arity overloads.
+The previously identified high-priority Spark Connect user API gaps against Spark v4.1.2 are now
+fixed on `main` through commit `965c6ef`.
 
-The highest-value items to fill first are:
+Completed high-priority items:
 
-1. `org.apache.spark.sql.streaming.Trigger` compatibility. Current working tree: fixed.
+1. `org.apache.spark.sql.streaming.Trigger` compatibility.
 2. Connect-compatible `SparkSession` convenience APIs such as `spark.implicits` and Builder config facades.
 3. `Metadata`, `MetadataBuilder`, Java `DataTypes`, and `RowFactory`.
 4. `Column.as(..., Metadata)` and related metadata-compatible APIs.
@@ -52,11 +52,18 @@ The highest-value items to fill first are:
 6. `RelationalGroupedDataset` public type compatibility.
 7. Avro and Protobuf function packages.
 
+The remaining work is lower-priority compatibility shim work. These items are still useful for
+source compatibility with upstream examples and libraries, but they are not currently blocking the
+core Spark Connect API surface. Work has started on this layer; `org.apache.spark.sql.expressions`
+Window package compatibility, Java streaming mode factories, `javalang.typed`, connector catalog
+Java value classes, encoder helper shims, `DatasetHolder`, `SQLImplicits`, and `SQLContext` are now
+implemented in the current working tree.
+
 ## Findings
 
 ### 1. Streaming Trigger API Is In The Wrong Public Package
 
-Current working tree status: fixed.
+Status: fixed.
 
 Current project defines `Trigger` in root package `org.apache.spark.sql`, inside:
 
@@ -103,6 +110,8 @@ Add `org.apache.spark.sql.streaming.Trigger` as the standard public API and upda
 
 ### 2. SparkSession Connect Compatibility Entry Points Are Still Missing
 
+Status: fixed.
+
 Current project already has important Connect APIs such as:
 
 - `SparkSession.conf`
@@ -145,6 +154,8 @@ methods.
 
 ### 3. Types API Is Missing Metadata, MetadataBuilder, DataTypes, And RowFactory
 
+Status: fixed.
+
 Current project defines `StructField` as:
 
 ```scala
@@ -179,6 +190,8 @@ Add `Metadata` and `MetadataBuilder` first, extend `StructField`, then add Java 
 
 ### 4. Column Metadata Alias API Is Type-Incompatible
 
+Status: fixed.
+
 Current project has:
 
 ```scala
@@ -207,6 +220,8 @@ After adding `Metadata`, replace or overload the current string-based metadata A
 
 ### 5. Java UDF Interfaces And UDF Overloads Stop Too Early
 
+Status: fixed.
+
 Current project has Java UDF interfaces only from:
 
 - `UDF0.java` through `UDF9.java`
@@ -231,6 +246,8 @@ Add `UDF10` through `UDF22` Java interfaces and generated overloads in:
 This is mostly mechanical, but should include compile tests to avoid arity/order mistakes.
 
 ### 6. RelationalGroupedDataset Public Type Is Missing
+
+Status: fixed.
 
 Current project returns a custom type:
 
@@ -260,6 +277,8 @@ Add a public `RelationalGroupedDataset` compatibility type. The lowest-risk rout
 
 ### 7. Avro And Protobuf Function Packages Are Missing
 
+Status: fixed.
+
 Spark v4.1.2 exposes:
 
 - `org.apache.spark.sql.avro.functions`
@@ -288,23 +307,31 @@ Add wrappers that build `Column` expressions via existing function-construction 
 These are visible in the v4.1.2 public API, but should not be treated as first-class gaps unless
 they are also used by upstream Spark Connect users or needed for source compatibility:
 
-- `SQLContext`
-- `DatasetHolder`, except where needed for local `Seq.toDS` / `Seq.toDF` compatibility
-- full `SQLImplicits` parity with RDD conversions, which is classic-only
-- `Encoders.kryo`
-- `Encoders.javaSerialization`
-- `Encoders.bean`
-- `org.apache.spark.sql.expressions.Window` and `WindowSpec`
-- `org.apache.spark.sql.expressions.javalang.typed`
-- connector catalog Java classes such as `Identifier`, `IdentifierImpl`, `IdentityColumnSpec`
-- Java streaming facade classes `OutputMode`, `TimeMode`, `GroupStateTimeout`
-- state variable files split as `ValueState.scala`, `ListState.scala`, `MapState.scala` rather than bundled in `StateVariables.scala`
+- `org.apache.spark.sql.expressions.Window` and `WindowSpec`. Status: fixed in current working tree.
+- Java streaming facade ergonomics for `OutputMode`, `TimeMode`, and `GroupStateTimeout`. Status:
+  fixed in current working tree.
+- `org.apache.spark.sql.expressions.javalang.typed`. Status: fixed in current working tree.
+- connector catalog Java classes such as `Identifier`, `IdentifierImpl`, and `IdentityColumnSpec`.
+  Status: fixed in current working tree.
+- `Encoders.kryo`, `Encoders.javaSerialization`, and `Encoders.bean`. Status: source-compatible
+  shims fixed in current working tree; runtime use fails clearly because these are classic-only in
+  this client.
+- `DatasetHolder`, except where needed for local `Seq.toDS` / `Seq.toDF` compatibility. Status:
+  fixed in current working tree.
+- broader `SQLImplicits` parity with RDD conversions, which is classic-only. Status: session-bound
+  source compatibility fixed in current working tree; RDD conversions remain out of scope.
+- `SQLContext`. Status: Connect-backed facade fixed in current working tree.
+- state variable source-file split compatibility: `ValueState.scala`, `ListState.scala`, and
+  `MapState.scala` rather than bundled declarations. Status: no code change needed; the public type
+  names already exist in `org.apache.spark.sql.streaming`.
 
 Some of these are useful compatibility shims; others depend on broader classic Spark or Java/Scala 2
 reflection behavior and should be evaluated case by case. For this project, Connect behavior and
 source compatibility should win over classic parity.
 
 ## Recommended Implementation Order
+
+Completed order:
 
 1. Add `org.apache.spark.sql.streaming.Trigger` and update `DataStreamWriter`.
 2. Add `SparkSession.Builder` compatibility methods and `spark.implicits`.
@@ -313,6 +340,17 @@ source compatibility should win over classic parity.
 5. Add `UDF10` through `UDF22` and UDF overload tests.
 6. Add `RelationalGroupedDataset` compatibility type.
 7. Add Avro / Protobuf functions packages.
+
+Next lower-priority order:
+
+1. Add `org.apache.spark.sql.expressions.Window` and `WindowSpec` package-name compatibility. Status: fixed in current working tree.
+2. Tighten Java accessors/factory ergonomics for streaming mode classes. Status: fixed in current working tree.
+3. Add `org.apache.spark.sql.expressions.javalang.typed` where the existing typed aggregation surface can support it. Status: fixed in current working tree.
+4. Add lightweight connector catalog Java value classes where they are pure data/API shims. Status: fixed in current working tree.
+5. Evaluate encoder helper shims (`kryo`, `javaSerialization`, `bean`) case by case, because they depend more heavily on classic Spark serialization/reflection behavior. Status: source-compatible shims fixed in current working tree.
+6. Add `DatasetHolder` and `SQLImplicits` source compatibility for local `Seq.toDS` / `Seq.toDF`. Status: fixed in current working tree.
+7. Add a Connect-backed `SQLContext` facade for common delegated APIs. Status: fixed in current working tree.
+8. Confirm state variable public type names. Status: no code change needed.
 
 ## Verification Suggestions
 

@@ -439,6 +439,9 @@ class Column private[sql] (
       this.subqueryRelations ++ windowRels
     )
 
+  def over(window: org.apache.spark.sql.expressions.WindowSpec): Column =
+    over(window.delegate)
+
   /** Apply a window function with an empty window specification. */
   def over(): Column = over(WindowSpec(Seq.empty, Seq.empty))
 

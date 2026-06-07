@@ -353,6 +353,31 @@ class EncodersSuite extends AnyFunSuite with Matchers:
     enc.agnosticEncoder shouldBe a[GeographyEncoder]
   }
 
+  test("GEOMETRY(dt) returns encoder with custom spatial type") {
+    val enc = Encoders.GEOMETRY(GeometryType(4326))
+    enc.schema shouldBe StructType(Seq(StructField("value", GeometryType(4326))))
+    enc.agnosticEncoder shouldBe a[GeometryEncoder]
+  }
+
+  test("GEOGRAPHY(dt) returns encoder with custom spatial type") {
+    val enc = Encoders.GEOGRAPHY(GeographyType(4326))
+    enc.schema shouldBe StructType(Seq(StructField("value", GeographyType(4326))))
+    enc.agnosticEncoder shouldBe a[GeographyEncoder]
+  }
+
+  test("classic-only encoder shims fail clearly when used") {
+    Seq(
+      Encoders.bean(classOf[String]),
+      Encoders.kryo[String],
+      Encoders.kryo(classOf[String]),
+      Encoders.javaSerialization[String],
+      Encoders.javaSerialization(classOf[String])
+    ).foreach { enc =>
+      val ex = intercept[UnsupportedOperationException](enc.schema)
+      ex.getMessage should include("not supported in Spark Connect")
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // R8-3: TupleEncoder3/4/5 fromRow and toRow
   // ---------------------------------------------------------------------------

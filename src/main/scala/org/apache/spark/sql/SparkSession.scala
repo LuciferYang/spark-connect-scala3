@@ -30,13 +30,14 @@ final class SparkSession private[sql] (
 
   def sessionId: String = client.sessionId
 
+  def sqlContext: SQLContext = SQLContext(this)
+
   private[sql] def nextPlanId(): Long = planIdCounter.getAndIncrement()
 
   // scalastyle:off
   /** Scala 3 imports bound to this session, matching `import spark.implicits.*`. */
-  object implicits:
-    implicit val sparkSession: SparkSession = SparkSession.this
-    export _root_.org.apache.spark.sql.implicits.*
+  object implicits extends SQLImplicits:
+    protected def session: SparkSession = SparkSession.this
   // scalastyle:on
 
   // ---------------------------------------------------------------------------

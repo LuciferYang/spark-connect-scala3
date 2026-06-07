@@ -144,9 +144,29 @@ class ImplicitsSuite extends AnyFunSuite with Matchers:
     ds.toDF().relation.hasLocalRelation shouldBe true
   }
 
+  test("Seq[Int] converts to DatasetHolder and supports upstream paren methods") {
+    import org.apache.spark.sql.implicits.*
+
+    given spark: SparkSession = SparkSession.builder().remote("sc://localhost:15002").build()
+
+    val holder: DatasetHolder[Int] = Seq(1, 2, 3)
+    holder.toDS().toDF().relation.hasLocalRelation shouldBe true
+    holder.toDF().relation.hasLocalRelation shouldBe true
+    holder.toDF("number").relation should not be null
+  }
+
   test("spark.implicits exposes session-scoped Seq.toDS") {
     val spark = SparkSession(null)
     import spark.implicits.*
+
+    val ds = Seq(1, 2, 3).toDS
+    ds.toDF().relation.hasLocalRelation shouldBe true
+  }
+
+  test("spark.implicits is typed as SQLImplicits") {
+    val spark = SparkSession(null)
+    val imps: SQLImplicits = spark.implicits
+    import imps.*
 
     val ds = Seq(1, 2, 3).toDS
     ds.toDF().relation.hasLocalRelation shouldBe true

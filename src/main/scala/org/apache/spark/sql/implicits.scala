@@ -2,6 +2,7 @@ package org.apache.spark.sql
 
 import org.apache.spark.sql.types.*
 
+import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
 /** Scala 3 implicits for idiomatic Spark column references and dataset conversions.
@@ -75,15 +76,30 @@ object implicits:
   // Seq[T].toDS / Seq[T].toDF convenience extensions
   // ---------------------------------------------------------------------------
 
+  private class LocalSeqDatasetHolder[T: Encoder: ClassTag](
+      seq: Seq[T]
+  )(using spark: SparkSession)
+      extends DatasetHolder[T]:
+    def toDS(): Dataset[T] = spark.createDataset(seq)
+
+    def toDF(): DataFrame = toDS().toDF()
+
+    def toDF(colNames: String*): DataFrame = toDS().toDF(colNames*)
+
+  implicit def localSeqToDatasetHolder[T: Encoder: ClassTag](seq: Seq[T])(using
+      SparkSession
+  ): DatasetHolder[T] =
+    LocalSeqDatasetHolder(seq)
+
   extension [T: Encoder: ClassTag](seq: Seq[T])
     /** Convert a Seq to a Dataset. Requires an implicit SparkSession. */
     def toDS(using spark: SparkSession): Dataset[T] =
-      spark.createDataset(seq)
+      LocalSeqDatasetHolder(seq).toDS()
 
     /** Convert a Seq to a DataFrame. Requires an implicit SparkSession. */
     def toDF(using spark: SparkSession): DataFrame =
-      spark.createDataset(seq).toDF()
+      LocalSeqDatasetHolder(seq).toDF()
 
     /** Convert a Seq to a DataFrame with specified column names. */
     def toDF(colNames: String*)(using spark: SparkSession): DataFrame =
-      spark.createDataset(seq).toDF(colNames*)
+      LocalSeqDatasetHolder(seq).toDF(colNames*)

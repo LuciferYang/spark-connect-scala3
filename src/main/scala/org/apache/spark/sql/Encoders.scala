@@ -6,9 +6,7 @@ import scala.reflect.ClassTag
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.*
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.types.StructField
-import org.apache.spark.sql.types.UserDefinedType
+import org.apache.spark.sql.types.*
 
 /** Factory methods for creating [[Encoder]] instances.
   *
@@ -44,6 +42,17 @@ object Encoders:
     override def agnosticEncoder: AgnosticEncoder[?] = underlying
 
   private def wrap[T](ae: AgnosticEncoder[T]): Encoder[T] = AgnosticEncoderWrapper(ae)
+
+  private class UnsupportedEncoder[T](name: String) extends Encoder[T]:
+    private def unsupported: Nothing =
+      throw UnsupportedOperationException(s"Encoders.$name is not supported in Spark Connect")
+
+    def schema: StructType = unsupported
+    def fromRow(row: Row): T = unsupported
+    def toRow(value: T): Row = unsupported
+    override def agnosticEncoder: AgnosticEncoder[?] = unsupported
+
+  private def unsupported[T](name: String): Encoder[T] = UnsupportedEncoder(name)
 
   /** Tuple2 encoder that properly implements fromRow/toRow for joinWith results.
     *
@@ -198,6 +207,29 @@ object Encoders:
     wrap(AgnosticEncoders.GeometryEncoder(org.apache.spark.sql.types.GeometryType()))
   def GEOGRAPHY: Encoder[org.apache.spark.sql.types.Geography] =
     wrap(AgnosticEncoders.GeographyEncoder(org.apache.spark.sql.types.GeographyType()))
+
+  def GEOMETRY(dt: GeometryType): Encoder[org.apache.spark.sql.types.Geometry] =
+    wrap(AgnosticEncoders.GeometryEncoder(dt))
+
+  def GEOGRAPHY(dt: GeographyType): Encoder[org.apache.spark.sql.types.Geography] =
+    wrap(AgnosticEncoders.GeographyEncoder(dt))
+
+  // -- Classic-only encoders ---------------------------------------------------
+
+  def bean[T](beanClass: Class[T]): Encoder[T] =
+    unsupported(s"bean(${beanClass.getName})")
+
+  def kryo[T](using tag: ClassTag[T]): Encoder[T] =
+    unsupported(s"kryo[${tag.runtimeClass.getName}]")
+
+  def kryo[T](clazz: Class[T]): Encoder[T] =
+    unsupported(s"kryo(${clazz.getName})")
+
+  def javaSerialization[T](using tag: ClassTag[T]): Encoder[T] =
+    unsupported(s"javaSerialization[${tag.runtimeClass.getName}]")
+
+  def javaSerialization[T](clazz: Class[T]): Encoder[T] =
+    unsupported(s"javaSerialization(${clazz.getName})")
 
   // -- User-defined type encoder -----------------------------------------------
 
