@@ -178,10 +178,14 @@ object functions:
   def pow(l: String, r: Double): Column = pow(Column(l), Column.lit(r))
   @deprecated("Use power() instead", "0.4.0")
   def pow(l: Double, r: String): Column = pow(Column.lit(l), Column(r))
-  def round(col: Column, scale: Int = 0): Column = callFn("round", col, Column.lit(scale))
+  def round(col: Column): Column = round(col, 0)
+  def round(col: Column, scale: Int): Column = callFn("round", col, Column.lit(scale))
+  def round(col: Column, scale: Column): Column = callFn("round", col, scale)
   def floor(col: Column): Column = callFn("floor", col)
+  def floor(col: Column, scale: Column): Column = callFn("floor", col, scale)
   def floor(colName: String): Column = floor(Column(colName))
   def ceil(col: Column): Column = callFn("ceil", col)
+  def ceil(col: Column, scale: Column): Column = callFn("ceil", col, scale)
   def ceil(colName: String): Column = ceil(Column(colName))
   def log(col: Column): Column = callFn("ln", col)
   def log(colName: String): Column = log(Column(colName))
@@ -274,16 +278,29 @@ object functions:
   def rtrim(e: Column, trimCol: Column): Column = callFn("rtrim", trimCol, e)
   def substring(col: Column, pos: Int, len: Int): Column =
     callFn("substring", col, Column.lit(pos), Column.lit(len))
+  def substring(col: Column, pos: Column, len: Column): Column =
+    callFn("substring", col, pos, len)
   def length(col: Column): Column = callFn("length", col)
   def replace(col: Column, search: Column, replacement: Column): Column =
     callFn("replace", col, search, replacement)
   def lpad(col: Column, len: Int, pad: String): Column =
     callFn("lpad", col, Column.lit(len), Column.lit(pad))
+  def lpad(col: Column, len: Int, pad: Array[Byte]): Column =
+    callFn("lpad", col, Column.lit(len), Column.lit(pad))
+  def lpad(col: Column, len: Column, pad: Column): Column =
+    callFn("lpad", col, len, pad)
   def rpad(col: Column, len: Int, pad: String): Column =
     callFn("rpad", col, Column.lit(len), Column.lit(pad))
+  def rpad(col: Column, len: Int, pad: Array[Byte]): Column =
+    callFn("rpad", col, Column.lit(len), Column.lit(pad))
+  def rpad(col: Column, len: Column, pad: Column): Column =
+    callFn("rpad", col, len, pad)
   def left(col: Column, len: Int): Column = callFn("left", col, Column.lit(len))
+  def left(col: Column, len: Column): Column = callFn("left", col, len)
   def right(col: Column, len: Int): Column =
     callFn("right", col, Column.lit(len))
+  def right(col: Column, len: Column): Column =
+    callFn("right", col, len)
   def char_length(col: Column): Column = callFn("char_length", col)
   def bit_length(col: Column): Column = callFn("bit_length", col)
   def octet_length(col: Column): Column = callFn("octet_length", col)
@@ -296,6 +313,8 @@ object functions:
   def btrim(col: Column): Column = callFn("btrim", col)
   def position(substr: Column, str: Column): Column =
     callFn("position", substr, str)
+  def position(substr: Column, str: Column, start: Column): Column =
+    callFn("position", substr, str, start)
   def sentences(str: Column, lang: Column, country: Column): Column =
     callFn("sentences", str, lang, country)
   def char(n: Column): Column = callFn("char", n)
@@ -384,8 +403,12 @@ object functions:
   def second(col: Column): Column = callFn("second", col)
   def date_add(start: Column, days: Int): Column =
     callFn("date_add", start, Column.lit(days))
+  def date_add(start: Column, days: Column): Column =
+    callFn("date_add", start, days)
   def date_sub(start: Column, days: Int): Column =
     callFn("date_sub", start, Column.lit(days))
+  def date_sub(start: Column, days: Column): Column =
+    callFn("date_sub", start, days)
   def to_date(col: Column): Column = callFn("to_date", col)
   def to_date(col: Column, fmt: String): Column = callFn("to_date", col, Column.lit(fmt))
   def to_timestamp(col: Column): Column = callFn("to_timestamp", col)
@@ -458,20 +481,29 @@ object functions:
     callFn("array_position", col, Column.lit(value))
   def array_remove(col: Column, element: Any): Column =
     callFn("array_remove", col, Column.lit(element))
+  def array_repeat(col: Column, count: Column): Column =
+    callFn("array_repeat", col, count)
   def array_repeat(col: Column, count: Int): Column =
-    callFn("array_repeat", col, Column.lit(count))
+    array_repeat(col, Column.lit(count))
   def arrays_zip(cols: Column*): Column = callFn("arrays_zip", cols*)
   def flatten(col: Column): Column = callFn("flatten", col)
   def element_at(col: Column, extraction: Any): Column =
     callFn("element_at", col, Column.lit(extraction))
   def slice(col: Column, start: Int, length: Int): Column =
-    callFn("slice", col, Column.lit(start), Column.lit(length))
+    slice(col, Column.lit(start), Column.lit(length))
+  def slice(col: Column, start: Column, length: Column): Column =
+    callFn("slice", col, start, length)
   def reverse(col: Column): Column = callFn("reverse", col)
-  def shuffle(col: Column): Column = callFn("shuffle", col)
+  def shuffle(col: Column): Column = shuffle(col, Column.lit(scala.util.Random.nextLong()))
+  def shuffle(col: Column, seed: Column): Column = callFn("shuffle", col, seed)
   def sort_array(col: Column, asc: Boolean = true): Column =
     callFn("sort_array", col, Column.lit(asc))
+  def array_append(col: Column, element: Any): Column =
+    callFn("array_append", col, Column.lit(element))
   def array_append(col: Column, element: Column): Column =
     callFn("array_append", col, element)
+  def array_prepend(col: Column, element: Any): Column =
+    callFn("array_prepend", col, Column.lit(element))
   def array_prepend(col: Column, element: Column): Column =
     callFn("array_prepend", col, element)
   def array_compact(col: Column): Column = callFn("array_compact", col)
@@ -479,10 +511,14 @@ object functions:
     callFn("array_insert", col, pos, value)
   def arrays_overlap(a1: Column, a2: Column): Column =
     callFn("arrays_overlap", a1, a2)
+  def sequence(start: Column, stop: Column): Column =
+    callFn("sequence", start, stop)
   def sequence(start: Column, stop: Column, step: Column): Column =
     callFn("sequence", start, stop, step)
   def array_size(col: Column): Column = callFn("array_size", col)
   def get(col: Column, index: Column): Column = callFn("get", col, index)
+  def map_contains_key(col: Column, key: Any): Column =
+    callFn("map_contains_key", col, Column.lit(key))
   def map_contains_key(col: Column, key: Column): Column =
     callFn("map_contains_key", col, key)
   def str_to_map(col: Column, pairDelim: Column, keyValueDelim: Column): Column =
@@ -672,8 +708,14 @@ object functions:
   def split(col: Column, pattern: String): Column =
     callFn("split", col, Column.lit(pattern))
 
+  def split(col: Column, pattern: Column): Column =
+    callFn("split", col, pattern)
+
   def split(col: Column, pattern: String, limit: Int): Column =
     callFn("split", col, Column.lit(pattern), Column.lit(limit))
+
+  def split(col: Column, pattern: Column, limit: Column): Column =
+    callFn("split", col, pattern, limit)
 
   def initcap(col: Column): Column = callFn("initcap", col)
   def soundex(col: Column): Column = callFn("soundex", col)
@@ -688,11 +730,16 @@ object functions:
     callFn("format_string", (Column.lit(format) +: args)*)
   def instr(str: Column, substring: String): Column =
     callFn("instr", str, Column.lit(substring))
+  def instr(str: Column, substring: Column): Column =
+    callFn("instr", str, substring)
   def locate(substr: String, str: Column, pos: Int = 1): Column =
     callFn("locate", Column.lit(substr), str, Column.lit(pos))
   def overlay(src: Column, replace: Column, pos: Column, len: Column): Column =
     callFn("overlay", src, replace, pos, len)
-  def repeat(col: Column, n: Int): Column = callFn("repeat", col, Column.lit(n))
+  def overlay(src: Column, replace: Column, pos: Column): Column =
+    callFn("overlay", src, replace, pos)
+  def repeat(col: Column, n: Int): Column = repeat(col, Column.lit(n))
+  def repeat(col: Column, n: Column): Column = callFn("repeat", col, n)
   def translate(col: Column, matchingString: String, replaceString: String): Column =
     callFn("translate", col, Column.lit(matchingString), Column.lit(replaceString))
 
@@ -714,6 +761,8 @@ object functions:
   def datediff(end: Column, start: Column): Column = callFn("datediff", end, start)
   def add_months(start: Column, numMonths: Int): Column =
     callFn("add_months", start, Column.lit(numMonths))
+  def add_months(start: Column, numMonths: Column): Column =
+    callFn("add_months", start, numMonths)
   def from_unixtime(ut: Column): Column = callFn("from_unixtime", ut)
   def from_unixtime(ut: Column, fmt: String): Column =
     callFn("from_unixtime", ut, Column.lit(fmt))
@@ -723,12 +772,29 @@ object functions:
     callFn("unix_timestamp", col, Column.lit(fmt))
   def from_utc_timestamp(ts: Column, tz: String): Column =
     callFn("from_utc_timestamp", ts, Column.lit(tz))
+  def from_utc_timestamp(ts: Column, tz: Column): Column =
+    callFn("from_utc_timestamp", ts, tz)
   def to_utc_timestamp(ts: Column, tz: String): Column =
     callFn("to_utc_timestamp", ts, Column.lit(tz))
+  def to_utc_timestamp(ts: Column, tz: Column): Column =
+    callFn("to_utc_timestamp", ts, tz)
   def window(timeColumn: Column, windowDuration: String): Column =
-    callFn("window", timeColumn, Column.lit(windowDuration))
+    window(timeColumn, windowDuration, windowDuration)
   def window(timeColumn: Column, windowDuration: String, slideDuration: String): Column =
-    callFn("window", timeColumn, Column.lit(windowDuration), Column.lit(slideDuration))
+    window(timeColumn, windowDuration, slideDuration, "0 second")
+  def window(
+      timeColumn: Column,
+      windowDuration: String,
+      slideDuration: String,
+      startTime: String
+  ): Column =
+    callFn(
+      "window",
+      timeColumn,
+      Column.lit(windowDuration),
+      Column.lit(slideDuration),
+      Column.lit(startTime)
+    )
   def date_trunc(format: String, timestamp: Column): Column =
     callFn("date_trunc", Column.lit(format), timestamp)
   def trunc(date: Column, format: String): Column =
@@ -1026,7 +1092,9 @@ object functions:
   def degrees(colName: String): Column = degrees(Column(colName))
   def radians(col: Column): Column = callFn("radians", col)
   def radians(colName: String): Column = radians(Column(colName))
-  def bround(col: Column, scale: Int = 0): Column = callFn("bround", col, Column.lit(scale))
+  def bround(col: Column): Column = bround(col, 0)
+  def bround(col: Column, scale: Int): Column = callFn("bround", col, Column.lit(scale))
+  def bround(col: Column, scale: Column): Column = callFn("bround", col, scale)
   def bin(col: Column): Column = callFn("bin", col)
   def bin(colName: String): Column = bin(Column(colName))
   def hex(col: Column): Column = callFn("hex", col)
@@ -1149,7 +1217,8 @@ object functions:
   def current_catalog(): Column = callFn("current_catalog")
   def current_database(): Column = callFn("current_database")
   def current_schema(): Column = callFn("current_schema")
-  def uuid(): Column = callFn("uuid")
+  def uuid(): Column = uuid(Column.lit(scala.util.Random.nextLong()))
+  def uuid(seed: Column): Column = callFn("uuid", seed)
   def session_user(): Column = callFn("session_user")
   def stack(n: Column, cols: Column*): Column =
     callFn("stack", (n +: cols)*)
@@ -1272,13 +1341,21 @@ object functions:
   // Partition transform functions
   // ---------------------------------------------------------------------------
 
-  def years(e: Column): Column = callFn("years", e)
-  def months(e: Column): Column = callFn("months", e)
-  def days(e: Column): Column = callFn("days", e)
-  def hours(e: Column): Column = callFn("hours", e)
-  def bucket(numBuckets: Column, e: Column): Column = callFn("bucket", numBuckets, e)
+  def years(e: Column): Column = partitioning.years(e)
+  def months(e: Column): Column = partitioning.months(e)
+  def days(e: Column): Column = partitioning.days(e)
+  def hours(e: Column): Column = partitioning.hours(e)
+  def bucket(numBuckets: Column, e: Column): Column = partitioning.bucket(numBuckets, e)
   def bucket(numBuckets: Int, e: Column): Column =
-    callFn("bucket", Column.lit(numBuckets), e)
+    partitioning.bucket(numBuckets, e)
+
+  object partitioning:
+    def years(e: Column): Column = callFn("years", e)
+    def months(e: Column): Column = callFn("months", e)
+    def days(e: Column): Column = callFn("days", e)
+    def hours(e: Column): Column = callFn("hours", e)
+    def bucket(numBuckets: Column, e: Column): Column = callFn("bucket", numBuckets, e)
+    def bucket(numBuckets: Int, e: Column): Column = bucket(Column.lit(numBuckets), e)
 
   // ---------------------------------------------------------------------------
   // Datasketch functions (HLL)
@@ -1287,8 +1364,16 @@ object functions:
   def hll_sketch_estimate(c: Column): Column = callFn("hll_sketch_estimate", c)
   def hll_sketch_estimate(colName: String): Column = hll_sketch_estimate(Column(colName))
   def hll_union(c1: Column, c2: Column): Column = callFn("hll_union", c1, c2)
+  def hll_union(colName1: String, colName2: String): Column =
+    hll_union(Column(colName1), Column(colName2))
   def hll_union(c1: Column, c2: Column, allowDifferentLgConfigK: Boolean): Column =
     callFn("hll_union", c1, c2, Column.lit(allowDifferentLgConfigK))
+  def hll_union(
+      colName1: String,
+      colName2: String,
+      allowDifferentLgConfigK: Boolean
+  ): Column =
+    hll_union(Column(colName1), Column(colName2), allowDifferentLgConfigK)
 
   // ---------------------------------------------------------------------------
   // Datasketch functions (Theta)
@@ -1314,13 +1399,21 @@ object functions:
   def theta_union_agg(colName: String): Column = theta_union_agg(Column(colName))
   def theta_difference(c1: Column, c2: Column): Column =
     callFn("theta_difference", c1, c2)
+  def theta_difference(colName1: String, colName2: String): Column =
+    theta_difference(Column(colName1), Column(colName2))
   def theta_intersection(c1: Column, c2: Column): Column =
     callFn("theta_intersection", c1, c2)
+  def theta_intersection(colName1: String, colName2: String): Column =
+    theta_intersection(Column(colName1), Column(colName2))
   def theta_sketch_estimate(c: Column): Column = callFn("theta_sketch_estimate", c)
   def theta_sketch_estimate(colName: String): Column = theta_sketch_estimate(Column(colName))
   def theta_union(c1: Column, c2: Column): Column = callFn("theta_union", c1, c2)
+  def theta_union(colName1: String, colName2: String): Column =
+    theta_union(Column(colName1), Column(colName2))
   def theta_union(c1: Column, c2: Column, lgNomEntries: Int): Column =
     callFn("theta_union", c1, c2, Column.lit(lgNomEntries))
+  def theta_union(colName1: String, colName2: String, lgNomEntries: Int): Column =
+    theta_union(Column(colName1), Column(colName2), lgNomEntries)
   def theta_union(c1: Column, c2: Column, lgNomEntries: Column): Column =
     callFn("theta_union", c1, c2, lgNomEntries)
 
@@ -1357,16 +1450,28 @@ object functions:
   def kll_merge_agg_bigint(e: Column, k: Int): Column =
     callFn("kll_merge_agg_bigint", e, Column.lit(k))
   def kll_merge_agg_bigint(e: Column): Column = callFn("kll_merge_agg_bigint", e)
+  def kll_merge_agg_bigint(colName: String, k: Int): Column =
+    kll_merge_agg_bigint(Column(colName), k)
+  def kll_merge_agg_bigint(colName: String): Column =
+    kll_merge_agg_bigint(Column(colName))
   def kll_merge_agg_float(e: Column, k: Column): Column =
     callFn("kll_merge_agg_float", e, k)
   def kll_merge_agg_float(e: Column, k: Int): Column =
     callFn("kll_merge_agg_float", e, Column.lit(k))
   def kll_merge_agg_float(e: Column): Column = callFn("kll_merge_agg_float", e)
+  def kll_merge_agg_float(colName: String, k: Int): Column =
+    kll_merge_agg_float(Column(colName), k)
+  def kll_merge_agg_float(colName: String): Column =
+    kll_merge_agg_float(Column(colName))
   def kll_merge_agg_double(e: Column, k: Column): Column =
     callFn("kll_merge_agg_double", e, k)
   def kll_merge_agg_double(e: Column, k: Int): Column =
     callFn("kll_merge_agg_double", e, Column.lit(k))
   def kll_merge_agg_double(e: Column): Column = callFn("kll_merge_agg_double", e)
+  def kll_merge_agg_double(colName: String, k: Int): Column =
+    kll_merge_agg_double(Column(colName), k)
+  def kll_merge_agg_double(colName: String): Column =
+    kll_merge_agg_double(Column(colName))
   def kll_sketch_get_n_bigint(e: Column): Column = callFn("kll_sketch_get_n_bigint", e)
   def kll_sketch_get_n_float(e: Column): Column = callFn("kll_sketch_get_n_float", e)
   def kll_sketch_get_n_double(e: Column): Column = callFn("kll_sketch_get_n_double", e)
@@ -1632,6 +1737,8 @@ object functions:
     callFn("try_divide", left, right)
   def try_to_number(col: Column, format: Column): Column =
     callFn("try_to_number", col, format)
+  def try_to_timestamp(col: Column, format: Column): Column =
+    callFn("try_to_timestamp", col, format)
   def try_to_timestamp(col: Column): Column = callFn("try_to_timestamp", col)
 
   /** Broadcast hint for a DataFrame — returns the same DataFrame with a broadcast hint. */

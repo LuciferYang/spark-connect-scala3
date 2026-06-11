@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
+import org.apache.spark.sql.types.{DoubleType, LongType, StringType}
+
 class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
 
   // A representative progress JSON shape, mirroring what the Connect server emits.
@@ -56,6 +58,29 @@ class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
       |    "description": "ConsoleSink",
       |    "numOutputRows": 100,
       |    "metrics": { "writeMs": "5" }
+      |  },
+      |  "observedMetrics": {
+      |    "event1": {
+      |      "values": [1, 3.0],
+      |      "schema": {
+      |        "type": "struct",
+      |        "fields": [
+      |          { "name": "c1", "type": "long", "nullable": true, "metadata": {} },
+      |          { "name": "c2", "type": "double", "nullable": true, "metadata": {} }
+      |        ]
+      |      }
+      |    },
+      |    "event2": {
+      |      "values": [1, "hello", "world"],
+      |      "schema": {
+      |        "type": "struct",
+      |        "fields": [
+      |          { "name": "rc", "type": "long", "nullable": true, "metadata": {} },
+      |          { "name": "min_q", "type": "string", "nullable": true, "metadata": {} },
+      |          { "name": "max_q", "type": "string", "nullable": true, "metadata": {} }
+      |        ]
+      |      }
+      |    }
       |  }
       |}""".stripMargin
 
@@ -119,6 +144,65 @@ class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
     p.sink.metrics.get("writeMs") shouldBe "5"
   }
 
+  test("fromJson parses observedMetrics as schema-aware rows") {
+    val p = StreamingQueryProgress.fromJson(sampleJson)
+    p.observedMetrics.keySet().asScala.toSet shouldBe Set("event1", "event2")
+
+    val event1 = p.observedMetrics.get("event1")
+    event1.getAs[Long]("c1") shouldBe 1L
+    event1.getAs[Double]("c2") shouldBe 3.0d
+    event1.schema.get.fields.map(_.dataType) shouldBe Seq(LongType, DoubleType)
+
+    val event2 = p.observedMetrics.get("event2")
+    event2.getAs[String]("min_q") shouldBe "hello"
+    event2.getAs[String]("max_q") shouldBe "world"
+    event2.schema.get.fields.map(_.dataType) shouldBe Seq(LongType, StringType, StringType)
+  }
+
+  test("fromJson parses observedMetrics field-object shape") {
+    val json =
+      """{"observedMetrics":{"event":{"c1":2,"c2":4.5,
+        |"schema":{"type":"struct","fields":[
+        |{"name":"c1","type":"long","nullable":true,"metadata":{}},
+        |{"name":"c2","type":"double","nullable":true,"metadata":{}}
+        |]}}}}""".stripMargin
+    val row = StreamingQueryProgress.fromJson(json).observedMetrics.get("event")
+    row.getAs[Long]("c1") shouldBe 2L
+    row.getAs[Double]("c2") shouldBe 4.5d
+  }
+
+  test("fromJson parses observedMetrics primitive value types") {
+    val json =
+      """{"observedMetrics":{"event":{
+        |"values":[true,1,2,3,4.5,"AQI=",12.34,"2026-01-02","2026-01-02T03:04:05Z",
+        |"2026-01-02T03:04:05"],
+        |"schema":{"type":"struct","fields":[
+        |{"name":"bool","type":"boolean","nullable":true,"metadata":{}},
+        |{"name":"byte","type":"byte","nullable":true,"metadata":{}},
+        |{"name":"short","type":"short","nullable":true,"metadata":{}},
+        |{"name":"int","type":"int","nullable":true,"metadata":{}},
+        |{"name":"float","type":"float","nullable":true,"metadata":{}},
+        |{"name":"binary","type":"binary","nullable":true,"metadata":{}},
+        |{"name":"decimal","type":"decimal(10,2)","nullable":true,"metadata":{}},
+        |{"name":"date","type":"date","nullable":true,"metadata":{}},
+        |{"name":"timestamp","type":"timestamp","nullable":true,"metadata":{}},
+        |{"name":"timestampNtz","type":"timestamp_ntz","nullable":true,"metadata":{}}
+        |]}}}}""".stripMargin
+    val row = StreamingQueryProgress.fromJson(json).observedMetrics.get("event")
+    row.getAs[Boolean]("bool") shouldBe true
+    row.getAs[Byte]("byte") shouldBe 1.toByte
+    row.getAs[Short]("short") shouldBe 2.toShort
+    row.getAs[Int]("int") shouldBe 3
+    row.getAs[Float]("float") shouldBe 4.5f
+    row.getAs[Array[Byte]]("binary").toSeq shouldBe Seq(1.toByte, 2.toByte)
+    row.getAs[java.math.BigDecimal]("decimal") shouldBe new java.math.BigDecimal("12.34")
+    row.getAs[java.sql.Date]("date") shouldBe java.sql.Date.valueOf("2026-01-02")
+    row.getAs[java.sql.Timestamp]("timestamp") shouldBe
+      java.sql.Timestamp.from(java.time.Instant.parse("2026-01-02T03:04:05Z"))
+    row.getAs[java.time.LocalDateTime]("timestampNtz") shouldBe
+      java.time.LocalDateTime.parse("2026-01-02T03:04:05")
+  }
+
   // ---------------------------------------------------------------------------
   // fromJson — null/missing-field tolerance
   // ---------------------------------------------------------------------------
@@ -135,6 +219,7 @@ class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
     p.sink shouldBe null
     p.durationMs shouldBe empty
     p.eventTime shouldBe empty
+    p.observedMetrics shouldBe empty
   }
 
   test("fromJson treats null id/runId as zero UUID") {
@@ -169,6 +254,7 @@ class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
     parsed.get("batchId").asLong shouldBe 7L
     parsed.get("stateOperators").size() shouldBe 1
     parsed.get("sources").size() shouldBe 1
+    parsed.get("observedMetrics").get("event1").get("c1").asLong shouldBe 1L
   }
 
   test("prettyJson is parseable and indented") {
@@ -206,6 +292,8 @@ class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
     parsed.get("numRowsUpdated").asLong shouldBe 2L
     parsed.get("numStateStoreInstances").asLong shouldBe 10L
     parsed.has("customMetrics") shouldBe false
+    op.prettyJson should include("\n")
+    op.toString shouldBe op.prettyJson
   }
 
   test("SinkProgress.json includes description and rows") {
@@ -213,6 +301,8 @@ class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
     val parsed = new ObjectMapper().readTree(sp.json)
     parsed.get("description").asText shouldBe "MySink"
     parsed.get("numOutputRows").asLong shouldBe 42L
+    sp.prettyJson should include("\n")
+    sp.toString shouldBe sp.prettyJson
   }
 
   test("SinkProgress single-arg constructor uses sentinel -1") {
@@ -242,6 +332,8 @@ class StreamingQueryProgressSuite extends AnyFunSuite with Matchers:
     parsed.get("description").asText shouldBe "S"
     parsed.get("numInputRows").asLong shouldBe 1L
     parsed.get("inputRowsPerSecond").asDouble shouldBe 0.5
+    src.prettyJson should include("\n")
+    src.toString shouldBe src.prettyJson
   }
 
   test("non-finite rate metrics are omitted from emitted JSON") {

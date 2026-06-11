@@ -112,6 +112,68 @@ class AvroProtobufFunctionsSuite extends AnyFunSuite with Matchers:
     optionsArgument(toClass).getFunctionName shouldBe "map"
   }
 
+  test("protobuf functions accept Scala Map options") {
+    val options = Map("recursive.fields.max.depth" -> "2")
+    val descriptor = Array[Byte](1, 2, 3)
+
+    val fromDescriptor = protobufFunctions.from_protobuf(
+      Column("bytes"),
+      "StorageLevel",
+      descriptor,
+      options
+    )
+    assertFn(fromDescriptor, "from_protobuf", 4)
+    optionsArgument(fromDescriptor).getFunctionName shouldBe "map"
+
+    val fromClass = protobufFunctions.from_protobuf(
+      Column("bytes"),
+      "com.example.StorageLevel",
+      options
+    )
+    assertFn(fromClass, "from_protobuf", 3)
+    optionsArgument(fromClass).getFunctionName shouldBe "map"
+
+    val toDescriptor = protobufFunctions.to_protobuf(
+      Column("value"),
+      "StorageLevel",
+      descriptor,
+      options
+    )
+    assertFn(toDescriptor, "to_protobuf", 4)
+    optionsArgument(toDescriptor).getFunctionName shouldBe "map"
+
+    val toClass = protobufFunctions.to_protobuf(
+      Column("value"),
+      "com.example.StorageLevel",
+      options
+    )
+    assertFn(toClass, "to_protobuf", 3)
+    optionsArgument(toClass).getFunctionName shouldBe "map"
+  }
+
+  test("protobuf descriptor path overloads accept Scala Map options") {
+    val descriptor = Array[Byte](3, 2, 1)
+    val options = Map("recursive.fields.max.depth" -> "1")
+    val path = Files.createTempFile("sc3-protobuf-options", ".desc")
+    try
+      Files.write(path, descriptor)
+
+      val fromColumn =
+        protobufFunctions.from_protobuf(Column("bytes"), "StorageLevel", path.toString, options)
+      assertFn(fromColumn, "from_protobuf", 4)
+      unresolvedFunction(fromColumn).getArguments(2).getLiteral.getBinary.toByteArray shouldBe
+        descriptor
+      optionsArgument(fromColumn).getFunctionName shouldBe "map"
+
+      val toColumn =
+        protobufFunctions.to_protobuf(Column("value"), "StorageLevel", path.toString, options)
+      assertFn(toColumn, "to_protobuf", 4)
+      unresolvedFunction(toColumn).getArguments(2).getLiteral.getBinary.toByteArray shouldBe
+        descriptor
+      optionsArgument(toColumn).getFunctionName shouldBe "map"
+    finally Files.deleteIfExists(path)
+  }
+
   test("protobuf descriptor path overloads read file content as binary literal") {
     val descriptor = Array[Byte](9, 8, 7)
     val path = Files.createTempFile("sc3-protobuf", ".desc")

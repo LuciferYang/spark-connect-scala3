@@ -400,3 +400,91 @@ class DataTypeSuite extends AnyFunSuite with Matchers:
     val outer = StructType(Seq(StructField("nested", nested)))
     outer.toDDL should include("STRUCT<inner: INT>")
   }
+
+  // ---------------------------------------------------------------------------
+  // Spark 4.1 public helper parity
+  // ---------------------------------------------------------------------------
+
+  test("DataType catalogString uses Spark-compatible names") {
+    IntegerType.catalogString shouldBe "int"
+    LongType.catalogString shouldBe "bigint"
+    ByteType.catalogString shouldBe "tinyint"
+
+    val schema = StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("tags", ArrayType(StringType, containsNull = false))
+    ))
+    schema.catalogString shouldBe "struct<id:int,tags:array<string>>"
+  }
+
+  test("DataType defaultSize follows Spark public helper values") {
+    BooleanType.defaultSize shouldBe 1
+    IntegerType.defaultSize shouldBe 4
+    LongType.defaultSize shouldBe 8
+    StringType.defaultSize shouldBe 20
+    BinaryType.defaultSize shouldBe 100
+    DecimalType(20, 2).defaultSize shouldBe 16
+
+    StructType(Seq(
+      StructField("id", IntegerType),
+      StructField("name", StringType)
+    )).defaultSize shouldBe 24
+  }
+
+  test("DataType json and prettyJson round-trip nested schemas") {
+    val schema = StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("attrs", MapType(StringType, ArrayType(LongType, containsNull = false), true))
+    ))
+
+    IntegerType.json shouldBe "\"integer\""
+    schema.prettyJson should include("\n")
+    DataType.fromJson(schema.json) shouldBe schema
+  }
+
+  test("DataType.fromJson parses upstream object shapes") {
+    val json =
+      """{"type":"struct","fields":[{"name":"id","type":"integer","nullable":false,"metadata":{}},{"name":"scores","type":{"type":"array","elementType":"double","containsNull":false},"nullable":true,"metadata":{}}]}"""
+
+    DataType.fromJson(json) shouldBe StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("scores", ArrayType(DoubleType, containsNull = false))
+    ))
+  }
+
+  test("DataType.fromDDL parses data types and falls back to table schemas") {
+    DataType.fromDDL("ARRAY<STRUCT<id: INT, name: STRING>>") shouldBe
+      ArrayType(
+        StructType(Seq(StructField("id", IntegerType), StructField("name", StringType))),
+        containsNull = true
+      )
+
+    DataType.fromDDL("id INT, name STRING") shouldBe
+      StructType(Seq(StructField("id", IntegerType), StructField("name", StringType)))
+  }
+
+  test("StructType.fromDDL parses quoted names and NOT NULL") {
+    StructType.fromDDL("`id` BIGINT NOT NULL, `name` STRING") shouldBe
+      StructType(Seq(
+        StructField("id", LongType, nullable = false),
+        StructField("name", StringType)
+      ))
+  }
+
+  test("DataType structural equality helpers ignore requested shape details") {
+    val left = StructType(Seq(
+      StructField("ID", ArrayType(IntegerType, containsNull = false), nullable = false)
+    ))
+    val right = StructType(Seq(
+      StructField("id", ArrayType(IntegerType, containsNull = true), nullable = true)
+    ))
+
+    DataType.equalsIgnoreNullability(left, right) shouldBe false
+    DataType.equalsIgnoreCaseAndNullability(left, right) shouldBe true
+    DataType.equalsStructurally(left, right) shouldBe false
+    DataType.equalsStructurally(left, right, ignoreNullability = true) shouldBe true
+    DataType.equalsStructurallyByName(left, right, (l, r) => l.equalsIgnoreCase(r)) shouldBe true
+    left.sameType(StructType(Seq(
+      StructField("ID", ArrayType(IntegerType, containsNull = true), nullable = true)
+    ))) shouldBe true
+  }

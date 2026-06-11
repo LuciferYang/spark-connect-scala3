@@ -49,6 +49,14 @@ class ImplicitsSuite extends AnyFunSuite with Matchers:
   // ColumnName StructField helpers
   // ---------------------------------------------------------------------------
 
+  test("top-level ColumnName extends Column and can be instantiated") {
+    val cn: ColumnName = new ColumnName("id")
+    val c: Column = cn
+
+    c.expr.hasUnresolvedAttribute shouldBe true
+    c.expr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "id"
+  }
+
   test("ColumnName.string creates StringType StructField") {
     import org.apache.spark.sql.implicits.*
 
@@ -119,6 +127,19 @@ class ImplicitsSuite extends AnyFunSuite with Matchers:
     field shouldBe StructField("data", BinaryType)
   }
 
+  test("ColumnName array/map/struct helpers create nested StructFields") {
+    val cn = new ColumnName("payload")
+
+    cn.array(IntegerType) shouldBe
+      StructField("payload", ArrayType(IntegerType, containsNull = true))
+    cn.map(StringType, LongType) shouldBe
+      StructField("payload", MapType(StringType, LongType, valueContainsNull = true))
+    cn.map(MapType(StringType, DoubleType, valueContainsNull = false)) shouldBe
+      StructField("payload", MapType(StringType, DoubleType, valueContainsNull = false))
+    cn.struct(StructField("id", IntegerType)) shouldBe
+      StructField("payload", StructType(Seq(StructField("id", IntegerType))))
+  }
+
   // ---------------------------------------------------------------------------
   // ColumnName implicit conversion to Column
   // ---------------------------------------------------------------------------
@@ -126,7 +147,7 @@ class ImplicitsSuite extends AnyFunSuite with Matchers:
   test("ColumnName implicitly converts to Column") {
     import org.apache.spark.sql.implicits.*
 
-    val cn = $"myCol"
+    val cn: ColumnName = $"myCol"
     val c: Column = cn // implicit conversion
     c.expr.getUnresolvedAttribute.getUnparsedIdentifier shouldBe "myCol"
   }

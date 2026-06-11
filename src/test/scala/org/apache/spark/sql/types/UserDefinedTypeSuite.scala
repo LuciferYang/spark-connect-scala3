@@ -47,6 +47,22 @@ class UserDefinedTypeSuite extends AnyFunSuite with Matchers:
     udt.sql shouldBe udt.sqlType.sql
   }
 
+  test("UserDefinedType public helpers delegate to sqlType") {
+    val udt = IntPairUDT()
+    udt.pyUDT shouldBe null
+    udt.serializedPyClass shouldBe null
+    udt.catalogString shouldBe udt.sqlType.catalogString
+    udt.defaultSize shouldBe udt.sqlType.defaultSize
+    udt.stringifyValue(IntPair(1, 2)) shouldBe "IntPair(1,2)"
+  }
+
+  test("UserDefinedType json round-trips through DataType.fromJson") {
+    val udt = IntPairUDT()
+    val parsed = DataType.fromJson(udt.json)
+    parsed shouldBe a[IntPairUDT]
+    parsed.asInstanceOf[IntPairUDT].sqlType shouldBe udt.sqlType
+  }
+
   test("UserDefinedType equality is by class") {
     val udt1 = IntPairUDT()
     val udt2 = IntPairUDT()

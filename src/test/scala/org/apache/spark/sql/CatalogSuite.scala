@@ -19,6 +19,53 @@ class CatalogSuite extends AnyFunSuite with Matchers:
     df.relation.getCatalog
 
   // ---------------------------------------------------------------------------
+  // Public catalog value classes
+  // ---------------------------------------------------------------------------
+
+  test("catalog value classes expose upstream-compatible constructors") {
+    val db = new catalog.Database("default", "main database", "file:/tmp/default")
+    db.name shouldBe "default"
+    db.catalog shouldBe null
+    db.description shouldBe "main database"
+    db.locationUri shouldBe "file:/tmp/default"
+    db.toString should include("Database[name='default'")
+
+    val table = new catalog.Table("tbl", "default", "table desc", "MANAGED", isTemporary = false)
+    table.catalog shouldBe null
+    table.namespace shouldBe Seq("default")
+    table.database shouldBe "default"
+    table.toString should include("database='default'")
+
+    val qualifiedTable = new catalog.Table(
+      "tbl",
+      "spark_catalog",
+      Array("db", "nested"),
+      "table desc",
+      "MANAGED",
+      isTemporary = false
+    )
+    qualifiedTable.namespace shouldBe Seq("db", "nested")
+    qualifiedTable.database shouldBe null
+
+    val column = new catalog.Column(
+      "id",
+      "identifier",
+      "int",
+      nullable = false,
+      isPartition = true,
+      isBucket = false
+    )
+    column.isCluster shouldBe false
+    column.toString should include("isCluster='false'")
+
+    val fn = new catalog.Function("f", "default", "function desc", "com.example.F", false)
+    fn.catalog shouldBe null
+    fn.namespace shouldBe Seq("default")
+    fn.database shouldBe "default"
+    fn.toString should include("database='default'")
+  }
+
+  // ---------------------------------------------------------------------------
   // List operations — proto-backed
   // ---------------------------------------------------------------------------
 

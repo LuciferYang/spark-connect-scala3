@@ -1,7 +1,5 @@
 package org.apache.spark.sql
 
-import org.apache.spark.sql.types.*
-
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
@@ -26,35 +24,11 @@ import scala.reflect.ClassTag
   */
 object implicits:
 
-  /** A Column wrapper that provides StructField helper methods.
-    *
-    * Unlike Spark 2/3 which uses subclassing (`class ColumnName extends Column`), this uses a
-    * wrapper class because `Column` is `final`. The wrapper delegates to the underlying Column for
-    * all Column operations via implicit conversion.
-    */
-  class ColumnName(val name: String):
-    /** The underlying Column for this name. */
-    def column: Column = Column(name)
-
-    // StructField convenience methods
-    def boolean: StructField = StructField(name, BooleanType)
-    def byte: StructField = StructField(name, ByteType)
-    def short: StructField = StructField(name, ShortType)
-    def int: StructField = StructField(name, IntegerType)
-    def long: StructField = StructField(name, LongType)
-    def float: StructField = StructField(name, FloatType)
-    def double: StructField = StructField(name, DoubleType)
-    def string: StructField = StructField(name, StringType)
-    def date: StructField = StructField(name, DateType)
-    def timestamp: StructField = StructField(name, TimestampType)
-    def binary: StructField = StructField(name, BinaryType)
-    def decimal: StructField = StructField(name, DecimalType.DEFAULT)
-    def decimal(precision: Int, scale: Int): StructField =
-      StructField(name, DecimalType(precision, scale))
+  type ColumnName = _root_.org.apache.spark.sql.ColumnName
 
   /** Implicit conversion from ColumnName to Column. */
   given Conversion[ColumnName, Column] with
-    def apply(cn: ColumnName): Column = cn.column
+    def apply(cn: ColumnName): Column = cn
 
   /** String interpolator for column references: `$"colName"`.
     *
@@ -63,7 +37,7 @@ object implicits:
   extension (sc: StringContext)
     def $(args: Any*): ColumnName =
       val name = sc.s(args*)
-      ColumnName(name)
+      new ColumnName(name)
 
   /** Implicit conversion from Symbol to Column (Scala 2 compat style). */
   given Conversion[Symbol, Column] with

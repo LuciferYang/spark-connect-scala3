@@ -60,19 +60,34 @@ object StreamingQueryListener:
         timestamp = fields("timestamp")
       )
 
-  /** Event representing any progress updates in a query. The progress is stored as raw JSON.
+  /** Event representing any progress updates in a query.
     *
-    * @param progressJson
-    *   The raw JSON string of the query progress.
+    * @param progress
+    *   The parsed query progress.
     */
-  case class QueryProgressEvent(progressJson: String) extends Event:
+  class QueryProgressEvent private[sql] (
+      val progress: StreamingQueryProgress,
+      private val rawProgressJson: String | Null = null
+  ) extends Event:
+    def progressJson: String =
+      if rawProgressJson != null then rawProgressJson else progress.json
+
     def json: String = s"""{"progress":$progressJson}"""
 
   object QueryProgressEvent:
+    def apply(progress: StreamingQueryProgress): QueryProgressEvent =
+      new QueryProgressEvent(progress)
+
+    def apply(progressJson: String): QueryProgressEvent =
+      new QueryProgressEvent(StreamingQueryProgress.fromJson(progressJson), progressJson)
+
     def fromJson(json: String): QueryProgressEvent =
-      // The event JSON wraps a "progress" key whose value is the full progress JSON.
-      // For simplicity, we store the entire event JSON and let callers access the raw string.
-      QueryProgressEvent(json)
+      val root = StreamingQueryProgress.mapper.readTree(json)
+      val hasProgressWrapper = root != null && root.isObject && root.has("progress")
+      val progressNode =
+        if hasProgressWrapper then root.get("progress") else root
+      val progressJson = if hasProgressWrapper then progressNode.toString else json
+      new QueryProgressEvent(StreamingQueryProgress.fromJson(progressJson), progressJson)
 
   /** Event representing that query is idle and waiting for new data to process.
     *

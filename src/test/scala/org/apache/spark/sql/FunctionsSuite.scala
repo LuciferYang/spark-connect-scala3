@@ -56,6 +56,9 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.exp(Column("x")), "exp", 1)
     assertFn(functions.pow(Column("a"), Column("b")), "power", 2)
     assertFn(functions.round(Column("x"), 2), "round", 2)
+    assertFn(functions.round(Column("x"), Column("scale")), "round", 2)
+    assertFn(functions.floor(Column("x"), Column("scale")), "floor", 2)
+    assertFn(functions.ceil(Column("x"), Column("scale")), "ceil", 2)
   }
 
   test("string functions") {
@@ -65,6 +68,7 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.length(Column("x")), "length", 1)
     assertFn(functions.concat(Column("a"), Column("b")), "concat", 2)
     assertFn(functions.substring(Column("x"), 1, 3), "substring", 3)
+    assertFn(functions.substring(Column("x"), Column("pos"), Column("len")), "substring", 3)
   }
 
   test("date functions") {
@@ -103,7 +107,9 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.regexp_extract(Column("x"), "\\d+", 0), "regexp_extract", 3)
     assertFn(functions.regexp_replace(Column("x"), "a", "b"), "regexp_replace", 3)
     assertFn(functions.split(Column("x"), ","), "split", 2)
+    assertFn(functions.split(Column("x"), Column("pattern")), "split", 2)
     assertFn(functions.split(Column("x"), ",", 3), "split", 3)
+    assertFn(functions.split(Column("x"), Column("pattern"), Column("limit")), "split", 3)
   }
 
   test("json functions") {
@@ -163,6 +169,7 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.ascii(Column("x")), "ascii", 1)
     assertFn(functions.base64(Column("x")), "base64", 1)
     assertFn(functions.repeat(Column("x"), 3), "repeat", 2)
+    assertFn(functions.repeat(Column("x"), Column("n")), "repeat", 2)
     assertFn(functions.format_number(Column("x"), 2), "format_number", 2)
   }
 
@@ -267,7 +274,9 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("new string functions") {
     assertFn(functions.left(Column("x"), 3), "left", 2)
+    assertFn(functions.left(Column("x"), Column("len")), "left", 2)
     assertFn(functions.right(Column("x"), 3), "right", 2)
+    assertFn(functions.right(Column("x"), Column("len")), "right", 2)
     assertFn(functions.char_length(Column("x")), "char_length", 1)
     assertFn(functions.bit_length(Column("x")), "bit_length", 1)
     assertFn(functions.octet_length(Column("x")), "octet_length", 1)
@@ -276,6 +285,7 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.endswith(Column("a"), Column("b")), "endswith", 2)
     assertFn(functions.btrim(Column("x")), "btrim", 1)
     assertFn(functions.position(Column("sub"), Column("str")), "position", 2)
+    assertFn(functions.position(Column("sub"), Column("str"), Column("start")), "position", 3)
     assertFn(
       functions.sentences(Column("s"), Column("l"), Column("c")),
       "sentences",
@@ -313,7 +323,9 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("new collection functions") {
     assertFn(functions.array_append(Column("a"), Column("e")), "array_append", 2)
+    assertFn(functions.array_append(Column("a"), 1), "array_append", 2)
     assertFn(functions.array_prepend(Column("a"), Column("e")), "array_prepend", 2)
+    assertFn(functions.array_prepend(Column("a"), 1), "array_prepend", 2)
     assertFn(functions.array_compact(Column("a")), "array_compact", 1)
     assertFn(
       functions.array_insert(Column("a"), Column("p"), Column("v")),
@@ -326,9 +338,11 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
       "sequence",
       3
     )
+    assertFn(functions.sequence(Column("s"), Column("e")), "sequence", 2)
     assertFn(functions.array_size(Column("a")), "array_size", 1)
     assertFn(functions.get(Column("a"), Column("i")), "get", 2)
     assertFn(functions.map_contains_key(Column("m"), Column("k")), "map_contains_key", 2)
+    assertFn(functions.map_contains_key(Column("m"), "k"), "map_contains_key", 2)
     assertFn(
       functions.str_to_map(Column("s"), Column("p"), Column("kv")),
       "str_to_map",
@@ -362,7 +376,8 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.current_catalog(), "current_catalog", 0)
     assertFn(functions.current_database(), "current_database", 0)
     assertFn(functions.current_schema(), "current_schema", 0)
-    assertFn(functions.uuid(), "uuid", 0)
+    assertFn(functions.uuid(), "uuid", 1)
+    assertFn(functions.uuid(Column("seed")), "uuid", 1)
     assertFn(functions.session_user(), "session_user", 0)
     assertFn(functions.stack(Column.lit(2), Column("a"), Column("b")), "stack", 3)
     assertFn(functions.inline(Column("x")), "inline", 1)
@@ -378,6 +393,7 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.try_sum(Column("x")), "try_sum", 1)
     assertFn(functions.try_to_number(Column("x"), Column("f")), "try_to_number", 2)
     assertFn(functions.try_to_timestamp(Column("x")), "try_to_timestamp", 1)
+    assertFn(functions.try_to_timestamp(Column("x"), Column("f")), "try_to_timestamp", 2)
   }
 
   // ----- Phase 4 (Task E) tests: Higher-order functions -----
@@ -769,6 +785,7 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
   test("bround") {
     assertFn(functions.bround(Column("x")), "bround", 2)
     assertFn(functions.bround(Column("x"), 3), "bround", 2)
+    assertFn(functions.bround(Column("x"), Column("scale")), "bround", 2)
   }
 
   test("unhex") {
@@ -835,7 +852,11 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("lpad and rpad") {
     assertFn(functions.lpad(Column("x"), 10, " "), "lpad", 3)
+    assertFn(functions.lpad(Column("x"), 10, Array[Byte](1, 2)), "lpad", 3)
+    assertFn(functions.lpad(Column("x"), Column("len"), Column("pad")), "lpad", 3)
     assertFn(functions.rpad(Column("x"), 10, " "), "rpad", 3)
+    assertFn(functions.rpad(Column("x"), 10, Array[Byte](1, 2)), "rpad", 3)
+    assertFn(functions.rpad(Column("x"), Column("len"), Column("pad")), "rpad", 3)
   }
 
   test("substring_index") {
@@ -958,6 +979,7 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("instr") {
     assertFn(functions.instr(Column("x"), "sub"), "instr", 2)
+    assertFn(functions.instr(Column("x"), Column("sub")), "instr", 2)
   }
 
   test("locate") {
@@ -970,6 +992,11 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
       functions.overlay(Column("s"), Column("r"), Column("p"), Column("l")),
       "overlay",
       4
+    )
+    assertFn(
+      functions.overlay(Column("s"), Column("r"), Column("p")),
+      "overlay",
+      3
     )
   }
 
@@ -1018,7 +1045,9 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("date_add and date_sub") {
     assertFn(functions.date_add(Column("d"), 5), "date_add", 2)
+    assertFn(functions.date_add(Column("d"), Column("days")), "date_add", 2)
     assertFn(functions.date_sub(Column("d"), 3), "date_sub", 2)
+    assertFn(functions.date_sub(Column("d"), Column("days")), "date_sub", 2)
   }
 
   test("to_date") {
@@ -1079,16 +1108,20 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("add_months") {
     assertFn(functions.add_months(Column("d"), 3), "add_months", 2)
+    assertFn(functions.add_months(Column("d"), Column("months")), "add_months", 2)
   }
 
   test("from_utc_timestamp and to_utc_timestamp") {
     assertFn(functions.from_utc_timestamp(Column("t"), "UTC"), "from_utc_timestamp", 2)
+    assertFn(functions.from_utc_timestamp(Column("t"), Column("tz")), "from_utc_timestamp", 2)
     assertFn(functions.to_utc_timestamp(Column("t"), "UTC"), "to_utc_timestamp", 2)
+    assertFn(functions.to_utc_timestamp(Column("t"), Column("tz")), "to_utc_timestamp", 2)
   }
 
   test("window") {
-    assertFn(functions.window(Column("t"), "10 minutes"), "window", 2)
-    assertFn(functions.window(Column("t"), "10 minutes", "5 minutes"), "window", 3)
+    assertFn(functions.window(Column("t"), "10 minutes"), "window", 4)
+    assertFn(functions.window(Column("t"), "10 minutes", "5 minutes"), "window", 4)
+    assertFn(functions.window(Column("t"), "10 minutes", "5 minutes", "1 minute"), "window", 4)
   }
 
   test("date_trunc and trunc") {
@@ -1479,6 +1512,7 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("array_repeat") {
     assertFn(functions.array_repeat(Column("x"), 3), "array_repeat", 2)
+    assertFn(functions.array_repeat(Column("x"), Column("n")), "array_repeat", 2)
   }
 
   test("arrays_zip") {
@@ -1487,10 +1521,12 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("slice") {
     assertFn(functions.slice(Column("arr"), 1, 3), "slice", 3)
+    assertFn(functions.slice(Column("arr"), Column("start"), Column("len")), "slice", 3)
   }
 
   test("shuffle") {
-    assertFn(functions.shuffle(Column("arr")), "shuffle", 1)
+    assertFn(functions.shuffle(Column("arr")), "shuffle", 2)
+    assertFn(functions.shuffle(Column("arr"), Column("seed")), "shuffle", 2)
   }
 
   test("sort_array") {
@@ -1704,6 +1740,15 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
     assertFn(functions.bucket(10, Column("x")), "bucket", 2)
   }
 
+  test("partitioning namespace exposes partition transforms") {
+    assertFn(functions.partitioning.years(Column("x")), "years", 1)
+    assertFn(functions.partitioning.months(Column("x")), "months", 1)
+    assertFn(functions.partitioning.days(Column("x")), "days", 1)
+    assertFn(functions.partitioning.hours(Column("x")), "hours", 1)
+    assertFn(functions.partitioning.bucket(Column("n"), Column("x")), "bucket", 2)
+    assertFn(functions.partitioning.bucket(10, Column("x")), "bucket", 2)
+  }
+
   // ----- Bitmap functions (non-aggregate) -----
 
   test("bitmap_bit_position, bitmap_bucket_number, bitmap_count") {
@@ -1720,7 +1765,9 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("hll_union") {
     assertFn(functions.hll_union(Column("a"), Column("b")), "hll_union", 2)
+    assertFn(functions.hll_union("a", "b"), "hll_union", 2)
     assertFn(functions.hll_union(Column("a"), Column("b"), true), "hll_union", 3)
+    assertFn(functions.hll_union("a", "b", true), "hll_union", 3)
   }
 
   // ----- AES encrypt/decrypt functions -----
@@ -1814,10 +1861,14 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
 
   test("theta_difference, theta_intersection, theta_sketch_estimate, theta_union") {
     assertFn(functions.theta_difference(Column("a"), Column("b")), "theta_difference", 2)
+    assertFn(functions.theta_difference("a", "b"), "theta_difference", 2)
     assertFn(functions.theta_intersection(Column("a"), Column("b")), "theta_intersection", 2)
+    assertFn(functions.theta_intersection("a", "b"), "theta_intersection", 2)
     assertFn(functions.theta_sketch_estimate(Column("x")), "theta_sketch_estimate", 1)
     assertFn(functions.theta_union(Column("a"), Column("b")), "theta_union", 2)
+    assertFn(functions.theta_union("a", "b"), "theta_union", 2)
     assertFn(functions.theta_union(Column("a"), Column("b"), 12), "theta_union", 3)
+    assertFn(functions.theta_union("a", "b", 12), "theta_union", 3)
     assertFn(functions.theta_union(Column("a"), Column("b"), Column("k")), "theta_union", 3)
   }
 
@@ -2003,19 +2054,25 @@ class FunctionsSuite extends AnyFunSuite with Matchers:
   test("kll_merge_agg_bigint") {
     assertFn(functions.kll_merge_agg_bigint(Column("x"), Column("k")), "kll_merge_agg_bigint", 2)
     assertFn(functions.kll_merge_agg_bigint(Column("x"), 200), "kll_merge_agg_bigint", 2)
+    assertFn(functions.kll_merge_agg_bigint("x", 200), "kll_merge_agg_bigint", 2)
     assertFn(functions.kll_merge_agg_bigint(Column("x")), "kll_merge_agg_bigint", 1)
+    assertFn(functions.kll_merge_agg_bigint("x"), "kll_merge_agg_bigint", 1)
   }
 
   test("kll_merge_agg_float") {
     assertFn(functions.kll_merge_agg_float(Column("x"), Column("k")), "kll_merge_agg_float", 2)
     assertFn(functions.kll_merge_agg_float(Column("x"), 200), "kll_merge_agg_float", 2)
+    assertFn(functions.kll_merge_agg_float("x", 200), "kll_merge_agg_float", 2)
     assertFn(functions.kll_merge_agg_float(Column("x")), "kll_merge_agg_float", 1)
+    assertFn(functions.kll_merge_agg_float("x"), "kll_merge_agg_float", 1)
   }
 
   test("kll_merge_agg_double") {
     assertFn(functions.kll_merge_agg_double(Column("x"), Column("k")), "kll_merge_agg_double", 2)
     assertFn(functions.kll_merge_agg_double(Column("x"), 200), "kll_merge_agg_double", 2)
+    assertFn(functions.kll_merge_agg_double("x", 200), "kll_merge_agg_double", 2)
     assertFn(functions.kll_merge_agg_double(Column("x")), "kll_merge_agg_double", 1)
+    assertFn(functions.kll_merge_agg_double("x"), "kll_merge_agg_double", 1)
   }
 
   test("kll_sketch_get_n") {

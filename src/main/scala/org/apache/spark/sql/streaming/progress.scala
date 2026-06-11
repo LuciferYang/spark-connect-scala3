@@ -9,6 +9,9 @@ import scala.jdk.CollectionConverters.*
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.{ArrayNode, JsonNodeFactory, ObjectNode}
 
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.types.*
+
 /** Information about updates made to stateful operators in a [[StreamingQuery]] during a trigger.
   */
 class StateOperatorProgress private[spark] (
@@ -57,9 +60,6 @@ end StateOperatorProgress
   *
   * Each event relates to processing done for a single trigger of the streaming query. Events are
   * emitted even when no new data is available to be processed.
-  *
-  * Note: `observedMetrics` from upstream is intentionally omitted in this client port — it requires
-  * `GenericRowWithSchema` infrastructure not present in this thin client.
   */
 class StreamingQueryProgress private[spark] (
     val id: UUID,
@@ -72,7 +72,8 @@ class StreamingQueryProgress private[spark] (
     val eventTime: ju.Map[String, String],
     val stateOperators: Array[StateOperatorProgress],
     val sources: Array[SourceProgress],
-    val sink: SinkProgress
+    val sink: SinkProgress,
+    val observedMetrics: ju.Map[String, Row] = new ju.HashMap[String, Row]()
 ) extends Serializable:
 
   /** The aggregate (across all sources) number of records processed in a trigger. */
@@ -111,12 +112,37 @@ class StreamingQueryProgress private[spark] (
     val srcs = node.putArray("sources")
     sources.foreach(p => srcs.add(p.toJsonNode))
     if sink != null then node.set[ObjectNode]("sink", sink.toJsonNode)
+    StreamingQueryProgress.putObservedMetrics(node, observedMetrics)
     node
 
 end StreamingQueryProgress
 
 object StreamingQueryProgress:
   private[streaming] val mapper = new ObjectMapper()
+
+  private val simpleTypes: Map[String, DataType] = Map(
+    "boolean" -> BooleanType,
+    "byte" -> ByteType,
+    "tinyint" -> ByteType,
+    "short" -> ShortType,
+    "smallint" -> ShortType,
+    "int" -> IntegerType,
+    "integer" -> IntegerType,
+    "long" -> LongType,
+    "bigint" -> LongType,
+    "float" -> FloatType,
+    "double" -> DoubleType,
+    "string" -> StringType,
+    "binary" -> BinaryType,
+    "date" -> DateType,
+    "timestamp" -> TimestampType,
+    "timestamp_ltz" -> TimestampType,
+    "timestamp_ntz" -> TimestampNTZType,
+    "null" -> NullType,
+    "void" -> NullType,
+    "variant" -> VariantType,
+    "decimal" -> DecimalType.DEFAULT
+  )
 
   /** Parse a JSON string emitted by the Connect server into a typed `StreamingQueryProgress`. */
   def fromJson(json: String): StreamingQueryProgress =
@@ -132,7 +158,8 @@ object StreamingQueryProgress:
       eventTime = readStringMap(node, "eventTime"),
       stateOperators = readStateOperators(node.get("stateOperators")),
       sources = readSources(node.get("sources")),
-      sink = readSink(node.get("sink"))
+      sink = readSink(node.get("sink")),
+      observedMetrics = readObservedMetrics(node.get("observedMetrics"))
     )
 
   private def readUuidOrZero(node: JsonNode, field: String): UUID =
@@ -217,6 +244,101 @@ object StreamingQueryProgress:
         metrics = readMetrics(node.get("metrics"))
       )
 
+  private def readObservedMetrics(node: JsonNode): ju.Map[String, Row] =
+    val out = new ju.HashMap[String, Row]()
+    if node != null && node.isObject then
+      node.properties().asScala.foreach { entry =>
+        out.put(entry.getKey, readObservedMetricRow(entry.getValue))
+      }
+    out
+
+  private def readObservedMetricRow(node: JsonNode): Row =
+    val schema = readStructType(node.get("schema"))
+    val valuesNode = node.get("values")
+    val values =
+      if valuesNode != null && valuesNode.isArray then
+        valuesNode.asInstanceOf[ArrayNode].asScala.zip(schema.fields).map { (value, field) =>
+          readValue(value, field.dataType)
+        }.toSeq
+      else schema.fields.map(field => readValue(node.get(field.name), field.dataType))
+    Row.fromSeqWithSchema(values, schema)
+
+  private def readStructType(node: JsonNode): StructType =
+    if node == null || !node.isObject then StructType.empty
+    else
+      val fieldsNode = node.get("fields")
+      val fields =
+        if fieldsNode != null && fieldsNode.isArray then
+          fieldsNode.asInstanceOf[ArrayNode].asScala.map(readStructField).toSeq
+        else Seq.empty
+      StructType(fields)
+
+  private def readStructField(node: JsonNode): StructField =
+    StructField(
+      name = readNullableString(node, "name"),
+      dataType = readDataType(node.get("type")),
+      nullable = readBoolean(node, "nullable", defaultValue = true),
+      metadata =
+        if node.has("metadata") && !node.get("metadata").isNull then
+          Metadata.fromJson(node.get("metadata").toString)
+        else Metadata.empty
+    )
+
+  private def readBoolean(node: JsonNode, field: String, defaultValue: Boolean): Boolean =
+    val v = node.get(field)
+    if v == null || v.isNull then defaultValue else v.asBoolean(defaultValue)
+
+  private def readDataType(node: JsonNode): DataType =
+    if node == null || node.isNull then UnparsedDataType("null")
+    else if node.isTextual then dataTypeFromName(node.asText)
+    else if node.isObject then
+      val typeNode = node.get("type")
+      if typeNode == null || typeNode.isNull then UnparsedDataType(node.toString)
+      else if typeNode.asText == "struct" then readStructType(node)
+      else dataTypeFromName(typeNode.asText)
+    else dataTypeFromName(node.asText)
+
+  private def dataTypeFromName(typeName: String): DataType =
+    val normalized = typeName.toLowerCase(java.util.Locale.ROOT)
+    simpleTypes.getOrElse(
+      normalized,
+      if normalized.startsWith("decimal(") then
+        val parts = normalized.stripPrefix("decimal(").stripSuffix(")").split(",").map(_.trim)
+        if parts.length == 2 then DecimalType(parts(0).toInt, parts(1).toInt)
+        else DecimalType.DEFAULT
+      else UnparsedDataType(normalized)
+    )
+
+  private def readValue(node: JsonNode, dataType: DataType): Any =
+    if node == null || node.isNull then null
+    else
+      dataType match
+        case BooleanType      => node.asBoolean()
+        case ByteType         => node.asInt().toByte
+        case ShortType        => node.asInt().toShort
+        case IntegerType      => node.asInt()
+        case LongType         => node.asLong()
+        case FloatType        => node.floatValue()
+        case DoubleType       => node.asDouble()
+        case StringType       => node.asText()
+        case BinaryType       => node.binaryValue()
+        case DateType         => java.sql.Date.valueOf(node.asText())
+        case TimestampType    => java.sql.Timestamp.from(java.time.Instant.parse(node.asText()))
+        case TimestampNTZType => java.time.LocalDateTime.parse(node.asText())
+        case _: DecimalType   => node.decimalValue()
+        case structType: StructType =>
+          val values =
+            if node.isArray then
+              node.asInstanceOf[ArrayNode].asScala.zip(structType.fields).map { (value, field) =>
+                readValue(value, field.dataType)
+              }.toSeq
+            else structType.fields.map(field => readValue(node.get(field.name), field.dataType))
+          Row.fromSeqWithSchema(values, structType)
+        case _ if node.isNumber  => node.numberValue()
+        case _ if node.isBoolean => node.asBoolean()
+        case _ if node.isTextual => node.asText()
+        case _                   => node.toString
+
   /** Server returns startOffset/endOffset as raw JSON values (object/string/null). Our typed field
     * is `String`; preserve the JSON literal for non-string nodes so callers can re-parse.
     */
@@ -245,6 +367,17 @@ object StreamingQueryProgress:
     if map != null && !map.isEmpty then
       val sub = node.putObject(field)
       map.asScala.toSeq.sortBy(_._1).foreach { case (k, v) => sub.put(k, v) }
+
+  private[streaming] def putObservedMetrics(
+      node: ObjectNode,
+      metrics: ju.Map[String, Row]
+  ): Unit =
+    if metrics != null && !metrics.isEmpty then
+      val sub = node.putObject("observedMetrics")
+      metrics.asScala.toSeq.sortBy(_._1).foreach { case (name, row) =>
+        try sub.set[JsonNode](name, mapper.readTree(row.json))
+        catch case _: UnsupportedOperationException => sub.put(name, row.toString)
+      }
 
 end StreamingQueryProgress
 

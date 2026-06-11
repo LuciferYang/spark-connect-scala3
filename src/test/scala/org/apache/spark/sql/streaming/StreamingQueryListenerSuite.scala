@@ -120,7 +120,17 @@ class StreamingQueryListenerSuite extends AnyFunSuite with Matchers:
     val event = QueryProgressEvent(progressJson)
 
     event.progressJson shouldBe progressJson
+    event.progress.batchId shouldBe 1L
     event.json should include(progressJson)
+  }
+
+  test("QueryProgressEvent stores parsed progress") {
+    val progress = StreamingQueryProgress.fromJson("""{"batchId":2,"batchDuration":20}""")
+    val event = QueryProgressEvent(progress)
+
+    (event.progress eq progress) shouldBe true
+    event.progressJson shouldBe progress.json
+    event.json shouldBe s"""{"progress":${progress.json}}"""
   }
 
   // ---------------------------------------------------------------------------
@@ -483,9 +493,20 @@ class StreamingQueryListenerSuite extends AnyFunSuite with Matchers:
   // ---------------------------------------------------------------------------
 
   test("QueryProgressEvent.fromJson stores the raw JSON") {
-    val rawJson = """{"batchId":5,"numInputRows":200,"inputRowsPerSecond":100.0}"""
+    val rawJson = """{ "batchId" : 5, "numInputRows" : 200, "inputRowsPerSecond" : 100.0 }"""
     val event = QueryProgressEvent.fromJson(rawJson)
     event.progressJson shouldBe rawJson
+    event.progress.batchId shouldBe 5L
+  }
+
+  test("QueryProgressEvent.fromJson parses upstream progress wrapper") {
+    val json =
+      """{"progress":{"batchId":5,"batchDuration":10,"numInputRows":200,
+        |"inputRowsPerSecond":100.0,"sources":[]}}""".stripMargin
+    val event = QueryProgressEvent.fromJson(json)
+    event.progress.batchId shouldBe 5L
+    event.progress.batchDuration shouldBe 10L
+    event.progress.numInputRows shouldBe 0L
   }
 
   test("QueryProgressEvent json wraps in progress key") {

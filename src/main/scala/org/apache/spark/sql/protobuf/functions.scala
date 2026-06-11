@@ -20,6 +20,14 @@ object functions:
   def from_protobuf(
       data: Column,
       messageName: String,
+      descFilePath: String,
+      options: Map[String, String]
+  ): Column =
+    from_protobuf(data, messageName, descFilePath, options.asJava)
+
+  def from_protobuf(
+      data: Column,
+      messageName: String,
       binaryFileDescriptorSet: Array[Byte],
       options: java.util.Map[String, String]
   ): Column =
@@ -30,6 +38,14 @@ object functions:
       sqlFunctions.lit(binaryFileDescriptorSet),
       optionsMapColumn(options.asScala.toMap)
     )
+
+  def from_protobuf(
+      data: Column,
+      messageName: String,
+      binaryFileDescriptorSet: Array[Byte],
+      options: Map[String, String]
+  ): Column =
+    from_protobuf(data, messageName, binaryFileDescriptorSet, options.asJava)
 
   def from_protobuf(data: Column, messageName: String, descFilePath: String): Column =
     from_protobuf(data, messageName, ProtobufUtils.readDescriptorFileContent(descFilePath))
@@ -61,6 +77,13 @@ object functions:
       optionsMapColumn(options.asScala.toMap)
     )
 
+  def from_protobuf(
+      data: Column,
+      messageClassName: String,
+      options: Map[String, String]
+  ): Column =
+    from_protobuf(data, messageClassName, options.asJava)
+
   def to_protobuf(data: Column, messageName: String, descFilePath: String): Column =
     to_protobuf(data, messageName, descFilePath, Map.empty[String, String].asJava)
 
@@ -83,6 +106,14 @@ object functions:
   def to_protobuf(
       data: Column,
       messageName: String,
+      descFilePath: String,
+      options: Map[String, String]
+  ): Column =
+    to_protobuf(data, messageName, descFilePath, options.asJava)
+
+  def to_protobuf(
+      data: Column,
+      messageName: String,
       binaryFileDescriptorSet: Array[Byte],
       options: java.util.Map[String, String]
   ): Column =
@@ -93,6 +124,14 @@ object functions:
       sqlFunctions.lit(binaryFileDescriptorSet),
       optionsMapColumn(options.asScala.toMap)
     )
+
+  def to_protobuf(
+      data: Column,
+      messageName: String,
+      binaryFileDescriptorSet: Array[Byte],
+      options: Map[String, String]
+  ): Column =
+    to_protobuf(data, messageName, binaryFileDescriptorSet, options.asJava)
 
   def to_protobuf(data: Column, messageClassName: String): Column =
     callFn("to_protobuf", data, sqlFunctions.lit(messageClassName))
@@ -108,6 +147,13 @@ object functions:
       sqlFunctions.lit(messageClassName),
       optionsMapColumn(options.asScala.toMap)
     )
+
+  def to_protobuf(
+      data: Column,
+      messageClassName: String,
+      options: Map[String, String]
+  ): Column =
+    to_protobuf(data, messageClassName, options.asJava)
 
   private def optionsMapColumn(options: Map[String, String]): Column =
     val entries =

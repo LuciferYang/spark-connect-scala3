@@ -7,7 +7,7 @@ import org.apache.spark.connect.proto.{
   DataType as ProtoDataType
 }
 import org.apache.spark.sql.connect.client.DataTypeProtoConverter
-import org.apache.spark.sql.types.Metadata
+import org.apache.spark.sql.types.*
 
 /** A column expression in a DataFrame.
   *
@@ -522,6 +522,31 @@ object Column:
           Expression.Literal.newBuilder().setBinary(ByteString.copyFrom(v)).build()
         case v => Expression.Literal.newBuilder().setString(v.toString).build()
       Column(Expression.newBuilder().setLiteral(literal).build())
+
+/** A convenient column-name subtype used for constructing schema fields. */
+class ColumnName(name: String) extends Column(name):
+
+  def boolean: StructField = StructField(name, BooleanType)
+  def byte: StructField = StructField(name, ByteType)
+  def short: StructField = StructField(name, ShortType)
+  def int: StructField = StructField(name, IntegerType)
+  def long: StructField = StructField(name, LongType)
+  def float: StructField = StructField(name, FloatType)
+  def double: StructField = StructField(name, DoubleType)
+  def string: StructField = StructField(name, StringType)
+  def date: StructField = StructField(name, DateType)
+  def decimal: StructField = StructField(name, DecimalType.DEFAULT)
+  def decimal(precision: Int, scale: Int): StructField =
+    StructField(name, DecimalType(precision, scale))
+  def timestamp: StructField = StructField(name, TimestampType)
+  def binary: StructField = StructField(name, BinaryType)
+  def array(dataType: DataType): StructField =
+    StructField(name, ArrayType(dataType, containsNull = true))
+  def map(keyType: DataType, valueType: DataType): StructField =
+    map(MapType(keyType, valueType, valueContainsNull = true))
+  def map(mapType: MapType): StructField = StructField(name, mapType)
+  def struct(fields: StructField*): StructField = struct(StructType(fields))
+  def struct(structType: StructType): StructField = StructField(name, structType)
 
 /** WindowSpec with partition, order, and frame specifications. */
 final class WindowSpec private[sql] (
