@@ -1,5 +1,9 @@
 package org.apache.spark.sql
 
+import java.util.concurrent.TimeUnit
+
+import scala.concurrent.duration.*
+
 import org.apache.spark.connect.proto.*
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders
 import org.apache.spark.sql.execution.streaming.{ProcessingTimeTrigger, RealTimeTrigger}
@@ -386,6 +390,32 @@ class DataStreamWriterSuite extends AnyFunSuite with Matchers:
     Trigger.processingTime("2 seconds").intervalMs shouldBe 2000
     Trigger.continuous("1 second").intervalMs shouldBe 1000
     Trigger.realTime("3 seconds").batchDurationMs shouldBe 3000
+  }
+
+  test("root Trigger facade covers overloads and extractors") {
+    Trigger.ProcessingTime(250L).intervalMs shouldBe 250
+    Trigger.ProcessingTime(2L, TimeUnit.SECONDS).intervalMs shouldBe 2000
+    Trigger.ProcessingTime(3.seconds).intervalMs shouldBe 3000
+    Trigger.processingTime(4L, TimeUnit.SECONDS).intervalMs shouldBe 4000
+    Trigger.processingTime(5.seconds).intervalMs shouldBe 5000
+
+    Trigger.Continuous(125L).intervalMs shouldBe 125
+    Trigger.Continuous(2L, TimeUnit.SECONDS).intervalMs shouldBe 2000
+    Trigger.Continuous(3.seconds).intervalMs shouldBe 3000
+    Trigger.continuous(4L, TimeUnit.SECONDS).intervalMs shouldBe 4000
+    Trigger.continuous(5.seconds).intervalMs shouldBe 5000
+
+    Trigger.RealTime().batchDurationMs shouldBe 300000
+    Trigger.RealTime(250L).batchDurationMs shouldBe 250
+    Trigger.RealTime(2L, TimeUnit.SECONDS).batchDurationMs shouldBe 2000
+    Trigger.RealTime(3.seconds).batchDurationMs shouldBe 3000
+    Trigger.realTime().batchDurationMs shouldBe 300000
+    Trigger.realTime(4L, TimeUnit.SECONDS).batchDurationMs shouldBe 4000
+    Trigger.realTime(5.seconds).batchDurationMs shouldBe 5000
+
+    Trigger.ProcessingTime.unapply(Trigger.ProcessingTime("6 seconds")) shouldBe Some(6000)
+    Trigger.Continuous.unapply(Trigger.Continuous("7 seconds")) shouldBe Some(7000)
+    Trigger.RealTime.unapply(Trigger.RealTime("8 seconds")) shouldBe Some(8000)
   }
 
   test("Trigger.Continuous stores interval") {
