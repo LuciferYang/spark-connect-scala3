@@ -4,16 +4,12 @@ A lightweight [Apache Spark Connect](https://spark.apache.org/docs/latest/spark-
 
 ## Motivation
 
-Apache Spark is built on Scala 2.13. A full cross-build to Scala 3 would touch hundreds of files and take 12–18 months of effort (see the [cross-build analysis](https://github.com/LuciferYang/spark-connect-scala3/issues/1) for details). Spark Connect changes the equation: the client communicates with the server purely through protobuf over gRPC, so it can be written in any language — including Scala 3 — with zero dependency on Spark internals.
-
-This project provides that Scala 3 client.
+Apache Spark is built on Scala 2.13, and a full cross-build to Scala 3 was estimated at 12–18 months (see the [cross-build analysis](https://github.com/LuciferYang/spark-connect-scala3/issues/1)). Spark Connect changes the equation: the client talks to the server purely through protobuf over gRPC, so it can be written in any language — including Scala 3 — with zero dependency on Spark internals. This project provides that client.
 
 ## Features
 
-Full Spark Connect client API for Scala 3, including:
-
 - **Core** — SparkSession, DataFrame, Dataset[T], Column, Row with compile-time Encoder derivation
-- **SQL Functions** — 542 built-in functions (100% coverage of the official Spark 4.1 API)
+- **SQL Functions** — 542 built-in functions (100% of the Spark 4.1 API)
 - **I/O** — Reader/Writer for Parquet, JSON, CSV, ORC, JDBC; V2 writes; MergeInto; streaming
 - **Typed Operations** — TypedColumn, Aggregator, UDF/UDAF (0–10 args), KeyValueGroupedDataset
 - **Streaming** — Structured Streaming with stateful operations (`transformWithState`, `flatMapGroupsWithState`), listener bus
@@ -27,45 +23,6 @@ Full Spark Connect client API for Scala 3, including:
 | Spark 4.1.x | Supported |
 | Spark 4.0.x | **Not supported** — incompatible `AgnosticEncoders` serialVersionUID, missing `SubqueryExpression` / `CloneSession` proto/RPC |
 
-## Known Limitations
-
-### Typed Lambdas Referencing User Case Class Fields
-
-Spark 4.0/4.1 servers are built with Scala 2.13. When a Scala 3 typed‑Dataset lambda directly references a user‑defined case class field (e.g., `_.name` on a `Dataset[Person]`), the Scala 3‑emitted lambda bytecode invokes `Person.name()` in a way the Scala 2.13 server cannot link, even when `Person` is uploaded via `addClassDir`. The error surfaces as `INTERNAL_ERROR: Failed to unpack scala udf`.
-
-**Affected APIs** when the input type is a user‑defined case class:
-
-| Category | Operations |
-|----------|-----------|
-| Dataset typed transforms | `map`, `flatMap`, `mapPartitions`, `filter`, `reduce`, `foreach`, `foreachPartition` |
-| KeyValueGroupedDataset | `reduceGroups` (via ReduceAggregator), `mapValues` (user lambda), `agg(TypedColumn)` (user lambda in aggregator) |
-| Streaming | `foreachBatch` (also has a server‑side `classic.Dataset` vs SC3 `DataFrame` cast issue) |
-
-**Unaffected operations** — these work correctly:
-
-| Category | Operations |
-|----------|-----------|
-| Primitive‑typed Datasets | `Dataset[Int]/[String]/...` `map`, `filter`, `flatMap`, etc. |
-| KeyValueGroupedDataset (adaptor‑wrapped) | `groupByKey`, `keys`, `count`, `mapGroups`, `flatMapGroups`, `flatMapSortedGroups`, `cogroup`, `keyAs` |
-| DataFrame transforms | `select`, `filter(Column)`, `where`, `join`, `joinWith`, `groupBy`, `agg`, `orderBy`, `withColumn`, `drop`, `union`, `distinct`, etc. |
-| DataFrame actions | `collect`, `count`, `show`, `first`, `head`, `take`, `toJSON`, `toLocalIterator`, etc. |
-| SQL | `spark.sql(...)` |
-| UDF/UDAF | `udf.register(...)` and `Aggregator` — these serialize via Java `ObjectOutputStream` and only ship column‑level lambdas |
-| Streaming | `readStream`, `writeStream` (trigger, outputMode, format, toTable), `StreamingQuery` lifecycle |
-| Catalog | All catalog operations |
-
-**Workaround:** Use Column‑expression APIs and column‑level UDFs instead of typed lambdas. For example, replace `ds.filter(_.age > 28)` with `df.filter(col("age") > 28)`, or extract the field into a column first and apply a `udf((name: String) => …)`.
-
-**Integration test status:** ~5 tests are `cancel`ed (not failed) for this limitation. They will start passing once a Scala 3‑native Spark Connect server is available.
-
-### Server-Side Hang on `interruptOperation` with Non-Existent Operation ID
-
-The Spark 4.1.x Connect server hangs indefinitely when the client sends an `InterruptRequest` with `INTERRUPT_TYPE_OPERATION_ID` for a non-existent operation id (e.g., a fake UUID). The server appears to wait for the operation to appear rather than returning immediately with an empty list.
-
-`interruptAll()` and `interruptTag(tag)` are unaffected — they return immediately on idle sessions.
-
-**Workaround**: Only call `spark.interruptOperation(id)` with operation ids you have actually observed from the server (e.g., via `addTag` + `getTags`). The integration test for this case is `cancel`ed pending an upstream fix.
-
 ## Requirements
 
 | Component | Version |
@@ -77,44 +34,27 @@ The Spark 4.1.x Connect server hangs indefinitely when the client sends an `Inte
 
 ## Quick Start
 
-### 1. Start a Spark Connect server
+Start a Spark Connect server, then build the client:
 
 ```bash
-# Spark 4.1+
-$SPARK_HOME/sbin/start-connect-server.sh
-```
+$SPARK_HOME/sbin/start-connect-server.sh   # Spark 4.1+
 
-### 2. Clone and build
-
-```bash
 git clone https://github.com/LuciferYang/spark-connect-scala3.git
 cd spark-connect-scala3
 build/sbt compile
 ```
-
-### 3. Try it out
 
 ```scala
 import org.apache.spark.sql.{SparkSession, Row, functions as F}
 import org.apache.spark.sql.types.*
 
 val spark = SparkSession.builder()
-  .remote("sc://localhost:15002")  // or set SPARK_CONNECT_URL env var
+  .remote("sc://localhost:15002")  // or set SPARK_REMOTE
   .build()
 
-// SQL query
-spark.sql("SELECT 1 as one, 'hello' as greeting").show()
+// SQL + transformations
+spark.sql("SELECT 1 AS one, 'hello' AS greeting").show()
 
-// Range DataFrame
-spark.range(10).show()
-
-// Transformations: filter, select, withColumn
-spark.range(20)
-  .filter(F.col("id") > F.lit(10))
-  .withColumn("doubled", F.col("id") * F.lit(2))
-  .show()
-
-// Aggregation
 spark.range(100)
   .withColumn("group", F.col("id") % F.lit(5))
   .groupBy(F.col("group"))
@@ -122,77 +62,28 @@ spark.range(100)
   .orderBy(F.col("group"))
   .show()
 
-// createDataFrame with Arrow serialization
+// createDataFrame with an explicit schema (Arrow serialization)
 val schema = StructType(Seq(
   StructField("name", StringType),
-  StructField("age", IntegerType),
-  StructField("score", DoubleType)
+  StructField("age", IntegerType)
 ))
-val rows = Seq(Row("Alice", 30, 95.5), Row("Bob", 25, 88.0), Row("Carol", 35, 92.3))
-val df = spark.createDataFrame(rows, schema)
-df.show()
-df.printSchema()
-
-// Join
-val left = spark.sql("SELECT 1 as id, 'a' as val1 UNION ALL SELECT 2, 'b'")
-val right = spark.sql("SELECT 1 as id, 'x' as val2 UNION ALL SELECT 2, 'y'")
-left.join(right, Seq("id")).show()
-
-// Config
-println(spark.conf.get("spark.sql.shuffle.partitions"))
-
-// Temp View + Catalog
-spark.range(5).createOrReplaceTempView("my_range")
-spark.catalog.tableExists("my_range")  // true
-spark.sql("SELECT * FROM my_range").show()
-spark.catalog.dropTempView("my_range")
+spark.createDataFrame(Seq(Row("Alice", 30), Row("Bob", 25)), schema).show()
 
 spark.stop()
 ```
 
-### 4. Launch the Scala 3 REPL
+### Build, test, and run
 
 ```bash
-# Connect to default server (localhost:15002)
-build/sbt run
-
-# Connect to a specific server
-build/sbt "run --remote sc://myhost:15002"
-
-# Or use the SPARK_REMOTE environment variable
-SPARK_REMOTE=sc://myhost:15002 build/sbt run
+build/sbt run                         # launch the Ammonite REPL (spark pre-bound)
+build/sbt "run --remote sc://host:15002"   # or set SPARK_REMOTE=sc://host:15002
+build/sbt test                        # unit tests
+build/sbt 'set Test / testOptions := Seq()' 'testOnly *IntegrationSuite'   # integration tests (live server)
 ```
 
-Once the REPL starts, `spark` is available as a pre-bound `SparkSession`:
+Integration tests that send Scala 3 lambdas to a Scala 2.13 server are **canceled** (not failed) — see [Known Limitations](#known-limitations).
 
-```scala
-scala> spark.sql("SELECT 1 + 1 AS result").show()
-+------+
-|result|
-+------+
-|     2|
-+------+
-
-scala> import org.apache.spark.sql.functions.*
-scala> spark.range(10).select(col("id"), (col("id") * 2).as("doubled")).show()
-```
-
-### 5. Run unit tests
-
-```bash
-build/sbt test
-```
-
-### 6. Run integration tests (requires a running Spark Connect server)
-
-```bash
-# Override the tag exclusion and run only integration suites
-build/sbt 'set Test / testOptions := Seq()' 'testOnly *IntegrationSuite'
-```
-
-> **Note**: Tests that send Scala 3 lambdas to a Scala 2.13 server will be **canceled** (not failed) with the message _"Scala 3 lambda serialization incompatible with Scala 2.13 server"_. See [Known Limitations](#scala-3-lambda-serialization-on-scala-213-spark-server) for details.
-
-### 7. Use in your own project
+### Use as a dependency
 
 ```scala
 // build.sbt
@@ -208,259 +99,87 @@ libraryDependencies += "io.github.luciferyang" %% "spark-connect-spark41" % "0.7
 </dependency>
 ```
 
-```scala
-import org.apache.spark.sql.{SparkSession, functions as F}
+## How It Works
 
-val spark = SparkSession.builder()
-  .remote("sc://localhost:15002")
-  .build()
-
-spark.sql("SELECT * FROM my_table")
-  .filter(F.col("age") > F.lit(18))
-  .groupBy(F.col("city"))
-  .count()
-  .show()
-
-spark.stop()
 ```
+┌──────────────────────┐          gRPC / Protobuf          ┌─────────────────────┐
+│  Scala 3 Client      │ ──────────────────────────────▶   │  Spark Connect      │
+│  SparkSession        │                                    │  Server (4.1+)      │
+│  DataFrame           │          Arrow IPC                 │  Spark SQL Engine   │
+│  Column / functions  │ ◀──────────────────────────────── │  Catalyst Optimizer │
+└──────────────────────┘                                    └─────────────────────┘
+```
+
+1. **Transformations** (select, filter, join, …) build a protobuf `Relation` tree on the client — no server calls.
+2. **Actions** (collect, show, count, …) serialize the tree into a `Plan` and send it via `ExecutePlan` gRPC.
+3. The server optimizes and executes the plan, streaming results back as **Arrow IPC** batches.
+4. The client deserializes Arrow batches into `Row` objects.
 
 ## Project Structure
 
 ```
 src/
 ├── main/
-│   ├── protobuf/spark/connect/         # Proto definitions (from upstream master)
-│   │   ├── base.proto
-│   │   ├── relations.proto
-│   │   ├── expressions.proto
-│   │   ├── commands.proto
-│   │   ├── types.proto
-│   │   └── ...
+│   ├── protobuf/                   # Spark Connect proto (from the spark-upstream submodule)
+│   ├── java/                       # UDF interfaces, Java function shims, serialization proxies
 │   └── scala/org/apache/spark/sql/
-│       ├── SparkSession.scala           # Entry point + Builder
-│       ├── DataFrame.scala              # Transformations + Actions
-│       ├── Dataset.scala                # Typed Dataset[T]
-│       ├── Column.scala                 # Expression tree builder
-│       ├── TypedColumn.scala            # Column + Encoder for type-safe aggregation
-│       ├── TableValuedFunction.scala    # Table-valued functions (explode, inline, etc.)
-│       ├── functions.scala              # 542 built-in SQL functions (100% coverage)
-│       ├── Row.scala                    # Row with typed accessors
-│       ├── Encoder.scala                # Compile-time encoder derivation
-│       ├── Encoders.scala               # Encoder factory (for UDAF bufferEncoder/outputEncoder)
-│       ├── GroupedDataFrame.scala        # groupBy / rollup / cube / pivot
-│       ├── DataFrameReader.scala        # Batch read
-│       ├── DataFrameWriter.scala        # Batch write
-│       ├── DataFrameWriterV2.scala      # V2 table writes (create/append/overwrite)
-│       ├── MergeIntoWriter.scala        # MERGE INTO support
-│       ├── DataStreamReader.scala       # Streaming read
-│       ├── DataStreamWriter.scala       # Streaming write + Trigger + foreachBatch/foreach
-│       ├── StreamingQuery.scala         # Query lifecycle management
-│       ├── StreamingQueryManager.scala  # Active query manager
-│       ├── ForeachWriter.scala          # Streaming foreach writer abstract class
-│       ├── Catalog.scala                # Database/table/function catalog
-│       ├── UserDefinedFunction.scala    # UDF + UDAF support
-│       ├── UDFRegistration.scala        # UDF registration
-│       ├── DataFrameNaFunctions.scala   # Null handling
-│       ├── DataFrameStatFunctions.scala # Statistical functions
-│       ├── StorageLevel.scala           # Cache storage levels
-│       ├── ArrowSerializer.scala        # Row → Arrow IPC encoding
-│       ├── KeyValueGroupedDataset.scala # Typed grouped + stateful streaming ops
-│       ├── implicits.scala              # Implicit conversions
-│       ├── SparkException.scala         # Spark exception hierarchy
-│       ├── Artifact.scala               # Artifact management
-│       ├── streaming/                   # Stateful streaming types
-│       │   ├── OutputMode.scala         # Append / Update / Complete
-│       │   ├── GroupStateTimeout.scala  # NoTimeout / ProcessingTime / EventTime
-│       │   ├── TimeMode.scala           # None / ProcessingTime / EventTime
-│       │   ├── GroupState.scala         # Managed state trait stub
-│       │   ├── StatefulProcessor.scala  # StatefulProcessor + WithInitialState
-│       │   ├── StatefulProcessorHandle.scala  # State handle trait stub
-│       │   ├── StateVariables.scala     # ValueState / ListState / MapState stubs
-│       │   ├── TimerValues.scala        # Timer values trait stub
-│       │   ├── ExpiredTimerInfo.scala   # Expired timer info trait stub
-│       │   ├── TTLConfig.scala          # TTL configuration
-│       │   └── QueryInfo.scala          # Query info trait stub
-│       ├── expressions/
-│       │   ├── Aggregator.scala         # UDAF Aggregator abstract class
-│       │   ├── ReduceAggregator.scala   # Server-side reduce aggregator
-│       │   └── scalalang/
-│       │       └── typed.scala          # Typed aggregation functions (avg, sum, etc.)
-│       ├── internal/
-│       │   └── TypedAggregators.scala   # TypedAverage, TypedCount, TypedSumDouble, TypedSumLong
-│       ├── types/DataType.scala         # Spark SQL type system
-│       ├── catalyst/encoders/
-│       │   └── AgnosticEncoder.scala    # Agnostic encoder definitions
-│       ├── connect/client/
-│       │   ├── SparkConnectClient.scala    # gRPC client
-│       │   ├── SparkConnectClientParser.scala # CLI argument parser for REPL
-│       │   ├── AmmoniteClassFinder.scala    # Ammonite REPL class discovery
-│       │   ├── ArrowDeserializer.scala     # Arrow IPC → Row decoding
-│       │   ├── DataTypeProtoConverter.scala # Proto ↔ DataType
-│       │   ├── ArtifactManager.scala       # Artifact upload/management
-│       │   ├── RetryPolicy.scala           # Retry policy definitions
-│       │   ├── GrpcRetryHandler.scala      # gRPC retry logic + RetryException
-│       │   ├── GrpcExceptionConverter.scala # gRPC → Spark exceptions
-│       │   ├── ResponseValidator.scala     # Server-side session ID tracking
-│       │   └── ExecutePlanResponseReattachableIterator.scala # Reattachable execution
-│       ├── connect/common/
-│       │   ├── UdfPacket.scala             # UDF serialization
-│       │   ├── UdfAdaptors.scala           # Top-level adaptor classes for Scala 3→2.13 lambda stability
-│       │   └── ForeachWriterPacket.scala   # ForeachWriter serialization
-│       ├── connect/
-│       │   └── SessionCleaner.scala        # GC-based CachedRemoteRelation cleanup
-│       └── application/
-│           └── ConnectRepl.scala           # Ammonite-based Scala 3 REPL
-└── test/
-    └── scala/org/apache/spark/sql/
-        ├── ColumnSuite.scala
-        ├── FunctionsSuite.scala
-        ├── WindowSuite.scala
-        ├── RowSuite.scala
-        ├── EncoderSuite.scala
-        ├── StorageLevelSuite.scala
-        ├── DataStreamReaderSuite.scala
-        ├── DataStreamWriterSuite.scala
-        ├── DataStreamWriterForeachSuite.scala
-        ├── StreamingQuerySuite.scala
-        ├── StreamingQueryManagerSuite.scala
-        ├── StreamingTypesSuite.scala
-        ├── DataFrameStatFunctionsSuite.scala
-        ├── DataFrameSuite.scala
-        ├── DataFrameWriterV2Suite.scala
-        ├── MergeIntoWriterSuite.scala
-        ├── UserDefinedFunctionSuite.scala
-        ├── CatalogSuite.scala
-        ├── TypedOpsSuite.scala
-        ├── SparkSessionSuite.scala
-        ├── SubquerySuite.scala
-        ├── ExpandedEncoderSuite.scala
-        ├── ImplicitsSuite.scala
-        ├── KeyValueGroupedDatasetStatefulSuite.scala
-        ├── IntegrationSuite.scala       # Requires running server
-        ├── expressions/
-        │   ├── AggregatorSuite.scala    # UDAF unit tests
-        │   └── scalalang/
-        │       └── TypedSuite.scala     # typed.avg/count/sum/sumLong tests
-        ├── TypedColumnSuite.scala
-        ├── TableValuedFunctionSuite.scala
-        ├── connect/client/
-        │   ├── SparkConnectClientParserSuite.scala
-        │   ├── DataTypeProtoConverterSuite.scala
-        │   ├── GrpcExceptionConverterSuite.scala
-        │   ├── RetryPolicySuite.scala
-        │   ├── ResponseValidatorSuite.scala
-        │   ├── ReattachableIteratorSuite.scala
-        │   └── PlanCompressionSuite.scala
-        ├── connect/
-        │   └── SessionCleanerSuite.scala
-        └── types/
-            └── DataTypeSuite.scala
-        application/
-            └── ConnectReplSuite.scala
+│       ├── *.scala                 # Public API: SparkSession, DataFrame, Dataset, Column, functions, Row, …
+│       ├── connect/client/         # gRPC client, Arrow (de)serialization, retries, reattachable execution
+│       ├── connect/common/         # UDF packets, closure cleaning, lambda adaptors
+│       ├── catalyst/encoders/      # AgnosticEncoder model
+│       ├── streaming/              # Structured Streaming types
+│       ├── expressions/            # Aggregator / typed aggregation
+│       ├── types/                  # SQL type system
+│       └── application/            # Ammonite-based REPL
+└── test/                           # Unit suites + @IntegrationTest suites (require a live server)
 ```
-
-## How It Works
-
-```
-┌──────────────────────┐          gRPC / Protobuf          ┌─────────────────────┐
-│  Scala 3 Client      │ ──────────────────────────────▶   │  Spark Connect      │
-│                      │                                    │  Server (4.1+)      │
-│  SparkSession        │          Arrow IPC                 │                     │
-│  DataFrame           │ ◀──────────────────────────────── │  Spark SQL Engine   │
-│  Column / functions  │                                    │  Catalyst Optimizer │
-└──────────────────────┘                                    └─────────────────────┘
-```
-
-1. **Transformations** (select, filter, join, ...) build a protobuf `Relation` tree on the client — no server calls.
-2. **Actions** (collect, show, count, ...) serialize the tree into a `Plan` and send it to the server via `ExecutePlan` gRPC.
-3. The server optimizes and executes the plan, streaming results back as **Arrow IPC** batches.
-4. The client deserializes Arrow batches into `Row` objects.
-
-## Memory & Resource Limits
-
-The Arrow allocators in [`ArrowSerializer`](src/main/scala/org/apache/spark/sql/ArrowSerializer.scala) and [`ArrowDeserializer`](src/main/scala/org/apache/spark/sql/connect/client/ArrowDeserializer.scala) share a 256 GB reservation cap (`MaxAllocatorBytes`). The cap is a ceiling on what the allocator may request, not a commitment — actual off-heap usage scales with in-flight batch size.
-
-- **Cap ≠ heap.** Arrow buffers are off-heap; `-Xmx` and the container memory limit still gate real usage.
-- **Small containers (<2 GB).** A large or malformed batch can OOM the process well before the 256 GB cap; the cap is not a safety net.
-- **Customizing.** The constant is `private` — fork it or file an issue to make it configurable.
 
 ## Key Dependencies
 
 | Library | Purpose |
 |---------|---------|
-| [gRPC-Java](https://grpc.io/) | Transport layer for Spark Connect protocol |
-| [Protobuf-Java](https://protobuf.dev/) | Java protobuf code generation for proto definitions |
-| [Apache Arrow](https://arrow.apache.org/) | Data serialization/deserialization (IPC format) |
+| [gRPC-Java](https://grpc.io/) | Transport for the Spark Connect protocol |
+| [Protobuf-Java](https://protobuf.dev/) | Proto code generation |
+| [Apache Arrow](https://arrow.apache.org/) | Data serialization (IPC format) |
 | [Ammonite](https://ammonite.io/) | Interactive Scala 3 REPL |
 | [ScalaTest](https://www.scalatest.org/) | Unit and integration testing |
 
 ## Supported API
 
-### SparkSession
-`sql`, `sql(query, args)` (parameterized), `table`, `range` (2/3/4-param), `emptyDataFrame`, `emptyDataset[T]`, `createDataFrame`, `createDataset`, `read`, `readStream`, `streams`, `catalog`, `conf`, `udf`, `tvf`, `newSession`, `cloneSession`, `version`, `time[T]`, `addTag`, `removeTag`, `getTags`, `clearTags`, `interruptAll`, `interruptTag`, `interruptOperation`, `executeCommand`, `stop`, `getActiveSession`, `getDefaultSession`, `active`, `setActiveSession`, `clearActiveSession`, `setDefaultSession`, `clearDefaultSession`, `Builder.config(Boolean/Long/Double)`
+| Area | Coverage |
+|------|----------|
+| **SparkSession** | `sql` (incl. parameterized), `table`, `range`, `createDataFrame`/`createDataset`, `read`/`readStream`, `catalog`, `conf`, `udf`, `tvf`, session lifecycle (`newSession`, `cloneSession`, active/default), tags & interruption, `executeCommand` |
+| **DataFrame** | Full transformation surface (`select`, `filter`, `join`, `groupBy`/`rollup`/`cube`, `agg`, `window`, `union`/`intersect`/`except`, `repartition`, …) and actions (`collect`, `show`, `count`, `head`/`take`, `toJSON`, `write`, `createTempView`, …) |
+| **Dataset[T]** | Typed `map`/`flatMap`/`filter`/`reduce`, `groupByKey`, `joinWith`, `select(TypedColumn)` — subject to the [lambda limitation](#known-limitations) |
+| **Column** | Full operator and expression surface (comparison, boolean, arithmetic, `isin`, `between`, `cast`, `when`/`otherwise`, `over`, struct ops, …) |
+| **Catalog** | Full coverage — all 37 proto RPCs (databases, tables, functions, caching, partitions) |
+| **Functions** | 542 built-ins, 100% of the Spark 4.1 API — see [`functions.scala`](src/main/scala/org/apache/spark/sql/functions.scala) |
+| **Streaming** | `readStream`/`writeStream`, triggers, `foreachBatch`/`foreach`, stateful ops (`mapGroupsWithState`, `flatMapGroupsWithState`, `transformWithState`), listeners |
 
-### DataFrame Transformations
-`select`, `selectExpr`, `filter`, `where`, `limit`, `offset`, `sort`, `orderBy`, `groupBy`, `rollup`, `cube`, `agg`, `join`, `crossJoin`, `lateralJoin`, `groupingSets`, `withColumn`, `withColumnRenamed`, `withMetadata`, `drop`, `distinct`, `dropDuplicates`, `dropDuplicatesWithinWatermark`, `union`, `unionAll`, `unionByName`, `intersect`, `intersectAll`, `except`, `exceptAll`, `repartition`, `repartitionByRange`, `coalesce`, `sample`, `describe`, `summary`, `alias`, `toDF`, `hint`, `broadcast`, `sortWithinPartitions`, `tail`, `transform`, `transpose`, `zipWithIndex`, `colRegex`, `metadataColumn`, `na`, `stat`, `cache`, `persist`, `unpersist`, `checkpoint`, `localCheckpoint`, `withWatermark`, `writeStream`
+## Known Limitations
 
-### DataFrame Actions
-`collect`, `collectAsList`, `count`, `first`, `head`, `take`, `takeAsList`, `show`, `show(vertical)`, `toJSON`, `printSchema`, `schema`, `columns`, `explain`, `isEmpty`, `isLocal`, `toLocalIterator`, `createTempView`, `createOrReplaceTempView`, `createGlobalTempView`, `write`
+### Typed lambdas referencing user case-class fields
 
-### Structured Streaming
-`readStream` (DataStreamReader), `writeStream` (DataStreamWriter), `StreamingQuery` (isActive, stop, awaitTermination, recentProgress, explain, exception), `StreamingQueryManager` (active, get, awaitAnyTermination, resetTerminated), `Trigger` (ProcessingTime, AvailableNow, Once, Continuous), `foreachBatch`, `foreach` (ForeachWriter), `mapGroupsWithState`, `flatMapGroupsWithState`, `transformWithState`
+Spark 4.0/4.1 servers run Scala 2.13 and cannot link lambda bytecode emitted by Scala 3 when it directly references a user-defined case-class field (e.g. `_.name` on a `Dataset[Person]`). The error surfaces as `INTERNAL_ERROR: Failed to unpack scala udf`.
 
-### Column Operators
-`===`, `=!=`, `>`, `>=`, `<`, `<=`, `&&`, `||`, `!`, `+`, `-`, `*`, `/`, `%`, `isNull`, `isNotNull`, `isNaN`, `contains`, `startsWith`, `endsWith`, `like`, `rlike`, `isin`, `isin(Dataset)`, `between`, `substr`, `cast`, `alias`, `as`, `asc`, `desc`, `over`, `when`, `otherwise`, `getItem`, `getField`, `withField`, `dropFields`
+| | Operations |
+|---|---|
+| **Affected** (input is a user case class) | `Dataset` typed transforms (`map`, `flatMap`, `filter`, `reduce`, `foreach`, …); `KeyValueGroupedDataset.{reduceGroups, mapValues, agg(TypedColumn)}` with user lambdas; streaming `foreachBatch` |
+| **Unaffected** | Primitive-typed `Dataset` transforms; adaptor-wrapped grouping (`groupByKey`, `mapGroups`, `cogroup`, …); all DataFrame/Column APIs; `spark.sql(...)`; UDF/UDAF (serialized via Java `ObjectOutputStream`); streaming lifecycle; all catalog ops |
 
-### Catalog
-`currentDatabase`, `setCurrentDatabase`, `currentCatalog`, `setCurrentCatalog`, `listDatabases`, `listTables`, `listColumns`, `listFunctions`, `listCatalogs`, `listCachedTables`, `listPartitions`, `listViews`, `getDatabase`, `getTable`, `getFunction`, `getTableProperties`, `getCreateTableString`, `catalogExists`, `databaseExists`, `tableExists`, `functionExists`, `isCached`, `cacheTable`, `uncacheTable`, `clearCache`, `createTable`, `createExternalTable`, `createDatabase`, `dropDatabase`, `dropTable`, `dropView`, `dropTempView`, `dropGlobalTempView`, `truncateTable`, `analyzeTable`, `refreshTable`, `refreshByPath`, `recoverPartitions`
+**Workaround:** prefer Column-expression APIs and column-level UDFs — e.g. replace `ds.filter(_.age > 28)` with `df.filter(col("age") > 28)`. The ~5 affected integration tests are `cancel`ed (not failed) and will pass once a Scala 3-native server exists.
 
-### Functions
-542 functions covering 100% of the official API: aggregates, math, string, date/time, null handling, conditional, collection, map, JSON, XML, URL, variant, regex, window, datasketch, geospatial, UDF, and UDAF — see [`functions.scala`](src/main/scala/org/apache/spark/sql/functions.scala) for the full list.
+### Server hang on `interruptOperation` with a non-existent operation id
 
-## Roadmap
+The Spark 4.1.x server hangs indefinitely on an `InterruptRequest` with `INTERRUPT_TYPE_OPERATION_ID` for an unknown id. Only call `spark.interruptOperation(id)` with ids you have actually observed from the server; `interruptAll()` and `interruptTag(tag)` are unaffected.
 
-- [x] SparkSession + gRPC client
-- [x] DataFrame / Dataset[T] API
-- [x] Column expressions + 542 built-in functions (100% coverage)
-- [x] DataFrameReader / Writer
-- [x] DataFrameWriterV2 / MergeIntoWriter
-- [x] Catalog API (full coverage — all 37 proto RPCs)
-- [x] Encoder derivation (Scala 3 `derives`)
-- [x] UDF support
-- [x] UDAF support (Aggregator + Encoders factory)
-- [x] Aggregator.toColumn / TypedColumn (type-safe aggregation)
-- [x] ReduceAggregator (server-side reduceGroups)
-- [x] TableValuedFunction (SparkSession.tvf)
-- [x] typed object (typed.avg, typed.sum, typed.count, typed.sumLong)
-- [x] KeyValueGroupedDataset.agg(TypedColumn) (1–4 typed columns)
-- [x] Structured Streaming
-- [x] `foreachBatch` / `foreach` (ForeachWriter)
-- [x] Stateful Streaming (`mapGroupsWithState` / `flatMapGroupsWithState` / `transformWithState`)
-- [x] Window functions
-- [x] Unit tests (2374 tests)
-- [x] Integration tests (Spark 4.1.2)
-- [x] Error handling (retry policies, gRPC exception conversion, reattachable execution, enriched error details via FetchErrorDetails RPC)
-- [x] Session management (ResponseValidator, SessionCleaner, checkpoint/localCheckpoint)
-- [x] Publish to Maven Central (0.1, 0.2)
-- [x] ConnectRepl (Ammonite-based Scala 3 REPL)
-- [x] Observation / CollectMetrics (`Dataset.observe()`)
-- [x] StreamingQueryListener
-- [x] SQLImplicits / DatasetHolder (`.toDS()`, `.toDF()` implicit conversions)
-- [x] Parameterized SQL (`sql(query, args: Map)` + `sql(query, args: Column*)`)
-- [x] `joinWith` (type-safe join returning `Dataset[(T, U)]`)
-- [x] `toLocalIterator` (lazy streaming iteration on DataFrame and Dataset)
-- [x] `newSession()` (independent session sharing same server endpoint)
-- [x] FetchErrorDetails RPC (enriched error details with exception chain and server stack traces)
-- [x] Operation Tags + Fine-grained Interruption (`addTag`/`removeTag`/`getTags`/`clearTags`/`interruptAll`/`interruptTag`/`interruptOperation`)
-- [x] `toJSON` / `show(vertical)` (server-side ShowString proto)
-- [x] `lateralJoin` / `groupingSets` / `repartitionByRange`
-- [x] Plan Compression (ZSTD with server-config-driven threshold)
-- [x] Phase 3 API Completeness: `cloneSession`, `range(numPartitions)`, `emptyDataset[T]`, typed `select(TypedColumn)` (1-5 arity), `dropDuplicatesWithinWatermark`, `collectAsList`/`takeAsList`, `withMetadata`, `colRegex`, `metadataColumn`, `transpose`, `zipWithIndex`, `isLocal`, static session management, `executeCommand`
-- [x] Scalar / Exists / IN Subqueries (`Dataset.scalar()`, `Dataset.exists()`, `Column.isin(Dataset)` via `SubqueryExpression` + `WithRelations`)
-- [x] Row typed getters (`getDecimal`, `getDate`, `getTimestamp`, `getInstant`, `getLocalDate`, `getSeq`, `getList`, `getMap`, `getJavaMap`, `getStruct`, `getAs(fieldName)`, `fieldIndex`, `anyNull`, `json`, `prettyJson`, `copy`), `Encoders.row`, `SparkSession.time`, `Builder.config(Boolean/Long/Double)`, `UDFRegistration.register` Function0–10 inline overloads, `Catalog.catalogExists`
-- [x] Upstream-contract alignment batch: typed `Catalog.{listDatabases,listTables,listFunctions,getDatabase,getTable,getFunction}` returns; typed `DataFrameWriterV2[T]` / `MergeIntoWriter[T]` / `DataStreamWriter[T]` (incl. `foreach` encoder propagation); typed `SparkSession.range` (`Dataset[java.lang.Long]`); `DataFrameReader.textFile` → `Dataset[String]` with schema rejection; `DataFrameReader.{json,csv,xml}(Dataset[String])` parse-from-Dataset overloads; `DataFrameReader.table` options propagation; `Encoders.row(schema: StructType)`; `Encoder` / `Dataset` / `Row` `extends Serializable`; `SparkSession.Builder.interceptor` (gRPC `ClientInterceptor`); `Observation.get` waits indefinitely + surfaces schema-less rows; `RuntimeConfig.get` throws `NoSuchElementException` for unset keys; `DataFrameWriter.insertInto` respects user `mode(...)`; `DataStreamWriter.outputMode(streaming.OutputMode)` lowercased on the wire; `DataFrame.union/unionAll/unionByName` default to `UNION ALL`; reattachable execution + `SESSION_CHANGED` propagation hardening; lambda-var collision fix in nested HOFs
+## Memory & Resource Limits
 
-See [docs/SC3-COMPLETE-API.md](docs/SC3-COMPLETE-API.md) for the full public API surface as a flat reference.
+The Arrow allocators in [`ArrowSerializer`](src/main/scala/org/apache/spark/sql/ArrowSerializer.scala) and [`ArrowDeserializer`](src/main/scala/org/apache/spark/sql/connect/client/ArrowDeserializer.scala) share a 256 GB reservation cap (`MaxAllocatorBytes`). The cap is a ceiling on what the allocator may request, not a commitment — Arrow buffers are off-heap, so `-Xmx` and the container memory limit still gate real usage, and a large or malformed batch can OOM a small container well before the cap. The constant is `private`; fork it or file an issue to make it configurable.
+
+## Status
+
+The client implements the full Spark Connect 4.1 API surface: SparkSession, DataFrame/Dataset[T], 542 functions (100% coverage), readers/writers (incl. V2 + MergeInto), the full Catalog (all 37 proto RPCs), Structured Streaming with stateful operations, subqueries, plan compression, operation tags, and an Ammonite REPL. It is covered by ~2,374 unit tests and 454 integration tests against Spark 4.1.2, and is published to Maven Central.
 
 ## License
 
