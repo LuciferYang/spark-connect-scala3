@@ -367,9 +367,10 @@ final class DataFrame private[sql] (
       .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
       .setTail(Tail.newBuilder().setInput(relation).setLimit(n).build())
       .build()
-    val (rows, observed) = executeAndCollect(tailRel)
+    val (rows, arrowSchema, observed) = executeAndCollect(tailRel)
     if observed.nonEmpty then session.processObservedMetrics(observed)
-    applyPostConversions(rows, schema)
+    if rows.isEmpty then rows
+    else applyPostConversions(rows, postConversionSchema(arrowSchema))
 
   /** Pipeline-style transformation. */
   def transform(f: DataFrame => DataFrame): DataFrame = f(this)
@@ -703,9 +704,11 @@ final class DataFrame private[sql] (
   // ---------------------------------------------------------------------------
 
   def collect(): Array[Row] =
-    val (rows, observed) = executeAndCollect(relation)
+    val (rows, arrowSchema, observed) = executeAndCollect(relation)
     if observed.nonEmpty then session.processObservedMetrics(observed)
-    applyPostConversions(rows, schema)
+    // Empty results need no post-conversion; skip it (and any schema-fallback RPC) entirely.
+    if rows.isEmpty then rows
+    else applyPostConversions(rows, postConversionSchema(arrowSchema))
 
   def collectAsList(): java.util.List[Row] = java.util.Arrays.asList(collect()*)
 
@@ -1054,24 +1057,32 @@ final class DataFrame private[sql] (
     * If execution fails, any [[Observation]]s bound to a CollectMetrics node in `rel` are failed
     * with the cause so a pending `Observation.get` unblocks instead of waiting forever.
     */
-  private[sql] def executeAndCollect(rel: Relation): (Array[Row], Seq[(Long, Row)]) =
+  private[sql] def executeAndCollect(
+      rel: Relation
+  ): (Array[Row], Option[StructType], Seq[(Long, Row)]) =
     try executeAndCollectImpl(rel)
     catch
       case NonFatal(e) =>
         session.failObservedMetrics(rel, e)
         throw e
 
-  private def executeAndCollectImpl(rel: Relation): (Array[Row], Seq[(Long, Row)]) =
+  private def executeAndCollectImpl(
+      rel: Relation
+  ): (Array[Row], Option[StructType], Seq[(Long, Row)]) =
     val plan = Plan.newBuilder().setRoot(rel).build()
     val responses = client.execute(plan)
     try
       val rows = mutable.ArrayBuffer.empty[Row]
       val observedMetrics = mutable.ArrayBuffer.empty[(Long, Row)]
+      // Capture the schema the Arrow result batches already carry, so callers can reuse it instead
+      // of issuing a second `analyzeSchema` RPC.
+      var arrowSchema: Option[StructType] = None
       responses.foreach { resp =>
         if resp.hasArrowBatch then
-          val (batchRows, _) =
+          val (batchRows, batchSchema) =
             ArrowDeserializer.fromArrowBatchWithSchema(resp.getArrowBatch.getData.toByteArray)
           rows ++= batchRows
+          if arrowSchema.isEmpty then arrowSchema = batchSchema
         val omList = resp.getObservedMetricsList
         if !omList.isEmpty then
           omList.asScala.foreach { om =>
@@ -1101,7 +1112,7 @@ final class DataFrame private[sql] (
       }
       // Rows already carry schema from ArrowDeserializer; no re-wrapping needed.
       val result = rows.toArray
-      (result, observedMetrics.toSeq)
+      (result, arrowSchema, observedMetrics.toSeq)
     finally
       (responses: Any) match
         case c: AutoCloseable => c.close()
@@ -1116,6 +1127,25 @@ final class DataFrame private[sql] (
         case st: StructType => Some(st)
         case _              => None
     else None
+
+  /** Schema used to drive post-conversions, reusing the Arrow result schema when possible.
+    *
+    * The Arrow result batches already carry the schema, so we avoid a second `analyzeSchema` RPC.
+    * Exception: Geometry/Geography deserialize to a struct `Row` (srid + wkb) or raw bytes, and the
+    * Arrow schema reports them as a plain `StructType`/`BinaryType` — indistinguishable from a user
+    * struct/binary column. Only the server's logical `GeometryType`/srid enables their conversion,
+    * so if any top-level column is a struct or binary, fall back to the server schema. (Variant
+    * carries `VariantType` in the Arrow schema, so it does not need the fallback.) Empty results
+    * need no conversion.
+    */
+  private def postConversionSchema(arrowSchema: Option[StructType]): StructType =
+    if arrowSchema.isEmpty then StructType.empty
+    else
+      val s = arrowSchema.get
+      val mayContainSpatial =
+        s.fields.exists(f => f.dataType.isInstanceOf[StructType] || f.dataType == types.BinaryType)
+      if mayContainSpatial then schema
+      else s
 
   /** Fused post-processing: spatial + variant conversions in a single pass over the rows.
     *
