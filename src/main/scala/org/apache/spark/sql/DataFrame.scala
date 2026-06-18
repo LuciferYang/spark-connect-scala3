@@ -369,7 +369,8 @@ final class DataFrame private[sql] (
       .build()
     val (rows, arrowSchema, observed) = executeAndCollect(tailRel)
     if observed.nonEmpty then session.processObservedMetrics(observed)
-    applyPostConversions(rows, postConversionSchema(arrowSchema))
+    if rows.isEmpty then rows
+    else applyPostConversions(rows, postConversionSchema(arrowSchema))
 
   /** Pipeline-style transformation. */
   def transform(f: DataFrame => DataFrame): DataFrame = f(this)
@@ -705,7 +706,9 @@ final class DataFrame private[sql] (
   def collect(): Array[Row] =
     val (rows, arrowSchema, observed) = executeAndCollect(relation)
     if observed.nonEmpty then session.processObservedMetrics(observed)
-    applyPostConversions(rows, postConversionSchema(arrowSchema))
+    // Empty results need no post-conversion; skip it (and any schema-fallback RPC) entirely.
+    if rows.isEmpty then rows
+    else applyPostConversions(rows, postConversionSchema(arrowSchema))
 
   def collectAsList(): java.util.List[Row] = java.util.Arrays.asList(collect()*)
 
