@@ -1027,6 +1027,22 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     assert(metrics("cnt").toString.toLong == 50L)
   }
 
+  test("collect issues no separate AnalyzePlan schema RPC") {
+    // collect() reuses the schema carried by the Arrow result batches, so it must not issue a
+    // separate AnalyzePlan (schema-resolution) round-trip on top of its ExecutePlan.
+    val interceptor = AnalyzePlanCountingInterceptor()
+    val session = SparkSession
+      .builder()
+      .remote("sc://localhost:15002")
+      .interceptor(interceptor)
+      .build()
+    try
+      val rows = session.range(10).toDF().collect()
+      assert(rows.length == 10)
+      assert(interceptor.analyzeCalls.get() == 0, "collect() must not issue an AnalyzePlan RPC")
+    finally session.stop()
+  }
+
   test("observe: get does not hang when the observed action fails") {
     // Regression: a server-side failure during an observed action must complete the observation
     // exceptionally, rather than leaving Observation.get blocked forever.
