@@ -1027,6 +1027,20 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     assert(metrics("cnt").toString.toLong == 50L)
   }
 
+  test("observe: get does not hang when the observed action fails") {
+    // Regression: a server-side failure during an observed action must complete the observation
+    // exceptionally, rather than leaving Observation.get blocked forever.
+    import scala.concurrent.Await
+    import scala.concurrent.duration.*
+    val observation = Observation("obs-fail")
+    val observed = spark.range(10).observe(observation, count(lit(1)).as("cnt"))
+    // raise_error forces a deterministic runtime failure on the server during collect().
+    intercept[Exception](observed.select(raise_error(lit("boom"))).collect())
+    // Bounded wait: without the fix the future stays pending and this times out (fails, not hangs).
+    Await.ready(observation.future, 30.seconds)
+    assert(observation.future.value.exists(_.isFailure))
+  }
+
   // --- zipWithIndex ---
 
   test("zipWithIndex") {
