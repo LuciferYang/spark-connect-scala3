@@ -322,6 +322,31 @@ final class SparkSession private[sql] (
         observationRegistry.remove(planId)
     }
 
+  /** Fail every [[Observation]] bound to a CollectMetrics node in `rel`, completing its `get` with
+    * the given cause instead of leaving it blocked forever when the observed action fails.
+    */
+  private[sql] def failObservedMetrics(rel: Relation, cause: Throwable): Unit =
+    collectMetricsPlanIds(rel).foreach { planId =>
+      val obs = observationRegistry.remove(planId)
+      if obs != null then obs.failMetrics(cause)
+    }
+
+  /** Collect the plan IDs of every CollectMetrics relation in a relation tree. */
+  private def collectMetricsPlanIds(rel: Relation): Set[Long] =
+    import scala.jdk.CollectionConverters.*
+    val ids = Set.newBuilder[Long]
+    def walk(value: Any): Unit =
+      if value.isInstanceOf[Relation] then
+        val r = value.asInstanceOf[Relation]
+        if r.hasCollectMetrics then ids += r.getCommon.getPlanId
+        r.getAllFields.values.asScala.foreach(walk)
+      else if value.isInstanceOf[com.google.protobuf.Message] then
+        value.asInstanceOf[com.google.protobuf.Message].getAllFields.values.asScala.foreach(walk)
+      else if value.isInstanceOf[java.util.List[?]] then
+        value.asInstanceOf[java.util.List[?]].asScala.foreach(walk)
+    walk(rel)
+    ids.result()
+
   // ---------------------------------------------------------------------------
   // Operation Tags
   // ---------------------------------------------------------------------------

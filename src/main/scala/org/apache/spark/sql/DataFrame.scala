@@ -1048,8 +1048,19 @@ final class DataFrame private[sql] (
   // Helpers
   // ---------------------------------------------------------------------------
 
-  /** Execute a relation and collect rows + observed metrics. */
+  /** Execute a relation and collect rows + observed metrics.
+    *
+    * If execution fails, any [[Observation]]s bound to a CollectMetrics node in `rel` are failed
+    * with the cause so a pending `Observation.get` unblocks instead of waiting forever.
+    */
   private[sql] def executeAndCollect(rel: Relation): (Array[Row], Seq[(Long, Row)]) =
+    try executeAndCollectImpl(rel)
+    catch
+      case e: Throwable =>
+        session.failObservedMetrics(rel, e)
+        throw e
+
+  private def executeAndCollectImpl(rel: Relation): (Array[Row], Seq[(Long, Row)]) =
     val plan = Plan.newBuilder().setRoot(rel).build()
     val responses = client.execute(plan)
     try
