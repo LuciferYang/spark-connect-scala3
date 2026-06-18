@@ -1,5 +1,6 @@
 package org.apache.spark.sql
 
+import org.apache.spark.connect.proto.Relation
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -67,6 +68,25 @@ class ObservationSuite extends AnyFunSuite with Matchers:
     val ex = intercept[IllegalStateException](obs.get)
     ex.getMessage should include("no-schema")
     ex.getMessage should include("metrics row without a schema")
+  }
+
+  test("Observation does not block forever when the observed action fails") {
+    // Regression test: previously, if the action on an observed Dataset threw (server error,
+    // network drop), the observation promise was never completed, so `get` blocked forever on
+    // `Await.result(future, Duration.Inf)`. The fix fails the bound observation with the cause.
+    //
+    // A null-client session makes `collect()` throw inside `executeAndCollect` — the same failure
+    // path the bug is about. We assert on `future` rather than calling `get`, because in the
+    // unfixed code `get` would hang the test.
+    val session = SparkSession(null)
+    val base = DataFrame(session, Relation.newBuilder().build())
+    val obs = Observation("fail-on-error")
+    val observed = base.observe(obs, functions.count(functions.lit(1)).as("rows"))
+
+    intercept[Throwable](observed.collect())
+
+    obs.future.isCompleted shouldBe true
+    obs.future.value.get.isFailure shouldBe true
   }
 
   test("Observation companion apply methods") {
