@@ -15,6 +15,7 @@ import org.apache.spark.sql.types.{
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
+import scala.util.control.NonFatal
 
 /** A distributed collection of rows organized into named columns.
   *
@@ -1056,7 +1057,7 @@ final class DataFrame private[sql] (
   private[sql] def executeAndCollect(rel: Relation): (Array[Row], Seq[(Long, Row)]) =
     try executeAndCollectImpl(rel)
     catch
-      case e: Throwable =>
+      case NonFatal(e) =>
         session.failObservedMetrics(rel, e)
         throw e
 
