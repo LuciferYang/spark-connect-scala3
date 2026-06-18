@@ -1128,16 +1128,20 @@ final class DataFrame private[sql] (
   /** Schema used to drive post-conversions, reusing the Arrow result schema when possible.
     *
     * The Arrow result batches already carry the schema, so we avoid a second `analyzeSchema` RPC.
-    * Exception: Geometry/Geography arrive as Arrow `Binary`, indistinguishable from a real binary
-    * column, and their conversion needs the server's logical `GeometryType`/srid — so if any
-    * top-level column is `Binary`, fall back to the server schema. (Variant is detectable from the
-    * Arrow schema, so it does not need the fallback.) Empty results need no conversion.
+    * Exception: Geometry/Geography deserialize to a struct `Row` (srid + wkb) or raw bytes, and the
+    * Arrow schema reports them as a plain `StructType`/`BinaryType` — indistinguishable from a user
+    * struct/binary column. Only the server's logical `GeometryType`/srid enables their conversion,
+    * so if any top-level column is a struct or binary, fall back to the server schema. (Variant
+    * carries `VariantType` in the Arrow schema, so it does not need the fallback.) Empty results
+    * need no conversion.
     */
   private def postConversionSchema(arrowSchema: Option[StructType]): StructType =
     if arrowSchema.isEmpty then StructType.empty
     else
       val s = arrowSchema.get
-      if s.fields.exists(_.dataType == types.BinaryType) then schema
+      val mayContainSpatial =
+        s.fields.exists(f => f.dataType.isInstanceOf[StructType] || f.dataType == types.BinaryType)
+      if mayContainSpatial then schema
       else s
 
   /** Fused post-processing: spatial + variant conversions in a single pass over the rows.
