@@ -18,5 +18,5 @@ final class AnalyzePlanCountingInterceptor extends ClientInterceptor:
       callOptions: CallOptions,
       next: Channel
   ): ClientCall[Req, Resp] =
-    if method.getFullMethodName.contains("AnalyzePlan") then analyzeCalls.incrementAndGet()
+    if method.getFullMethodName.endsWith("/AnalyzePlan") then analyzeCalls.incrementAndGet()
     next.newCall(method, callOptions)
