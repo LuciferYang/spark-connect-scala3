@@ -1,6 +1,6 @@
 package org.apache.spark.sql.connect.client
 
-import io.grpc.{ManagedChannel, Status, StatusRuntimeException}
+import io.grpc.{Context, ManagedChannel, Status, StatusRuntimeException}
 import io.grpc.stub.StreamObserver
 import org.apache.spark.connect.proto.*
 
@@ -53,6 +53,10 @@ class ExecutePlanResponseReattachableIterator private[client] (
   // Raw stubs — NOT wrapped by ResponseValidator or GrpcExceptionConverter.
   private val blockingStub = SparkConnectServiceGrpc.newBlockingStub(channel)
   private val asyncStub = SparkConnectServiceGrpc.newStub(channel)
+
+  // Cancellable context for the in-flight execute/reattach call, so close() can abort the stream
+  // instead of leaving it open until the channel deadline or GC.
+  private val cancellableContext: Context.CancellableContext = Context.current().withCancellation()
 
   // Stream state.
   private val stateLock = new AnyRef
@@ -117,6 +121,8 @@ class ExecutePlanResponseReattachableIterator private[client] (
     if !closed then
       closed = true
       releaseAll()
+      // Abort the in-flight executePlan/reattachExecute server stream (no-op if already done).
+      cancellableContext.cancel(null)
 
   // ---------------------------------------------------------------------------
   // Core helpers
@@ -155,8 +161,16 @@ class ExecutePlanResponseReattachableIterator private[client] (
   // gRPC calls
   // ---------------------------------------------------------------------------
 
+  /** Run a stub call within the cancellable context so the resulting call can be cancelled by
+    * `close()`.
+    */
+  private def withinCancellableContext[T](body: => T): T =
+    val previous = cancellableContext.attach()
+    try body
+    finally cancellableContext.detach(previous)
+
   private def rawExecutePlan(req: ExecutePlanRequest): java.util.Iterator[ExecutePlanResponse] =
-    blockingStub.executePlan(req)
+    withinCancellableContext(blockingStub.executePlan(req))
 
   private def rawReattachExecute(): java.util.Iterator[ExecutePlanResponse] =
     val rb = ReattachExecuteRequest.newBuilder()
@@ -166,7 +180,7 @@ class ExecutePlanResponseReattachableIterator private[client] (
     if request.hasClientObservedServerSideSessionId then
       rb.setClientObservedServerSideSessionId(request.getClientObservedServerSideSessionId)
     lastReturnedResponseId.foreach(rb.setLastResponseId)
-    blockingStub.reattachExecute(rb.build())
+    withinCancellableContext(blockingStub.reattachExecute(rb.build()))
 
   /** Release all server-side buffered responses asynchronously. */
   private def releaseAll(): Unit =
