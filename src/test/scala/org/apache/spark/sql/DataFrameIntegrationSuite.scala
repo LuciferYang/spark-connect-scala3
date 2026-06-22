@@ -1043,6 +1043,31 @@ class DataFrameIntegrationSuite extends IntegrationTestBase:
     finally session.stop()
   }
 
+  test("toLocalIterator issues no separate AnalyzePlan schema RPC") {
+    // Like collect(), toLocalIterator() should reuse the schema carried by the Arrow result
+    // batches rather than issuing a separate AnalyzePlan round-trip.
+    val interceptor = AnalyzePlanCountingInterceptor()
+    val session = SparkSession
+      .builder()
+      .remote("sc://localhost:15002")
+      .interceptor(interceptor)
+      .build()
+    try
+      val it = session.range(10).toDF().toLocalIterator()
+      var count = 0
+      try
+        while it.hasNext do
+          it.next()
+          count += 1
+      finally it.close()
+      assert(count == 10)
+      assert(
+        interceptor.analyzeCalls.get() == 0,
+        "toLocalIterator() must not issue an AnalyzePlan RPC"
+      )
+    finally session.stop()
+  }
+
   test("observe: get does not hang when the observed action fails") {
     // Regression: a server-side failure during an observed action must complete the observation
     // exceptionally, rather than leaving Observation.get blocked forever.
