@@ -93,7 +93,7 @@ final class StreamingQueryManager private[sql] (private val session: SparkSessio
         case _                => ()
     if result == null then
       val cmdCase = cmdBuilder.build().getCommandCase
-      throw new RuntimeException(
+      throw SparkRuntimeException(
         s"No StreamingQueryManagerCommandResult in response (command=$cmdCase)"
       )
     result
