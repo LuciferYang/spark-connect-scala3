@@ -821,18 +821,32 @@ final class DataFrame private[sql] (
   def toLocalIterator(): java.util.Iterator[Row] with AutoCloseable =
     val plan = Plan.newBuilder().setRoot(relation).build()
     val responses = client.execute(plan)
+    // Capture the schema the first Arrow batch carries, so post-conversions resolve without a
+    // separate analyzeSchema RPC (consistent with collect/tail).
+    var arrowSchema: Option[StructType] = None
     val rawIter = responses.flatMap { resp =>
       if resp.hasArrowBatch then
-        ArrowDeserializer.fromArrowBatch(resp.getArrowBatch.getData.toByteArray)
+        val (batchRows, batchSchema) =
+          ArrowDeserializer.fromArrowBatchWithSchema(resp.getArrowBatch.getData.toByteArray)
+        if arrowSchema.isEmpty then arrowSchema = batchSchema
+        batchRows
       else
         Iterator.empty
     }
-    // Apply spatial/variant post-conversions lazily per row (consistent with collect/tail)
-    val sch = schema
-    val rowIter = needsPostConversions(sch) match
-      case None                           => rawIter
-      case Some((spatialIdx, variantIdx)) =>
-        rawIter.map(row => convertRowPost(row, sch, spatialIdx, variantIdx))
+    // Resolve the spatial/variant conversion plan lazily, once the first batch (and thus its
+    // schema) has been read, then apply it per row.
+    var planResolved = false
+    var convPlan: Option[(Seq[(Int, Boolean)], Seq[Int])] = None
+    var convSchema: StructType = StructType.empty
+    def convertRow(row: Row): Row =
+      if !planResolved then
+        convSchema = postConversionSchema(arrowSchema)
+        convPlan = needsPostConversions(convSchema)
+        planResolved = true
+      convPlan.fold(row) { case (spatialIdx, variantIdx) =>
+        convertRowPost(row, convSchema, spatialIdx, variantIdx)
+      }
+    val rowIter = rawIter.map(convertRow)
     new java.util.Iterator[Row] with AutoCloseable:
       private var closed = false
       def hasNext: Boolean =
