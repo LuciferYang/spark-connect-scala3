@@ -547,7 +547,8 @@ object SparkConnectClient:
       sessionId: String = UUID.randomUUID().toString,
       configs: Map[String, String] = Map.empty,
       interceptors: List[ClientInterceptor] = List.empty,
-      maxInboundMessageSize: Option[Int] = None
+      maxInboundMessageSize: Option[Int] = None,
+      retryPolicy: RetryPolicy = RetryPolicy.defaultPolicy()
   ): SparkConnectClient =
     val (host, port, params) = parseUrl(url)
     val paramMap = params.toMap
@@ -600,7 +601,7 @@ object SparkConnectClient:
       aStub,
       sessionId,
       userId,
-      GrpcRetryHandler(RetryPolicy.defaultPolicy()),
+      GrpcRetryHandler(retryPolicy),
       sanitizedUrl,
       token
     )
