@@ -27,7 +27,8 @@ class StreamingListenerBusStopSuite extends AnyFunSuite with Matchers:
   private val handlerThreadName = "StreamingQueryListenerBus-handler"
 
   private def handlerThreadAlive(): Boolean =
-    Thread.getAllStackTraces.keySet.asScala.exists(t => t.getName == handlerThreadName && t.isAlive)
+    Thread.getAllStackTraces.keySet.asScala
+      .exists(t => t.getName == handlerThreadName && t.isAlive)
 
   private def awaitUntil(timeoutMs: Long)(cond: => Boolean): Boolean =
     val deadline = System.currentTimeMillis() + timeoutMs
@@ -50,14 +51,15 @@ class StreamingListenerBusStopSuite extends AnyFunSuite with Matchers:
           // Long-running event stream: confirm registration, then keep it open until cancelled.
           val sobs = obs.asInstanceOf[ServerCallStreamObserver[ExecutePlanResponse]]
           sobs.setOnCancelHandler(() => eventStreamCancelled.countDown())
-          sobs.onNext(
-            ExecutePlanResponse
-              .newBuilder()
-              .setStreamingQueryListenerEventsResult(
-                StreamingQueryListenerEventsResult.newBuilder().setListenerBusListenerAdded(true).build()
-              )
-              .build()
-          )
+          val added = StreamingQueryListenerEventsResult
+            .newBuilder()
+            .setListenerBusListenerAdded(true)
+            .build()
+          val confirmation = ExecutePlanResponse
+            .newBuilder()
+            .setStreamingQueryListenerEventsResult(added)
+            .build()
+          sobs.onNext(confirmation)
         else
           // RemoveListenerBusListener (or any other) command: complete immediately.
           obs.onCompleted()
@@ -79,7 +81,10 @@ class StreamingListenerBusStopSuite extends AnyFunSuite with Matchers:
           def onQueryTerminated(e: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
 
         spark.streams.addListener(listener)
-        assert(awaitUntil(5000)(handlerThreadAlive()), "handler thread should start after addListener")
+        assert(
+          awaitUntil(5000)(handlerThreadAlive()),
+          "handler thread should start after addListener"
+        )
 
         spark.streams.removeListener(listener)
         assert(
