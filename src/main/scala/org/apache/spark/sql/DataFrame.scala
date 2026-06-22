@@ -55,11 +55,13 @@ final class DataFrame private[sql] (
   def filter(conditionExpr: String): DataFrame = where(conditionExpr)
 
   def limit(n: Int): DataFrame =
+    require(n >= 0, s"The limit must be greater than or equal to 0, but got $n")
     withRelation(_.setLimit(
       Limit.newBuilder().setInput(relation).setLimit(n).build()
     ))
 
   def offset(n: Int): DataFrame =
+    require(n >= 0, s"The offset must be greater than or equal to 0, but got $n")
     withRelation(_.setOffset(
       Offset.newBuilder().setInput(relation).setOffset(n).build()
     ))
@@ -363,6 +365,7 @@ final class DataFrame private[sql] (
 
   /** Return the last n rows. */
   def tail(n: Int): Array[Row] =
+    require(n >= 0, s"The tail count must be greater than or equal to 0, but got $n")
     val tailRel = Relation.newBuilder()
       .setCommon(RelationCommon.newBuilder().setPlanId(session.nextPlanId()).build())
       .setTail(Tail.newBuilder().setInput(relation).setLimit(n).build())
