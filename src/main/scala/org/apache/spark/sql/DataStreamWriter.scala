@@ -140,7 +140,7 @@ final class DataStreamWriter[T] private[sql] (
         case c: AutoCloseable => c.close()
         case _                => ()
     if queryId.isEmpty || runId.isEmpty then
-      throw new RuntimeException(
+      throw SparkRuntimeException(
         "Server response did not contain WriteStreamOperationStartResult with query IDs"
       )
     StreamingQuery(df.session, queryId, runId, queryName)
