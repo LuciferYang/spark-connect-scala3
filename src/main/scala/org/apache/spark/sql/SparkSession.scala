@@ -520,9 +520,19 @@ object SparkSession:
     private var url: String = SparkSession.DefaultRemoteUrl
     private var configs: Map[String, String] = Map.empty
     private var interceptors: List[io.grpc.ClientInterceptor] = List.empty
+    private var maxInboundMessageSizeBytes: Option[Int] = None
 
     def remote(connectionString: String): Builder =
       url = connectionString
+      this
+
+    /** Override the maximum inbound gRPC message size, in bytes (default 128 MB).
+      *
+      * Raise it for very large `collect()` results, or lower it to bound the per-message memory
+      * spike in constrained containers.
+      */
+    def maxInboundMessageSize(bytes: Int): Builder =
+      maxInboundMessageSizeBytes = Some(bytes)
       this
 
     /** Add a gRPC `ClientInterceptor` to be used during channel creation.
