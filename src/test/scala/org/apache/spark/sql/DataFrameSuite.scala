@@ -23,6 +23,15 @@ class DataFrameSuite extends AnyFunSuite with Matchers:
       .build()
     DataFrame(session, rel)
 
+  // ---------- argument validation ----------
+
+  test("limit, offset, and tail reject negative arguments") {
+    val df = testDf()
+    an[IllegalArgumentException] should be thrownBy df.limit(-1)
+    an[IllegalArgumentException] should be thrownBy df.offset(-1)
+    an[IllegalArgumentException] should be thrownBy df.tail(-1)
+  }
+
   // ---------- unpivot / melt ----------
 
   test("unpivot with explicit values builds Unpivot proto") {
