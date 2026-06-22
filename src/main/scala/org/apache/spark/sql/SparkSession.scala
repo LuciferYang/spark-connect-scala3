@@ -2,7 +2,7 @@ package org.apache.spark.sql
 
 import org.apache.spark.connect.proto.{Catalog as _, StorageLevel as _, *}
 import org.apache.spark.sql.connect.SessionCleaner
-import org.apache.spark.sql.connect.client.{ClassFinder, SparkConnectClient}
+import org.apache.spark.sql.connect.client.{ClassFinder, RetryPolicy, SparkConnectClient}
 
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
@@ -521,6 +521,12 @@ object SparkSession:
     private var configs: Map[String, String] = Map.empty
     private var interceptors: List[io.grpc.ClientInterceptor] = List.empty
     private var maxInboundMessageSizeBytes: Option[Int] = None
+    private var retryPolicyValue: RetryPolicy = RetryPolicy.defaultPolicy()
+
+    /** Override the gRPC retry policy (max retries, backoff, jitter, retryable conditions). */
+    def retryPolicy(policy: RetryPolicy): Builder =
+      retryPolicyValue = policy
+      this
 
     def remote(connectionString: String): Builder =
       url = connectionString
@@ -577,7 +583,8 @@ object SparkSession:
         url,
         configs = configs,
         interceptors = interceptors,
-        maxInboundMessageSize = maxInboundMessageSizeBytes
+        maxInboundMessageSize = maxInboundMessageSizeBytes,
+        retryPolicy = retryPolicyValue
       )
       val session = SparkSession(client)
       if defaultSession.get() == null then defaultSession.compareAndSet(null, session)
