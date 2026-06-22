@@ -546,7 +546,8 @@ object SparkConnectClient:
       url: String,
       sessionId: String = UUID.randomUUID().toString,
       configs: Map[String, String] = Map.empty,
-      interceptors: List[ClientInterceptor] = List.empty
+      interceptors: List[ClientInterceptor] = List.empty,
+      maxInboundMessageSize: Option[Int] = None
   ): SparkConnectClient =
     val (host, port, params) = parseUrl(url)
     val paramMap = params.toMap
@@ -565,7 +566,7 @@ object SparkConnectClient:
 
     val channelBuilder = ManagedChannelBuilder
       .forAddress(host, port)
-      .maxInboundMessageSize(MaxInboundMessageSize)
+      .maxInboundMessageSize(maxInboundMessageSize.getOrElse(MaxInboundMessageSize))
       .userAgent(UserAgentString)
 
     if !useSsl then channelBuilder.usePlaintext()

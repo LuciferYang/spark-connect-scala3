@@ -573,7 +573,12 @@ object SparkSession:
         url != null && url.startsWith("sc://"),
         s"Invalid Spark Connect URL: '$url'. URL must start with 'sc://'."
       )
-      val client = SparkConnectClient.create(url, configs = configs, interceptors = interceptors)
+      val client = SparkConnectClient.create(
+        url,
+        configs = configs,
+        interceptors = interceptors,
+        maxInboundMessageSize = maxInboundMessageSizeBytes
+      )
       val session = SparkSession(client)
       if defaultSession.get() == null then defaultSession.compareAndSet(null, session)
       activeSession.set(session)
