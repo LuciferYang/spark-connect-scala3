@@ -29,7 +29,14 @@ class StreamingManagerErrorSuite extends AnyFunSuite with Matchers:
           request: ExecutePlanRequest,
           obs: StreamObserver[ExecutePlanResponse]
       ): Unit =
-        // Complete the stream without a StreamingQueryManagerCommandResult.
+        // End the stream cleanly (ResultComplete) but without a StreamingQueryManagerCommandResult,
+        // so the client reaches the missing-result path rather than attempting a reattach.
+        obs.onNext(
+          ExecutePlanResponse
+            .newBuilder()
+            .setResultComplete(ExecutePlanResponse.ResultComplete.getDefaultInstance)
+            .build()
+        )
         obs.onCompleted()
 
       override def releaseExecute(
