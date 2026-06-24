@@ -27,8 +27,10 @@ object ArrowDeserializer:
       schema: StructType
   )
 
-  /** Maximum bytes the Arrow allocator may reserve (256 GB). */
-  private val MaxAllocatorBytes: Long = 256L * 1024 * 1024 * 1024
+  /** Maximum bytes the Arrow allocator may reserve (default 256 GB; configurable — see
+    * [[ArrowAllocators]]).
+    */
+  private val MaxAllocatorBytes: Long = ArrowAllocators.maxAllocatorBytes
 
   /** Shared RootAllocator — thread-safe (uses AtomicLong internally). */
   private val rootAllocator = RootAllocator(MaxAllocatorBytes)

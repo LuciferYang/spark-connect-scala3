@@ -1,6 +1,7 @@
 package org.apache.spark.sql
 
 import org.apache.arrow.memory.RootAllocator
+import org.apache.spark.sql.connect.client.ArrowAllocators
 import org.apache.arrow.vector.{
   BigIntVector,
   BitVector,
@@ -33,8 +34,10 @@ import scala.jdk.CollectionConverters.*
 /** Encodes Row sequences into Arrow IPC byte arrays. */
 private[sql] object ArrowSerializer:
 
-  /** Maximum bytes the Arrow allocator may reserve (256 GB). */
-  private val MaxAllocatorBytes: Long = 256L * 1024 * 1024 * 1024
+  /** Maximum bytes the Arrow allocator may reserve (default 256 GB; configurable — see
+    * [[org.apache.spark.sql.connect.client.ArrowAllocators]]).
+    */
+  private val MaxAllocatorBytes: Long = ArrowAllocators.maxAllocatorBytes
 
   /** Shared RootAllocator — thread-safe (uses AtomicLong internally). */
   private val rootAllocator = RootAllocator(MaxAllocatorBytes)

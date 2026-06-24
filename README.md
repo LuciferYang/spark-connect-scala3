@@ -175,7 +175,9 @@ The Spark 4.1.x server hangs indefinitely on an `InterruptRequest` with `INTERRU
 
 ## Memory & Resource Limits
 
-The Arrow allocators in [`ArrowSerializer`](src/main/scala/org/apache/spark/sql/ArrowSerializer.scala) and [`ArrowDeserializer`](src/main/scala/org/apache/spark/sql/connect/client/ArrowDeserializer.scala) share a 256 GB reservation cap (`MaxAllocatorBytes`). The cap is a ceiling on what the allocator may request, not a commitment — Arrow buffers are off-heap, so `-Xmx` and the container memory limit still gate real usage, and a large or malformed batch can OOM a small container well before the cap. The constant is `private`; fork it or file an issue to make it configurable.
+The Arrow allocators in [`ArrowSerializer`](src/main/scala/org/apache/spark/sql/ArrowSerializer.scala) and [`ArrowDeserializer`](src/main/scala/org/apache/spark/sql/connect/client/ArrowDeserializer.scala) share a reservation cap that defaults to 256 GB. The cap is a ceiling on what the allocator may request, not a commitment — Arrow buffers are off-heap, so `-Xmx` and the container memory limit still gate real usage, and a large or malformed batch can OOM a small container well before the cap.
+
+Override the cap with the `spark.connect.scala3.arrow.maxAllocatorBytes` system property (a positive byte count), e.g. `-Dspark.connect.scala3.arrow.maxAllocatorBytes=2147483648` for a 2 GB ceiling in a constrained container.
 
 ## Status
 
