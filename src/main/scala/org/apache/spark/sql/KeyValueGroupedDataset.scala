@@ -156,6 +156,14 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   def flatMapGroups[U: Encoder: ClassTag](
       func: (K, Iterator[V]) => IterableOnce[U]
   ): Dataset[U] =
+    flatMapGroupsImpl(Nil)(func)
+
+  /** Shared GroupMap assembly for `flatMapGroups` / `flatMapSortedGroups`. The only difference is
+    * the (possibly empty) list of sorting expressions.
+    */
+  private def flatMapGroupsImpl[U: Encoder: ClassTag](
+      sortExprs: Seq[Column]
+  )(func: (K, Iterator[V]) => IterableOnce[U]): Dataset[U] =
     val outEnc = summon[Encoder[U]]
     val keyAg = keyEncoder.agnosticEncoder
     val outAg = outEnc.agnosticEncoder
@@ -189,6 +197,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       )
       .setFunc(mapUdf)
     groupingColumnExprs.foreach(_.foreach(c => groupMapBuilder.addGroupingExpressions(c.expr)))
+    sortExprs.foreach(c => groupMapBuilder.addSortingExpressions(c.expr))
     val relation = Relation
       .newBuilder()
       .setCommon(
@@ -248,48 +257,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   def flatMapSortedGroups[U: Encoder: ClassTag](
       sortExprs: Column*
   )(func: (K, Iterator[V]) => IterableOnce[U]): Dataset[U] =
-    val outEnc = summon[Encoder[U]]
-    val keyAg = keyEncoder.agnosticEncoder
-    val outAg = outEnc.agnosticEncoder
-    // For mapValues-derived KVGDs, use the original relation and value encoder
-    val inputRelation = originalRelation.getOrElse(ds.df.relation)
-    val inputValueAg =
-      originalValueEncoder.map(_.agnosticEncoder).getOrElse(valueEncoder.agnosticEncoder)
-    val currentValueAg = valueEncoder.agnosticEncoder
-    if keyAg == null || inputValueAg == null || currentValueAg == null || outAg == null then
-      return flatMapGroupsLocal(func, outEnc)
-    // Build server-side GroupMap
-    val groupingUdf = buildGroupingUdf(keyAg, inputValueAg)
-    // When mapValuesFunc is set, compose it with the user function
-    val effectiveFunc: AnyRef = mapValuesFunc match
-      case Some(mvf) =>
-        new MapValuesFlatMapAdaptor[K, U](
-          mvf.asInstanceOf[Any => Any],
-          func.asInstanceOf[(K, Iterator[Any]) => IterableOnce[U]]
-        )
-      case None => func.asInstanceOf[AnyRef]
-    val mapUdf = buildGroupMapUdf(effectiveFunc, keyAg, inputValueAg, outAg)
-    val groupMapBuilder = GroupMap
-      .newBuilder()
-      .setInput(inputRelation)
-      .addGroupingExpressions(
-        Expression
-          .newBuilder()
-          .setCommonInlineUserDefinedFunction(groupingUdf)
-          .build()
-      )
-      .setFunc(mapUdf)
-    groupingColumnExprs.foreach(_.foreach(c => groupMapBuilder.addGroupingExpressions(c.expr)))
-    sortExprs.foreach(c => groupMapBuilder.addSortingExpressions(c.expr))
-    val relation = Relation
-      .newBuilder()
-      .setCommon(
-        RelationCommon.newBuilder().setPlanId(ds.sparkSession.nextPlanId()).build()
-      )
-      .setGroupMap(groupMapBuilder.build())
-      .build()
-    val newDf = DataFrame(ds.sparkSession, relation)
-    Dataset(newDf, outEnc)
+    flatMapGroupsImpl(sortExprs)(func)
 
   def flatMapSortedGroups[U](
       sortExprs: Array[Column],
