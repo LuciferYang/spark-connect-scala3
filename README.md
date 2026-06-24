@@ -194,6 +194,14 @@ val spark = SparkSession.builder()
 
 Interceptors are applied at channel creation. When a connection token is supplied, the auth-header interceptor is added last so it runs closest to the wire.
 
+The client also emits its own diagnostic warnings (retry/release failures, the streaming listener handler) to `System.err` by default. Route them into your logging system — or silence them — with `ClientLogging`:
+
+```scala
+import org.apache.spark.sql.connect.client.ClientLogging
+
+ClientLogging.setHandler(line => logger.warn(line))
+```
+
 ## Status
 
 The client implements the full Spark Connect 4.1 API surface: SparkSession, DataFrame/Dataset[T], 542 functions (100% coverage), readers/writers (incl. V2 + MergeInto), the full Catalog (all 37 proto RPCs), Structured Streaming with stateful operations, subqueries, plan compression, operation tags, and an Ammonite REPL. It is covered by ~2,374 unit tests and 454 integration tests against Spark 4.1.2, and is published to Maven Central.

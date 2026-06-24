@@ -7,6 +7,7 @@ import scala.util.control.NonFatal
 
 import org.apache.spark.connect.proto.{Command, ExecutePlanResponse, Plan, StreamingQueryEventType}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.connect.client.ClientLogging
 import org.apache.spark.sql.streaming.StreamingQueryListener.*
 
 /** Client-side event bus for streaming query listeners.
@@ -134,8 +135,9 @@ final class StreamingQueryListenerBus private[sql] (session: SparkSession):
         Thread.currentThread().interrupt() // restore interrupt status
       case NonFatal(e) =>
         // Log the failure before removing listeners so users can diagnose
-        System.err.println(
-          s"[WARN] [StreamingQueryListenerBus] Event handler thread failed: ${e.getMessage}"
+        ClientLogging.warn(
+          "StreamingQueryListenerBus",
+          s"Event handler thread failed: ${e.getMessage}"
         )
         // Handler thread failed — remove all listeners
         lock.synchronized {
