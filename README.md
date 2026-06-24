@@ -179,6 +179,21 @@ The Arrow allocators in [`ArrowSerializer`](src/main/scala/org/apache/spark/sql/
 
 Override the cap with the `spark.connect.scala3.arrow.maxAllocatorBytes` system property (a positive byte count), e.g. `-Dspark.connect.scala3.arrow.maxAllocatorBytes=2147483648` for a 2 GB ceiling in a constrained container.
 
+## Observability
+
+Attach a gRPC [`ClientInterceptor`](https://grpc.github.io/grpc-java/javadoc/io/grpc/ClientInterceptor.html) to instrument every RPC — for metrics, distributed tracing (OpenTelemetry/Micrometer), or custom headers:
+
+```scala
+import org.apache.spark.sql.SparkSession
+
+val spark = SparkSession.builder()
+  .remote("sc://localhost:15002")
+  .interceptor(myClientInterceptor)  // io.grpc.ClientInterceptor; call multiple times to add more
+  .build()
+```
+
+Interceptors are applied at channel creation. When a connection token is supplied, the auth-header interceptor is added last so it runs closest to the wire.
+
 ## Status
 
 The client implements the full Spark Connect 4.1 API surface: SparkSession, DataFrame/Dataset[T], 542 functions (100% coverage), readers/writers (incl. V2 + MergeInto), the full Catalog (all 37 proto RPCs), Structured Streaming with stateful operations, subqueries, plan compression, operation tags, and an Ammonite REPL. It is covered by ~2,374 unit tests and 454 integration tests against Spark 4.1.2, and is published to Maven Central.
