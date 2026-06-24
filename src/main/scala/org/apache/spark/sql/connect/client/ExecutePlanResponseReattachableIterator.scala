@@ -218,16 +218,12 @@ class ExecutePlanResponseReattachableIterator private[client] (
             try blockingStub.releaseExecute(req)
             catch
               case NonFatal(e) =>
-                System.err.println(
-                  s"[WARN] [SparkConnect] releaseExecute retry failed: ${e.getMessage}"
-                )
+                ClientLogging.warn("SparkConnect", s"releaseExecute retry failed: ${e.getMessage}")
           def onCompleted(): Unit = ()
       )
     catch
       case NonFatal(e) =>
-        System.err.println(
-          s"[WARN] [SparkConnect] releaseExecute async call failed: ${e.getMessage}"
-        )
+        ClientLogging.warn("SparkConnect", s"releaseExecute async call failed: ${e.getMessage}")
 
 object ExecutePlanResponseReattachableIterator:
 
