@@ -272,7 +272,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
   /** Shared CoGroupMap assembly for `cogroup` / `cogroupSorted`. The two differ only in their
     * sorting expressions and in what they do when encoders are missing (`onMissingEncoders`).
     */
-  private def cogroupImpl[U, R: Encoder](
+  private def cogroupImpl[U, R: Encoder: ClassTag](
       other: KeyValueGroupedDataset[K, U],
       thisSortExprs: Seq[Column],
       otherSortExprs: Seq[Column]
