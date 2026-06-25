@@ -22,6 +22,9 @@ import java.util.Locale
   *     .trigger(Trigger.ProcessingTime(1000))
   *     .start()
   * }}}
+  *
+  * Not thread-safe: a single instance accumulates mutable builder state, so do not share one
+  * instance across threads.
   */
 final class DataStreamWriter[T] private[sql] (
     private val df: DataFrame,
