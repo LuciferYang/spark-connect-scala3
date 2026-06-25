@@ -269,80 +269,16 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       func.call(key, values.asJava).asScala
     )(using encoder, classTagFromEncoder(encoder))
 
-  /** Co-group with another KeyValueGroupedDataset and apply a function. */
-  @nowarn("msg=unused.*parameter")
-  def cogroup[U: Encoder: ClassTag, R: Encoder: ClassTag](
-      other: KeyValueGroupedDataset[K, U]
-  )(func: (K, Iterator[V], Iterator[U]) => IterableOnce[R]): Dataset[R] =
-    val outEnc = summon[Encoder[R]]
-    val otherEnc = other.valueEncoder
-    val keyAg = keyEncoder.agnosticEncoder
-    val valueAg = valueEncoder.agnosticEncoder
-    val otherValueAg = otherEnc.agnosticEncoder
-    val outAg = outEnc.agnosticEncoder
-    if keyAg == null || valueAg == null || otherValueAg == null || outAg == null then
-      return cogroupLocal(other, func, outEnc)
-    // For mapValues-derived KVGDs, use the original relations and value encoders.
-    val thisInputRelation = originalRelation.getOrElse(ds.df.relation)
-    val otherInputRelation = other.originalRelation.getOrElse(other.ds.df.relation)
-    val thisInputValueAg =
-      originalValueEncoder.map(_.agnosticEncoder).getOrElse(valueAg)
-    val otherInputValueAg =
-      other.originalValueEncoder.map(_.agnosticEncoder).getOrElse(otherValueAg)
-    val thisGroupingUdf = buildGroupingUdf(keyAg, thisInputValueAg)
-    val otherGroupingUdf = other.buildGroupingUdf(keyAg, otherInputValueAg)
-    val effectiveFunc: AnyRef =
-      if mapValuesFunc.isDefined || other.mapValuesFunc.isDefined then
-        new MapValuesCoGroupAdaptor[K, V, U, R](
-          mapValuesFunc.map(_.asInstanceOf[Any => V]),
-          other.mapValuesFunc.map(_.asInstanceOf[Any => U]),
-          func
-        )
-      else new CoGroupAdaptor(func)
-    val cogroupUdf = buildCoGroupUdf(
-      effectiveFunc,
-      keyAg,
-      thisInputValueAg,
-      otherInputValueAg,
-      outAg
-    )
-    val builder = CoGroupMap
-      .newBuilder()
-      .setInput(thisInputRelation)
-      .setOther(otherInputRelation)
-      .addInputGroupingExpressions(
-        Expression.newBuilder().setCommonInlineUserDefinedFunction(thisGroupingUdf).build()
-      )
-      .addOtherGroupingExpressions(
-        Expression.newBuilder().setCommonInlineUserDefinedFunction(otherGroupingUdf).build()
-      )
-      .setFunc(cogroupUdf)
-    groupingColumnExprs.foreach(_.foreach(c => builder.addInputGroupingExpressions(c.expr)))
-    other.groupingColumnExprs.foreach(_.foreach(c => builder.addOtherGroupingExpressions(c.expr)))
-    val relation = Relation
-      .newBuilder()
-      .setCommon(RelationCommon.newBuilder().setPlanId(ds.sparkSession.nextPlanId()).build())
-      .setCoGroupMap(builder.build())
-      .build()
-    val newDf = DataFrame(ds.sparkSession, relation)
-    Dataset(newDf, outEnc)
-
-  /** Co-group with sorting within each group.
-    *
-    * Sorts this group's values by `thisSortExprs` and the other group's values by `otherSortExprs`
-    * before applying the function.
-    *
-    * Requires AgnosticEncoder-compatible encoders on key, both value sides, and the output. The
-    * client-side `cogroupLocal` fallback used by [[cogroup]] cannot honour the sort expressions, so
-    * this method refuses to fall back silently — call [[cogroup]] explicitly if you do not need
-    * sorting and your encoders are not bridge-compatible.
+  /** Shared CoGroupMap assembly for `cogroup` / `cogroupSorted`. The two differ only in their
+    * sorting expressions and in what they do when encoders are missing (`onMissingEncoders`).
     */
-  @nowarn("msg=unused.*parameter")
-  def cogroupSorted[U: Encoder: ClassTag, R: Encoder: ClassTag](
-      other: KeyValueGroupedDataset[K, U]
-  )(thisSortExprs: Column*)(otherSortExprs: Column*)(
+  private def cogroupImpl[U, R: Encoder](
+      other: KeyValueGroupedDataset[K, U],
+      thisSortExprs: Seq[Column],
+      otherSortExprs: Seq[Column]
+  )(
       func: (K, Iterator[V], Iterator[U]) => IterableOnce[R]
-  ): Dataset[R] =
+  )(onMissingEncoders: => Dataset[R]): Dataset[R] =
     val outEnc = summon[Encoder[R]]
     val otherEnc = other.valueEncoder
     val keyAg = keyEncoder.agnosticEncoder
@@ -350,12 +286,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val otherValueAg = otherEnc.agnosticEncoder
     val outAg = outEnc.agnosticEncoder
     if keyAg == null || valueAg == null || otherValueAg == null || outAg == null then
-      throw UnsupportedOperationException(
-        "cogroupSorted requires AgnosticEncoder-compatible encoders for key, both value sides, " +
-          "and the output. Falling back to client-side cogroup would silently drop sort " +
-          "expressions and break the contract. Either supply Spark-built-in encoders or call " +
-          "cogroup(other)(f) without sort semantics."
-      )
+      return onMissingEncoders
     // For mapValues-derived KVGDs, use the original relations and value encoders.
     val thisInputRelation = originalRelation.getOrElse(ds.df.relation)
     val otherInputRelation = other.originalRelation.getOrElse(other.ds.df.relation)
@@ -402,6 +333,38 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       .build()
     val newDf = DataFrame(ds.sparkSession, relation)
     Dataset(newDf, outEnc)
+
+  /** Co-group with another KeyValueGroupedDataset and apply a function. */
+  @nowarn("msg=unused.*parameter")
+  def cogroup[U: Encoder: ClassTag, R: Encoder: ClassTag](
+      other: KeyValueGroupedDataset[K, U]
+  )(func: (K, Iterator[V], Iterator[U]) => IterableOnce[R]): Dataset[R] =
+    cogroupImpl(other, Nil, Nil)(func)(cogroupLocal(other, func, summon[Encoder[R]]))
+
+  /** Co-group with sorting within each group.
+    *
+    * Sorts this group's values by `thisSortExprs` and the other group's values by `otherSortExprs`
+    * before applying the function.
+    *
+    * Requires AgnosticEncoder-compatible encoders on key, both value sides, and the output. The
+    * client-side `cogroupLocal` fallback used by [[cogroup]] cannot honour the sort expressions, so
+    * this method refuses to fall back silently — call [[cogroup]] explicitly if you do not need
+    * sorting and your encoders are not bridge-compatible.
+    */
+  @nowarn("msg=unused.*parameter")
+  def cogroupSorted[U: Encoder: ClassTag, R: Encoder: ClassTag](
+      other: KeyValueGroupedDataset[K, U]
+  )(thisSortExprs: Column*)(otherSortExprs: Column*)(
+      func: (K, Iterator[V], Iterator[U]) => IterableOnce[R]
+  ): Dataset[R] =
+    cogroupImpl(other, thisSortExprs, otherSortExprs)(func)(
+      throw UnsupportedOperationException(
+        "cogroupSorted requires AgnosticEncoder-compatible encoders for key, both value sides, " +
+          "and the output. Falling back to client-side cogroup would silently drop sort " +
+          "expressions and break the contract. Either supply Spark-built-in encoders or call " +
+          "cogroup(other)(f) without sort semantics."
+      )
+    )
 
   // ---------------------------------------------------------------------------
   // Java Functional Interface Overloads
