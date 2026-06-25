@@ -9,6 +9,9 @@ import org.apache.spark.sql.internal.{OptionBuilder, StringEnumParser}
   *   df.write.format("parquet").mode("overwrite").save("/path")
   *   df.write.saveAsTable("my_table")
   * }}}
+  *
+  * Not thread-safe: a single instance accumulates mutable builder state, so do not share one
+  * instance across threads.
   */
 final class DataFrameWriter private[sql] (private val df: DataFrame)
     extends OptionBuilder[DataFrameWriter]:

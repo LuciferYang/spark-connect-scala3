@@ -17,6 +17,9 @@ import org.apache.spark.sql.internal.OptionBuilder
   *   df.writeTo("my_table").append()
   *   df.writeTo("my_table").overwrite(col("date") === lit("2024-01-01"))
   * }}}
+  *
+  * Not thread-safe: a single instance accumulates mutable builder state, so do not share one
+  * instance across threads.
   */
 final class DataFrameWriterV2[T] private[sql] (table: String, df: DataFrame)
     extends OptionBuilder[DataFrameWriterV2[T]]:

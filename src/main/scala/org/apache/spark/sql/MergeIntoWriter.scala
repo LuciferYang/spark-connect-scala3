@@ -14,6 +14,9 @@ import org.apache.spark.connect.proto.*
   * The type parameter `T` propagates the source dataset element type through the DSL chain so typed
   * `Dataset[T].mergeInto(...)` flows the element type into the `WhenMatched[T]` /
   * `WhenNotMatched[T]` / `WhenNotMatchedBySource[T]` helper classes.
+  *
+  * Not thread-safe: a single instance accumulates mutable builder state, so do not share one
+  * instance across threads.
   */
 final class MergeIntoWriter[T] private[sql] (table: String, df: DataFrame, on: Column):
 
