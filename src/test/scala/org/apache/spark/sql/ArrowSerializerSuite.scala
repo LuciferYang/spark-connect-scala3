@@ -439,3 +439,86 @@ class ArrowSerializerSuite extends AnyFunSuite with Matchers:
       ArrowSerializer.encodeRows(Seq(Row(nullKeyMap.asScala.toMap)), schema)
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Value-level round-trips through the deserializer.
+  //
+  // The bytes-only assertions above only prove encoding does not crash — a wrong
+  // per-column setter (mis-cast, wrong vector branch) would still emit non-empty
+  // bytes. These decode the result and assert the actual cell values per Arrow
+  // vector type, locking in the setArrowValue dispatch before it is refactored.
+  // ---------------------------------------------------------------------------
+
+  private def roundTrip(schema: StructType, rows: Seq[Row]): Seq[Row] =
+    val bytes = ArrowSerializer.encodeRows(rows, schema)
+    ArrowDeserializer.fromArrowBatchWithSchema(bytes)._1
+
+  test("round-trips every primitive column to its exact value") {
+    val schema = StructType(Seq(
+      StructField("bool", BooleanType),
+      StructField("byte", ByteType),
+      StructField("short", ShortType),
+      StructField("int", IntegerType),
+      StructField("long", LongType),
+      StructField("float", FloatType),
+      StructField("double", DoubleType),
+      StructField("str", StringType)
+    ))
+    val r = roundTrip(schema, Seq(Row(true, 1.toByte, 2.toShort, 3, 4L, 5.5f, 6.5, "hi"))).head
+    r.get(0) shouldBe true
+    r.get(1) shouldBe 1.toByte
+    r.get(2) shouldBe 2.toShort
+    r.get(3) shouldBe 3
+    r.get(4) shouldBe 4L
+    r.get(5) shouldBe 5.5f
+    r.get(6) shouldBe 6.5
+    r.get(7) shouldBe "hi"
+  }
+
+  test("round-trips BinaryType bytes") {
+    val schema = StructType(Seq(StructField("b", BinaryType)))
+    val r = roundTrip(schema, Seq(Row(Array[Byte](1, 2, 3)))).head
+    r.get(0).asInstanceOf[Array[Byte]].toSeq shouldBe Seq[Byte](1, 2, 3)
+  }
+
+  test("round-trips DateType via java.sql.Date") {
+    val schema = StructType(Seq(StructField("d", DateType)))
+    val r = roundTrip(schema, Seq(Row(java.sql.Date.valueOf("2024-01-15")))).head
+    r.get(0).asInstanceOf[java.sql.Date].toString shouldBe "2024-01-15"
+  }
+
+  test("round-trips TimestampType at microsecond precision") {
+    val schema = StructType(Seq(StructField("ts", TimestampType)))
+    val input = java.sql.Timestamp.valueOf("2024-01-15 10:30:00")
+    val r = roundTrip(schema, Seq(Row(input))).head
+    r.get(0).asInstanceOf[java.sql.Timestamp] shouldBe input
+  }
+
+  test("round-trips DecimalType preserving numeric value") {
+    val schema = StructType(Seq(StructField("dec", DecimalType(10, 2))))
+    val r = roundTrip(schema, Seq(Row(BigDecimal("123.45")))).head
+    val decoded = r.get(0).asInstanceOf[java.math.BigDecimal]
+    decoded.compareTo(new java.math.BigDecimal("123.45")) shouldBe 0
+  }
+
+  test("round-trips nested StructType field values") {
+    val inner = StructType(Seq(StructField("x", StringType), StructField("y", IntegerType)))
+    val schema = StructType(Seq(StructField("s", inner)))
+    val r = roundTrip(schema, Seq(Row(Row("hello", 42)))).head
+    val nested = r.get(0).asInstanceOf[Row]
+    nested.get(0) shouldBe "hello"
+    nested.get(1) shouldBe 42
+  }
+
+  test("round-trips a null in a nullable column") {
+    val schema = StructType(Seq(StructField("i", IntegerType, nullable = true)))
+    val out = roundTrip(schema, Seq(Row(1), Row(null), Row(3)))
+    out.map(_.get(0)) shouldBe Seq(1, null, 3)
+  }
+
+  test("round-trips multiple rows and columns to the right cells") {
+    val schema = StructType(Seq(StructField("i", IntegerType), StructField("s", StringType)))
+    val rows = Seq(Row(1, "a"), Row(2, "b"), Row(3, "c"))
+    val out = roundTrip(schema, rows)
+    out.map(r => (r.get(0), r.get(1))) shouldBe Seq((1, "a"), (2, "b"), (3, "c"))
+  }
