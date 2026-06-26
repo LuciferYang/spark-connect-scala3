@@ -60,17 +60,20 @@ private[sql] object ArrowSerializer:
           val vectors = root.getFieldVectors.asScala.toArray
           val numCols = vectors.length
           val numRows = rows.length
+          // Resolve the vector-type dispatch and the column DataType once per column rather than
+          // once per (row × column) cell — the vector type is fixed for the whole column.
+          val fields = schema.fields
+          val setters = new Array[(Int, Any) => Unit](numCols)
+          var setupCol = 0
+          while setupCol < numCols do
+            setters(setupCol) = buildColumnSetter(vectors(setupCol), fields(setupCol).dataType)
+            setupCol += 1
           var rowIdx = 0
           while rowIdx < numRows do
             val row = rows(rowIdx)
             var colIdx = 0
             while colIdx < numCols do
-              setArrowValue(
-                vectors(colIdx),
-                rowIdx,
-                row.get(colIdx),
-                schema.fields(colIdx).dataType
-              )
+              setters(colIdx)(rowIdx, row.get(colIdx))
               colIdx += 1
             rowIdx += 1
           vectors.foreach(_.setValueCount(rows.size))
@@ -187,6 +190,101 @@ private[sql] object ArrowSerializer:
       inst.getEpochSecond * 1_000_000 + inst.getNano / 1000
     case n: Number => n.longValue()
     case _         => value.toString.toLong
+
+  /** Build a reusable value setter for one column.
+    *
+    * The vector-type dispatch happens once here instead of once per (row × column) cell. The
+    * returned closure handles nulls uniformly; for the fixed vector type it writes directly.
+    * Complex/nested vectors (Map/List/Struct) delegate to [[setArrowValue]], which recurses
+    * per element — those columns are uncommon and inherently per-element.
+    */
+  private def buildColumnSetter(vec: FieldVector, dt: types.DataType): (Int, Any) => Unit =
+    val raw: (Int, Any) => Unit = vec match
+      case v: BitVector =>
+        (idx, value) => v.setSafe(idx, if value.asInstanceOf[Boolean] then 1 else 0)
+      case v: TinyIntVector =>
+        (idx, value) => v.setSafe(idx, value.asInstanceOf[Byte].toInt)
+      case v: SmallIntVector =>
+        (idx, value) => v.setSafe(idx, value.asInstanceOf[Short].toInt)
+      case v: IntVector =>
+        (idx, value) => v.setSafe(idx, value.asInstanceOf[Int])
+      case v: BigIntVector =>
+        (idx, value) => v.setSafe(idx, value.asInstanceOf[Long])
+      case v: Float4Vector =>
+        (idx, value) => v.setSafe(idx, value.asInstanceOf[Float])
+      case v: Float8Vector =>
+        (idx, value) => v.setSafe(idx, value.asInstanceOf[Double])
+      case v: VarCharVector =>
+        (idx, value) => v.setSafe(idx, value.toString.getBytes(StandardCharsets.UTF_8))
+      case v: DateDayVector =>
+        (idx, value) =>
+          val epochDay = value match
+            case d: java.sql.Date        => d.toLocalDate.toEpochDay.toInt
+            case ld: java.time.LocalDate => ld.toEpochDay.toInt
+            case n: Number               => n.intValue()
+            case _                       => value.toString.toInt
+          v.setSafe(idx, epochDay)
+      case v: TimeStampMicroTZVector =>
+        (idx, value) => v.setSafe(idx, toMicros(value))
+      case v: TimeStampMicroVector =>
+        (idx, value) => v.setSafe(idx, toMicros(value))
+      case v: DecimalVector =>
+        (idx, value) =>
+          val bd0 = value match
+            case d: BigDecimal           => d.underlying()
+            case d: java.math.BigDecimal => d
+            case _                       => java.math.BigDecimal(value.toString)
+          // Match upstream ArrowWriter.DecimalWriter: rescale to the vector's declared scale
+          // (HALF_UP), then null out values that overflow the declared precision.
+          val rescaled = bd0.setScale(v.getScale, java.math.RoundingMode.HALF_UP)
+          if rescaled.precision <= v.getPrecision then v.setSafe(idx, rescaled)
+          else v.setNull(idx)
+      case v: DurationVector =>
+        (idx, value) =>
+          value match
+            case d: java.time.Duration =>
+              v.setSafe(idx, d.getSeconds * 1_000_000L + d.getNano / 1_000L)
+            case n: Number =>
+              v.setSafe(idx, n.longValue())
+            case _ =>
+              v.setSafe(idx, value.toString.toLong)
+      case v: IntervalYearVector =>
+        (idx, value) =>
+          value match
+            case p: java.time.Period =>
+              v.setSafe(idx, p.toTotalMonths.toInt)
+            case n: Number =>
+              v.setSafe(idx, n.intValue())
+            case _ =>
+              v.setSafe(idx, value.toString.toInt)
+      case v: TimeMicroVector =>
+        (idx, value) =>
+          value match
+            case t: java.time.LocalTime =>
+              v.setSafe(idx, t.toNanoOfDay / 1_000L)
+            case n: Number =>
+              v.setSafe(idx, n.longValue())
+            case _ =>
+              v.setSafe(idx, value.toString.toLong)
+      case v: VarBinaryVector =>
+        (idx, value) =>
+          val bytes = value.asInstanceOf[Array[Byte]]
+          v.setSafe(idx, bytes, 0, bytes.length)
+      // Complex/nested vectors recurse per element via setArrowValue.
+      case _: MapVector =>
+        (idx, value) => setArrowValue(vec, idx, value, dt)
+      case _: ListVector =>
+        (idx, value) => setArrowValue(vec, idx, value, dt)
+      case _: StructVector =>
+        (idx, value) => setArrowValue(vec, idx, value, dt)
+      case other =>
+        (_, _) =>
+          throw UnsupportedOperationException(
+            s"Unsupported Arrow vector type: ${other.getClass.getName}"
+          )
+    (idx, value) =>
+      if value == null then vec.setNull(idx)
+      else raw(idx, value)
 
   private def setArrowValue(vec: FieldVector, idx: Int, value: Any, dt: types.DataType): Unit =
     if value == null then
