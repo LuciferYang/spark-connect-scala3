@@ -551,7 +551,8 @@ object SparkConnectClient:
       interceptors: List[ClientInterceptor] = List.empty,
       maxInboundMessageSize: Option[Int] = None,
       retryPolicy: RetryPolicy = RetryPolicy.defaultPolicy(),
-      planCompressionEnabled: Boolean = true
+      planCompressionEnabled: Boolean = true,
+      channelBuilderCustomizer: ManagedChannelBuilder[?] => Unit = _ => ()
   ): SparkConnectClient =
     val (host, port, params) = parseUrl(url)
     val paramMap = params.toMap
@@ -574,6 +575,10 @@ object SparkConnectClient:
       .userAgent(UserAgentString)
 
     if !useSsl then channelBuilder.usePlaintext()
+
+    // Apply caller customizations last so they can tune (or override) any channel option —
+    // keepalive, idle timeout, proxy, executor, etc. — before the channel is built.
+    channelBuilderCustomizer(channelBuilder)
 
     val channel = channelBuilder.build()
 

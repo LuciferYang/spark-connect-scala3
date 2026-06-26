@@ -523,6 +523,7 @@ object SparkSession:
     private var maxInboundMessageSizeBytes: Option[Int] = None
     private var retryPolicyValue: RetryPolicy = RetryPolicy.defaultPolicy()
     private var planCompressionEnabledValue: Boolean = true
+    private var channelBuilderCustomizerValue: io.grpc.ManagedChannelBuilder[?] => Unit = _ => ()
 
     /** Override the gRPC retry policy (max retries, backoff, jitter, retryable conditions). */
     def retryPolicy(policy: RetryPolicy): Builder =
@@ -558,6 +559,20 @@ object SparkSession:
       */
     def interceptor(interceptor: io.grpc.ClientInterceptor): Builder =
       interceptors = interceptors :+ interceptor
+      this
+
+    /** Customize the underlying gRPC `ManagedChannelBuilder` before the channel is built.
+      *
+      * The callback runs after the built-in options (address, max message size, user agent,
+      * plaintext/TLS) so it can tune or override any of them. Use it for channel-level settings
+      * with no dedicated builder method — e.g. `keepAliveTime`/`keepAliveWithoutCalls` to keep
+      * long-lived sessions alive behind load balancers, or `idleTimeout`. Multiple calls compose.
+      */
+    def channelBuilder(customizer: io.grpc.ManagedChannelBuilder[?] => Unit): Builder =
+      val previous = channelBuilderCustomizerValue
+      channelBuilderCustomizerValue = b =>
+        previous(b)
+        customizer(b)
       this
 
     def config(key: String, value: String): Builder =
@@ -596,7 +611,8 @@ object SparkSession:
         interceptors = interceptors,
         maxInboundMessageSize = maxInboundMessageSizeBytes,
         retryPolicy = retryPolicyValue,
-        planCompressionEnabled = planCompressionEnabledValue
+        planCompressionEnabled = planCompressionEnabledValue,
+        channelBuilderCustomizer = channelBuilderCustomizerValue
       )
       val session = SparkSession(client)
       if defaultSession.get() == null then defaultSession.compareAndSet(null, session)
