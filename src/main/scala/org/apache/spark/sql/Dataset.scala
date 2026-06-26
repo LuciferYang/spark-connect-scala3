@@ -67,9 +67,9 @@ final class Dataset[T: ClassTag] private[sql] (
     val outEnc = summon[Encoder[U]]
     val inAg = encoder.agnosticEncoder
     val outAg = outEnc.agnosticEncoder
-    if inAg == null || outAg == null then return mapPartitionsLocal(func, outEnc)
+    if inAg.isEmpty || outAg.isEmpty then return mapPartitionsLocal(func, outEnc)
     // Build server-side MapPartitions
-    val udfProto = buildMapPartitionsUdf(func, inAg, outAg)
+    val udfProto = buildMapPartitionsUdf(func, inAg.get, outAg.get)
     val relation = Relation
       .newBuilder()
       .setCommon(
@@ -386,11 +386,9 @@ final class Dataset[T: ClassTag] private[sql] (
 
     // Determine if the left/right schemas are structs for JoinDataType
     val isLeftStruct = encoder.schema.fields.length > 1 ||
-      (encoder.agnosticEncoder != null && encoder.agnosticEncoder.isInstanceOf[ProductEncoder[?]])
+      encoder.agnosticEncoder.exists(_.isInstanceOf[ProductEncoder[?]])
     val isRightStruct = other.encoder.schema.fields.length > 1 ||
-      (other.encoder.agnosticEncoder != null &&
-        other.encoder.agnosticEncoder
-          .isInstanceOf[ProductEncoder[?]])
+      other.encoder.agnosticEncoder.exists(_.isInstanceOf[ProductEncoder[?]])
 
     val joinBuilder = Join.newBuilder()
       .setLeft(df.relation)
@@ -708,7 +706,7 @@ final class Dataset[T: ClassTag] private[sql] (
 
   /** Access the streaming writer. */
   def writeStream: DataStreamWriter[T] =
-    val ag = Option(encoder.agnosticEncoder).getOrElse(AgnosticEncoders.UnboundRowEncoder)
+    val ag = encoder.agnosticEncoder.getOrElse(AgnosticEncoders.UnboundRowEncoder)
     new DataStreamWriter[T](df, ag)
 
   /** Define a watermark for streaming aggregations. */
@@ -815,7 +813,7 @@ final class Dataset[T: ClassTag] private[sql] (
     Dataset(newDf, outEnc)
 
   private def classTagFromEncoder[U](encoder: Encoder[U]): ClassTag[U] =
-    Option(encoder.agnosticEncoder)
+    encoder.agnosticEncoder
       .map(_.clsTag.asInstanceOf[ClassTag[U]])
       .getOrElse(ClassTag(classOf[Object]).asInstanceOf[ClassTag[U]])
 

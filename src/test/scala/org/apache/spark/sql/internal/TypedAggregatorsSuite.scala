@@ -42,7 +42,7 @@ class TypedAggregatorsSuite extends AnyFunSuite with Matchers:
     val agg = TypedAverage[Int](_.toDouble)
     val bufEnc = agg.bufferEncoder
     bufEnc should not be null
-    val ae = bufEnc.agnosticEncoder.asInstanceOf[ProductEncoder[?]]
+    val ae = bufEnc.agnosticEncoder.get.asInstanceOf[ProductEncoder[?]]
     ae.fields should have size 2
     ae.fields(0).enc shouldBe PrimitiveDoubleEncoder
     ae.fields(1).enc shouldBe PrimitiveLongEncoder
@@ -50,7 +50,7 @@ class TypedAggregatorsSuite extends AnyFunSuite with Matchers:
 
   test("TypedAverage outputEncoder is scalaDouble") {
     val agg = TypedAverage[Int](_.toDouble)
-    agg.outputEncoder.agnosticEncoder shouldBe PrimitiveDoubleEncoder
+    agg.outputEncoder.agnosticEncoder shouldBe Some(PrimitiveDoubleEncoder)
   }
 
   // ---------------------------------------------------------------------------
@@ -88,12 +88,12 @@ class TypedAggregatorsSuite extends AnyFunSuite with Matchers:
 
   test("TypedCount bufferEncoder is scalaLong") {
     val agg = TypedCount[String](identity)
-    agg.bufferEncoder.agnosticEncoder shouldBe PrimitiveLongEncoder
+    agg.bufferEncoder.agnosticEncoder shouldBe Some(PrimitiveLongEncoder)
   }
 
   test("TypedCount outputEncoder is scalaLong") {
     val agg = TypedCount[String](identity)
-    agg.outputEncoder.agnosticEncoder shouldBe PrimitiveLongEncoder
+    agg.outputEncoder.agnosticEncoder shouldBe Some(PrimitiveLongEncoder)
   }
 
   // ---------------------------------------------------------------------------
@@ -125,12 +125,12 @@ class TypedAggregatorsSuite extends AnyFunSuite with Matchers:
 
   test("TypedSumDouble bufferEncoder is scalaDouble") {
     val agg = TypedSumDouble[Int](_.toDouble)
-    agg.bufferEncoder.agnosticEncoder shouldBe PrimitiveDoubleEncoder
+    agg.bufferEncoder.agnosticEncoder shouldBe Some(PrimitiveDoubleEncoder)
   }
 
   test("TypedSumDouble outputEncoder is scalaDouble") {
     val agg = TypedSumDouble[Int](_.toDouble)
-    agg.outputEncoder.agnosticEncoder shouldBe PrimitiveDoubleEncoder
+    agg.outputEncoder.agnosticEncoder shouldBe Some(PrimitiveDoubleEncoder)
   }
 
   // ---------------------------------------------------------------------------
@@ -162,12 +162,12 @@ class TypedAggregatorsSuite extends AnyFunSuite with Matchers:
 
   test("TypedSumLong bufferEncoder is scalaLong") {
     val agg = TypedSumLong[Int](_.toLong)
-    agg.bufferEncoder.agnosticEncoder shouldBe PrimitiveLongEncoder
+    agg.bufferEncoder.agnosticEncoder shouldBe Some(PrimitiveLongEncoder)
   }
 
   test("TypedSumLong outputEncoder is scalaLong") {
     val agg = TypedSumLong[Int](_.toLong)
-    agg.outputEncoder.agnosticEncoder shouldBe PrimitiveLongEncoder
+    agg.outputEncoder.agnosticEncoder shouldBe Some(PrimitiveLongEncoder)
   }
 
   // ---------------------------------------------------------------------------

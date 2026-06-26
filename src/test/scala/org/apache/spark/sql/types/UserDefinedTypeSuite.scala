@@ -117,8 +117,8 @@ class UserDefinedTypeSuite extends AnyFunSuite with Matchers:
   test("Encoders.udt creates encoder with UDT dataType") {
     val udt = IntPairUDT()
     val encoder = Encoders.udt(udt)
-    encoder.agnosticEncoder shouldBe a[UDTEncoder[?]]
-    val udtEnc = encoder.agnosticEncoder.asInstanceOf[UDTEncoder[IntPair]]
+    encoder.agnosticEncoder.get shouldBe a[UDTEncoder[?]]
+    val udtEnc = encoder.agnosticEncoder.get.asInstanceOf[UDTEncoder[IntPair]]
     udtEnc.dataType shouldBe udt
   }
 

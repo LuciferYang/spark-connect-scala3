@@ -24,11 +24,11 @@ trait Encoder[T] extends Serializable:
 
   /** The corresponding AgnosticEncoder for server-side typed operations.
     *
-    * Returns `null` when no AgnosticEncoder is available (e.g. for derived case class encoders
-    * before ProductEncoder is implemented). Typed operations fall back to client-side
-    * implementation in this case.
+    * Returns `None` when no AgnosticEncoder is available (e.g. for user-defined `Encoder`
+    * implementations that do not override this). Typed operations fall back to a client-side
+    * implementation in that case.
     */
-  def agnosticEncoder: AgnosticEncoder[?] = null
+  def agnosticEncoder: Option[AgnosticEncoder[?]] = None
 
 object Encoder:
 
@@ -40,49 +40,49 @@ object Encoder:
     def schema = StructType(Seq(StructField("value", IntegerType)))
     def fromRow(row: Row) = row.getInt(0)
     def toRow(value: Int) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.PrimitiveIntEncoder
+    override def agnosticEncoder = Some(AgnosticEncoders.PrimitiveIntEncoder)
 
   given Encoder[Long] with
     def schema = StructType(Seq(StructField("value", LongType)))
     def fromRow(row: Row) = row.getLong(0)
     def toRow(value: Long) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.PrimitiveLongEncoder
+    override def agnosticEncoder = Some(AgnosticEncoders.PrimitiveLongEncoder)
 
   given Encoder[Double] with
     def schema = StructType(Seq(StructField("value", DoubleType)))
     def fromRow(row: Row) = row.getDouble(0)
     def toRow(value: Double) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.PrimitiveDoubleEncoder
+    override def agnosticEncoder = Some(AgnosticEncoders.PrimitiveDoubleEncoder)
 
   given Encoder[Float] with
     def schema = StructType(Seq(StructField("value", FloatType)))
     def fromRow(row: Row) = row.getFloat(0)
     def toRow(value: Float) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.PrimitiveFloatEncoder
+    override def agnosticEncoder = Some(AgnosticEncoders.PrimitiveFloatEncoder)
 
   given Encoder[Short] with
     def schema = StructType(Seq(StructField("value", ShortType)))
     def fromRow(row: Row) = row.getShort(0)
     def toRow(value: Short) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.PrimitiveShortEncoder
+    override def agnosticEncoder = Some(AgnosticEncoders.PrimitiveShortEncoder)
 
   given Encoder[Byte] with
     def schema = StructType(Seq(StructField("value", ByteType)))
     def fromRow(row: Row) = row.getByte(0)
     def toRow(value: Byte) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.PrimitiveByteEncoder
+    override def agnosticEncoder = Some(AgnosticEncoders.PrimitiveByteEncoder)
 
   given Encoder[Boolean] with
     def schema = StructType(Seq(StructField("value", BooleanType)))
     def fromRow(row: Row) = row.getBoolean(0)
     def toRow(value: Boolean) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.PrimitiveBooleanEncoder
+    override def agnosticEncoder = Some(AgnosticEncoders.PrimitiveBooleanEncoder)
 
   given Encoder[String] with
     def schema = StructType(Seq(StructField("value", StringType)))
     def fromRow(row: Row) = row.getString(0)
     def toRow(value: String) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.StringEncoder
+    override def agnosticEncoder = Some(AgnosticEncoders.StringEncoder)
 
   // ---------------------------------------------------------------------------
   // Extended Type Encoders (Date, Timestamp, Decimal, Binary, LocalDate, Instant)
@@ -95,7 +95,7 @@ object Encoder:
       case d: java.sql.Date => d
       case other            => other.asInstanceOf[java.sql.Date]
     def toRow(value: java.sql.Date) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.STRICT_DATE_ENCODER
+    override def agnosticEncoder = Some(AgnosticEncoders.STRICT_DATE_ENCODER)
 
   given Encoder[java.sql.Timestamp] with
     def schema = StructType(Seq(StructField("value", TimestampType)))
@@ -104,7 +104,7 @@ object Encoder:
       case ts: java.sql.Timestamp => ts
       case other                  => other.asInstanceOf[java.sql.Timestamp]
     def toRow(value: java.sql.Timestamp) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.STRICT_TIMESTAMP_ENCODER
+    override def agnosticEncoder = Some(AgnosticEncoders.STRICT_TIMESTAMP_ENCODER)
 
   given Encoder[java.time.LocalDate] with
     def schema = StructType(Seq(StructField("value", DateType)))
@@ -113,7 +113,7 @@ object Encoder:
       case ld: java.time.LocalDate => ld
       case other                   => other.asInstanceOf[java.time.LocalDate]
     def toRow(value: java.time.LocalDate) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.STRICT_LOCAL_DATE_ENCODER
+    override def agnosticEncoder = Some(AgnosticEncoders.STRICT_LOCAL_DATE_ENCODER)
 
   given Encoder[java.time.Instant] with
     def schema = StructType(Seq(StructField("value", TimestampType)))
@@ -122,7 +122,7 @@ object Encoder:
       case inst: java.time.Instant => inst
       case other                   => other.asInstanceOf[java.time.Instant]
     def toRow(value: java.time.Instant) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.STRICT_INSTANT_ENCODER
+    override def agnosticEncoder = Some(AgnosticEncoders.STRICT_INSTANT_ENCODER)
 
   given Encoder[BigDecimal] with
     def schema = StructType(Seq(StructField("value", DecimalType.DEFAULT)))
@@ -132,13 +132,13 @@ object Encoder:
       case n: Number               => BigDecimal(n.doubleValue())
       case other                   => BigDecimal(other.toString)
     def toRow(value: BigDecimal) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.DEFAULT_SCALA_DECIMAL_ENCODER
+    override def agnosticEncoder = Some(AgnosticEncoders.DEFAULT_SCALA_DECIMAL_ENCODER)
 
   given Encoder[Array[Byte]] with
     def schema = StructType(Seq(StructField("value", BinaryType)))
     def fromRow(row: Row) = row.get(0).asInstanceOf[Array[Byte]]
     def toRow(value: Array[Byte]) = Row(value)
-    override def agnosticEncoder = AgnosticEncoders.BinaryEncoder
+    override def agnosticEncoder = Some(AgnosticEncoders.BinaryEncoder)
 
   // ---------------------------------------------------------------------------
   // Scala type -> Spark DataType mapping (compile time)
@@ -293,7 +293,7 @@ object Encoder:
         i += 1
       Row.fromSeq(scala.collection.immutable.ArraySeq.unsafeWrapArray(arr))
 
-    override def agnosticEncoder: AgnosticEncoder[?] = _agnosticEncoder
+    override def agnosticEncoder: Option[AgnosticEncoder[?]] = Some(_agnosticEncoder)
 
   /** Derive an Encoder for any case class T using Scala 3 Mirror. */
   inline given derived[T](using m: Mirror.ProductOf[T], ct: ClassTag[T]): Encoder[T] =

@@ -14,86 +14,86 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
 
   test("primitive Encoder[Int] has correct agnosticEncoder") {
     val enc = summon[Encoder[Int]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.PrimitiveIntEncoder
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.PrimitiveIntEncoder)
   }
 
   test("primitive Encoder[Long] has correct agnosticEncoder") {
     val enc = summon[Encoder[Long]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.PrimitiveLongEncoder
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.PrimitiveLongEncoder)
   }
 
   test("primitive Encoder[Double] has correct agnosticEncoder") {
     val enc = summon[Encoder[Double]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.PrimitiveDoubleEncoder
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.PrimitiveDoubleEncoder)
   }
 
   test("primitive Encoder[Float] has correct agnosticEncoder") {
     val enc = summon[Encoder[Float]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.PrimitiveFloatEncoder
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.PrimitiveFloatEncoder)
   }
 
   test("primitive Encoder[Short] has correct agnosticEncoder") {
     val enc = summon[Encoder[Short]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.PrimitiveShortEncoder
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.PrimitiveShortEncoder)
   }
 
   test("primitive Encoder[Byte] has correct agnosticEncoder") {
     val enc = summon[Encoder[Byte]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.PrimitiveByteEncoder
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.PrimitiveByteEncoder)
   }
 
   test("primitive Encoder[Boolean] has correct agnosticEncoder") {
     val enc = summon[Encoder[Boolean]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.PrimitiveBooleanEncoder
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.PrimitiveBooleanEncoder)
   }
 
   test("Encoder[String] has correct agnosticEncoder") {
     val enc = summon[Encoder[String]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.StringEncoder
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.StringEncoder)
   }
 
   test("Encoder[java.sql.Date] has correct agnosticEncoder") {
     val enc = summon[Encoder[java.sql.Date]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.STRICT_DATE_ENCODER
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.STRICT_DATE_ENCODER)
   }
 
   test("Encoder[java.sql.Timestamp] has correct agnosticEncoder") {
     val enc = summon[Encoder[java.sql.Timestamp]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.STRICT_TIMESTAMP_ENCODER
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.STRICT_TIMESTAMP_ENCODER)
   }
 
   test("Encoder[java.time.LocalDate] has correct agnosticEncoder") {
     val enc = summon[Encoder[java.time.LocalDate]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.STRICT_LOCAL_DATE_ENCODER
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.STRICT_LOCAL_DATE_ENCODER)
   }
 
   test("Encoder[java.time.Instant] has correct agnosticEncoder") {
     val enc = summon[Encoder[java.time.Instant]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.STRICT_INSTANT_ENCODER
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.STRICT_INSTANT_ENCODER)
   }
 
   test("Encoder[BigDecimal] has correct agnosticEncoder") {
     val enc = summon[Encoder[BigDecimal]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.DEFAULT_SCALA_DECIMAL_ENCODER
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.DEFAULT_SCALA_DECIMAL_ENCODER)
   }
 
   test("Encoder[Array[Byte]] has correct agnosticEncoder") {
     val enc = summon[Encoder[Array[Byte]]]
-    enc.agnosticEncoder shouldBe AgnosticEncoders.BinaryEncoder
+    enc.agnosticEncoder shouldBe Some(AgnosticEncoders.BinaryEncoder)
   }
 
   test("derived case class encoder has ProductEncoder agnosticEncoder") {
     val enc = summon[Encoder[Person]]
-    enc.agnosticEncoder should not be null
-    enc.agnosticEncoder shouldBe a[AgnosticEncoders.ProductEncoder[?]]
+    enc.agnosticEncoder shouldBe defined
+    enc.agnosticEncoder.get shouldBe a[AgnosticEncoders.ProductEncoder[?]]
   }
 
-  test("default Encoder trait agnosticEncoder is null") {
+  test("default Encoder trait agnosticEncoder is None") {
     val customEnc = new Encoder[String]:
       def schema = StructType(Seq(StructField("v", StringType)))
       def fromRow(row: Row) = row.getString(0)
       def toRow(value: String) = Row(value)
-    customEnc.agnosticEncoder shouldBe null
+    customEnc.agnosticEncoder shouldBe None
   }
 
   // ---------------------------------------------------------------------------
@@ -108,8 +108,8 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
     val intEnc = summon[Encoder[Int]]
     val strEnc = summon[Encoder[String]]
     // Both should have agnosticEncoder available for server-side execution
-    intEnc.agnosticEncoder should not be null
-    strEnc.agnosticEncoder should not be null
+    intEnc.agnosticEncoder shouldBe defined
+    strEnc.agnosticEncoder shouldBe defined
   }
 
   test("Dataset.reduce throws on empty data") {
@@ -1349,13 +1349,13 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
   test(
     "KVGD.cogroupSorted refuses encoder-null fallback rather than silently dropping sort exprs (R85)"
   ) {
-    // Build an output Encoder whose agnosticEncoder is null — this would have routed through
+    // Build an output Encoder whose agnosticEncoder is None — this would have routed through
     // the old client-side `cogroupLocal` fallback path that silently ignored sort expressions.
     given customOutEnc: Encoder[Long] = new Encoder[Long]:
       def schema: StructType = StructType(Seq(StructField("value", LongType)))
       def fromRow(row: Row): Long = row.getLong(0)
       def toRow(value: Long): Row = Row(value)
-      // Note: deliberately NOT overriding agnosticEncoder — defaults to null, triggering the
+      // Note: deliberately NOT overriding agnosticEncoder — defaults to None, triggering the
       // fallback condition the fix protects against.
 
     val left = stubDs.groupByKey(identity)
@@ -1373,8 +1373,8 @@ class TypedOpsSuite extends AnyFunSuite with Matchers:
 
   test("KVGD buildGroupingUdf produces correct proto") {
     val kvgd = stubKvgd
-    val keyAg = summon[Encoder[Long]].agnosticEncoder
-    val valueAg = summon[Encoder[Long]].agnosticEncoder
+    val keyAg = summon[Encoder[Long]].agnosticEncoder.get
+    val valueAg = summon[Encoder[Long]].agnosticEncoder.get
     val udf = kvgd.buildGroupingUdf(keyAg, valueAg)
     udf.getFunctionName shouldBe "groupByKey"
     udf.getDeterministic shouldBe true

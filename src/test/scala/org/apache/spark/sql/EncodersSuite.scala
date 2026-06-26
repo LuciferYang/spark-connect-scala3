@@ -16,43 +16,43 @@ class EncodersSuite extends AnyFunSuite with Matchers:
   test("scalaBoolean returns correct encoder") {
     val enc = Encoders.scalaBoolean
     enc.schema shouldBe StructType(Seq(StructField("value", BooleanType)))
-    enc.agnosticEncoder shouldBe PrimitiveBooleanEncoder
+    enc.agnosticEncoder shouldBe Some(PrimitiveBooleanEncoder)
   }
 
   test("scalaByte returns correct encoder") {
     val enc = Encoders.scalaByte
     enc.schema shouldBe StructType(Seq(StructField("value", ByteType)))
-    enc.agnosticEncoder shouldBe PrimitiveByteEncoder
+    enc.agnosticEncoder shouldBe Some(PrimitiveByteEncoder)
   }
 
   test("scalaShort returns correct encoder") {
     val enc = Encoders.scalaShort
     enc.schema shouldBe StructType(Seq(StructField("value", ShortType)))
-    enc.agnosticEncoder shouldBe PrimitiveShortEncoder
+    enc.agnosticEncoder shouldBe Some(PrimitiveShortEncoder)
   }
 
   test("scalaInt returns correct encoder") {
     val enc = Encoders.scalaInt
     enc.schema shouldBe StructType(Seq(StructField("value", IntegerType)))
-    enc.agnosticEncoder shouldBe PrimitiveIntEncoder
+    enc.agnosticEncoder shouldBe Some(PrimitiveIntEncoder)
   }
 
   test("scalaLong returns correct encoder") {
     val enc = Encoders.scalaLong
     enc.schema shouldBe StructType(Seq(StructField("value", LongType)))
-    enc.agnosticEncoder shouldBe PrimitiveLongEncoder
+    enc.agnosticEncoder shouldBe Some(PrimitiveLongEncoder)
   }
 
   test("scalaFloat returns correct encoder") {
     val enc = Encoders.scalaFloat
     enc.schema shouldBe StructType(Seq(StructField("value", FloatType)))
-    enc.agnosticEncoder shouldBe PrimitiveFloatEncoder
+    enc.agnosticEncoder shouldBe Some(PrimitiveFloatEncoder)
   }
 
   test("scalaDouble returns correct encoder") {
     val enc = Encoders.scalaDouble
     enc.schema shouldBe StructType(Seq(StructField("value", DoubleType)))
-    enc.agnosticEncoder shouldBe PrimitiveDoubleEncoder
+    enc.agnosticEncoder shouldBe Some(PrimitiveDoubleEncoder)
   }
 
   // ---------------------------------------------------------------------------
@@ -62,43 +62,43 @@ class EncodersSuite extends AnyFunSuite with Matchers:
   test("BOOLEAN returns correct encoder") {
     val enc = Encoders.BOOLEAN
     enc.schema shouldBe StructType(Seq(StructField("value", BooleanType)))
-    enc.agnosticEncoder shouldBe BoxedBooleanEncoder
+    enc.agnosticEncoder shouldBe Some(BoxedBooleanEncoder)
   }
 
   test("BYTE returns correct encoder") {
     val enc = Encoders.BYTE
     enc.schema shouldBe StructType(Seq(StructField("value", ByteType)))
-    enc.agnosticEncoder shouldBe BoxedByteEncoder
+    enc.agnosticEncoder shouldBe Some(BoxedByteEncoder)
   }
 
   test("SHORT returns correct encoder") {
     val enc = Encoders.SHORT
     enc.schema shouldBe StructType(Seq(StructField("value", ShortType)))
-    enc.agnosticEncoder shouldBe BoxedShortEncoder
+    enc.agnosticEncoder shouldBe Some(BoxedShortEncoder)
   }
 
   test("INT returns correct encoder") {
     val enc = Encoders.INT
     enc.schema shouldBe StructType(Seq(StructField("value", IntegerType)))
-    enc.agnosticEncoder shouldBe BoxedIntEncoder
+    enc.agnosticEncoder shouldBe Some(BoxedIntEncoder)
   }
 
   test("LONG returns correct encoder") {
     val enc = Encoders.LONG
     enc.schema shouldBe StructType(Seq(StructField("value", LongType)))
-    enc.agnosticEncoder shouldBe BoxedLongEncoder
+    enc.agnosticEncoder shouldBe Some(BoxedLongEncoder)
   }
 
   test("FLOAT returns correct encoder") {
     val enc = Encoders.FLOAT
     enc.schema shouldBe StructType(Seq(StructField("value", FloatType)))
-    enc.agnosticEncoder shouldBe BoxedFloatEncoder
+    enc.agnosticEncoder shouldBe Some(BoxedFloatEncoder)
   }
 
   test("DOUBLE returns correct encoder") {
     val enc = Encoders.DOUBLE
     enc.schema shouldBe StructType(Seq(StructField("value", DoubleType)))
-    enc.agnosticEncoder shouldBe BoxedDoubleEncoder
+    enc.agnosticEncoder shouldBe Some(BoxedDoubleEncoder)
   }
 
   // ---------------------------------------------------------------------------
@@ -108,13 +108,13 @@ class EncodersSuite extends AnyFunSuite with Matchers:
   test("STRING returns correct encoder") {
     val enc = Encoders.STRING
     enc.schema shouldBe StructType(Seq(StructField("value", StringType)))
-    enc.agnosticEncoder shouldBe StringEncoder
+    enc.agnosticEncoder shouldBe Some(StringEncoder)
   }
 
   test("BINARY returns correct encoder") {
     val enc = Encoders.BINARY
     enc.schema shouldBe StructType(Seq(StructField("value", BinaryType)))
-    enc.agnosticEncoder shouldBe BinaryEncoder
+    enc.agnosticEncoder shouldBe Some(BinaryEncoder)
   }
 
   // ---------------------------------------------------------------------------
@@ -124,37 +124,37 @@ class EncodersSuite extends AnyFunSuite with Matchers:
   test("DATE returns correct encoder") {
     val enc = Encoders.DATE
     enc.schema shouldBe StructType(Seq(StructField("value", DateType)))
-    enc.agnosticEncoder shouldBe STRICT_DATE_ENCODER
+    enc.agnosticEncoder shouldBe Some(STRICT_DATE_ENCODER)
   }
 
   test("LOCALDATE returns correct encoder") {
     val enc = Encoders.LOCALDATE
     enc.schema shouldBe StructType(Seq(StructField("value", DateType)))
-    enc.agnosticEncoder shouldBe STRICT_LOCAL_DATE_ENCODER
+    enc.agnosticEncoder shouldBe Some(STRICT_LOCAL_DATE_ENCODER)
   }
 
   test("TIMESTAMP returns correct encoder") {
     val enc = Encoders.TIMESTAMP
     enc.schema shouldBe StructType(Seq(StructField("value", TimestampType)))
-    enc.agnosticEncoder shouldBe STRICT_TIMESTAMP_ENCODER
+    enc.agnosticEncoder shouldBe Some(STRICT_TIMESTAMP_ENCODER)
   }
 
   test("INSTANT returns correct encoder") {
     val enc = Encoders.INSTANT
     enc.schema shouldBe StructType(Seq(StructField("value", TimestampType)))
-    enc.agnosticEncoder shouldBe STRICT_INSTANT_ENCODER
+    enc.agnosticEncoder shouldBe Some(STRICT_INSTANT_ENCODER)
   }
 
   test("LOCALDATETIME returns correct encoder") {
     val enc = Encoders.LOCALDATETIME
     enc.schema shouldBe StructType(Seq(StructField("value", TimestampNTZType)))
-    enc.agnosticEncoder shouldBe LocalDateTimeEncoder
+    enc.agnosticEncoder shouldBe Some(LocalDateTimeEncoder)
   }
 
   test("DECIMAL returns correct encoder") {
     val enc = Encoders.DECIMAL
     enc.schema shouldBe StructType(Seq(StructField("value", DecimalType.DEFAULT)))
-    enc.agnosticEncoder shouldBe DEFAULT_JAVA_DECIMAL_ENCODER
+    enc.agnosticEncoder shouldBe Some(DEFAULT_JAVA_DECIMAL_ENCODER)
   }
 
   // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ class EncodersSuite extends AnyFunSuite with Matchers:
   test("row returns Row encoder") {
     val enc = Encoders.row
     enc should not be null
-    enc.agnosticEncoder shouldBe UnboundRowEncoder
+    enc.agnosticEncoder shouldBe Some(UnboundRowEncoder)
   }
 
   test("row(schema) returns schema-bound RowEncoder for primitive fields") {
@@ -174,7 +174,7 @@ class EncodersSuite extends AnyFunSuite with Matchers:
     ))
     val enc = Encoders.row(schema)
     enc should not be null
-    val ae = enc.agnosticEncoder.asInstanceOf[RowEncoder]
+    val ae = enc.agnosticEncoder.get.asInstanceOf[RowEncoder]
     ae.dataType shouldBe schema
     ae.fields should have size 2
     ae.fields(0).name shouldBe "id"
@@ -193,7 +193,7 @@ class EncodersSuite extends AnyFunSuite with Matchers:
       StructField("m", MapType(StringType, BooleanType, valueContainsNull = false))
     ))
     val enc = Encoders.row(schema)
-    val ae = enc.agnosticEncoder.asInstanceOf[RowEncoder]
+    val ae = enc.agnosticEncoder.get.asInstanceOf[RowEncoder]
     ae.fields(0).enc shouldBe a[RowEncoder]
     ae.fields(1).enc shouldBe a[IterableEncoder[?, ?]]
     ae.fields(2).enc shouldBe a[MapEncoder[?, ?, ?]]
@@ -206,7 +206,7 @@ class EncodersSuite extends AnyFunSuite with Matchers:
       StructField("d", DateType)
     ))
     val enc = Encoders.row(schema)
-    val ae = enc.agnosticEncoder.asInstanceOf[RowEncoder]
+    val ae = enc.agnosticEncoder.get.asInstanceOf[RowEncoder]
     ae.fields(0).enc shouldBe a[JavaDecimalEncoder]
     ae.fields(1).enc shouldBe a[TimestampEncoder]
     ae.fields(2).enc shouldBe a[DateEncoder]
@@ -218,7 +218,7 @@ class EncodersSuite extends AnyFunSuite with Matchers:
       StructField("geog", GeographyType())
     ))
     val enc = Encoders.row(schema)
-    val ae = enc.agnosticEncoder.asInstanceOf[RowEncoder]
+    val ae = enc.agnosticEncoder.get.asInstanceOf[RowEncoder]
     ae.fields(0).enc shouldBe a[GeometryEncoder]
     ae.fields(1).enc shouldBe a[GeographyEncoder]
   }
@@ -250,7 +250,7 @@ class EncodersSuite extends AnyFunSuite with Matchers:
 
   test("tuple3 encoder has correct schema") {
     val enc = Encoders.tuple(Encoders.scalaInt, Encoders.STRING, Encoders.scalaDouble)
-    val innerFields = enc.agnosticEncoder.asInstanceOf[ProductEncoder[?]].fields
+    val innerFields = enc.agnosticEncoder.get.asInstanceOf[ProductEncoder[?]].fields
     innerFields should have size 3
     innerFields(0).name shouldBe "_1"
     innerFields(1).name shouldBe "_2"
@@ -264,7 +264,7 @@ class EncodersSuite extends AnyFunSuite with Matchers:
       Encoders.scalaDouble,
       Encoders.scalaLong
     )
-    val innerFields = enc.agnosticEncoder.asInstanceOf[ProductEncoder[?]].fields
+    val innerFields = enc.agnosticEncoder.get.asInstanceOf[ProductEncoder[?]].fields
     innerFields should have size 4
     innerFields(3).name shouldBe "_4"
   }
@@ -277,7 +277,7 @@ class EncodersSuite extends AnyFunSuite with Matchers:
       Encoders.scalaLong,
       Encoders.scalaBoolean
     )
-    val innerFields = enc.agnosticEncoder.asInstanceOf[ProductEncoder[?]].fields
+    val innerFields = enc.agnosticEncoder.get.asInstanceOf[ProductEncoder[?]].fields
     innerFields should have size 5
     innerFields(4).name shouldBe "_5"
   }
@@ -344,25 +344,25 @@ class EncodersSuite extends AnyFunSuite with Matchers:
   test("GEOMETRY returns correct encoder") {
     val enc = Encoders.GEOMETRY
     enc.schema shouldBe StructType(Seq(StructField("value", GeometryType())))
-    enc.agnosticEncoder shouldBe a[GeometryEncoder]
+    enc.agnosticEncoder.get shouldBe a[GeometryEncoder]
   }
 
   test("GEOGRAPHY returns correct encoder") {
     val enc = Encoders.GEOGRAPHY
     enc.schema shouldBe StructType(Seq(StructField("value", GeographyType())))
-    enc.agnosticEncoder shouldBe a[GeographyEncoder]
+    enc.agnosticEncoder.get shouldBe a[GeographyEncoder]
   }
 
   test("GEOMETRY(dt) returns encoder with custom spatial type") {
     val enc = Encoders.GEOMETRY(GeometryType(4326))
     enc.schema shouldBe StructType(Seq(StructField("value", GeometryType(4326))))
-    enc.agnosticEncoder shouldBe a[GeometryEncoder]
+    enc.agnosticEncoder.get shouldBe a[GeometryEncoder]
   }
 
   test("GEOGRAPHY(dt) returns encoder with custom spatial type") {
     val enc = Encoders.GEOGRAPHY(GeographyType(4326))
     enc.schema shouldBe StructType(Seq(StructField("value", GeographyType(4326))))
-    enc.agnosticEncoder shouldBe a[GeographyEncoder]
+    enc.agnosticEncoder.get shouldBe a[GeographyEncoder]
   }
 
   test("classic-only encoder shims fail clearly when used") {
