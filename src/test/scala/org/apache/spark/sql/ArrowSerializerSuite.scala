@@ -347,6 +347,48 @@ class ArrowSerializerSuite extends AnyFunSuite with Matchers:
     bytes should not be empty
   }
 
+  // ---------------------------------------------------------------------------
+  // Array / Map value round-trips through the deserializer.
+  //
+  // The bytes-only tests above prove encoding succeeds, but they never decode
+  // the populated MapVector / ListVector — the per-element extraction loop in
+  // ArrowDeserializer (start..end over the data vector) is what these lock in:
+  // element ordering, per-row offset boundaries, empty containers, and nulls.
+  // ---------------------------------------------------------------------------
+
+  test("round-trips ArrayType(Int) element values across rows") {
+    val schema = StructType(Seq(StructField("arr", ArrayType(IntegerType, false))))
+    val rows = Seq(Row(Seq(1, 2, 3)), Row(Seq.empty[Int]), Row(Seq(42)))
+    val bytes = ArrowSerializer.encodeRows(rows, schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decoded.map(_.get(0)) shouldBe Seq(Seq(1, 2, 3), Seq.empty[Int], Seq(42))
+  }
+
+  test("round-trips ArrayType(String) preserving element order") {
+    val schema = StructType(Seq(StructField("arr", ArrayType(StringType, false))))
+    val bytes = ArrowSerializer.encodeRows(Seq(Row(Seq("x", "y", "z"))), schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decoded.head.get(0) shouldBe Seq("x", "y", "z")
+  }
+
+  test("round-trips ArrayType with null elements") {
+    val schema = StructType(Seq(StructField("arr", ArrayType(IntegerType, true))))
+    val bytes = ArrowSerializer.encodeRows(Seq(Row(Seq(1, null, 3))), schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decoded.head.get(0) shouldBe Seq(1, null, 3)
+  }
+
+  test("round-trips MapType entries across rows") {
+    val schema = StructType(Seq(
+      StructField("m", MapType(StringType, IntegerType, valueContainsNull = false))
+    ))
+    val rows = Seq(Row(Map("a" -> 1, "b" -> 2)), Row(Map.empty[String, Int]), Row(Map("c" -> 3)))
+    val bytes = ArrowSerializer.encodeRows(rows, schema)
+    val (decoded, _) = ArrowDeserializer.fromArrowBatchWithSchema(bytes)
+    decoded.map(_.get(0)) shouldBe
+      Seq(Map("a" -> 1, "b" -> 2), Map.empty[String, Int], Map("c" -> 3))
+  }
+
   test("encodeRows with TimestampNTZType using java.sql.Timestamp") {
     val schema = StructType(Seq(StructField("ts", TimestampNTZType)))
     val rows = Seq(Row(java.sql.Timestamp.valueOf("2024-01-15 10:30:00")))
