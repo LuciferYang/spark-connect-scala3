@@ -139,15 +139,30 @@ object ArrowDeserializer:
         val valVec = dataVec.getChildByOrdinal(1).asInstanceOf[FieldVector]
         val start = v.getElementStartIndex(index)
         val end = v.getElementEndIndex(index)
-        (start until end).map(i =>
-          extractValue(keyVec, i, structMetaCache) -> extractValue(valVec, i, structMetaCache)
-        ).toMap
+        // while loop into a pre-sized builder — avoids boxing the index and the intermediate
+        // collection a Range.map(...).toMap would allocate.
+        val builder = Map.newBuilder[Any, Any]
+        builder.sizeHint(end - start)
+        var i = start
+        while i < end do
+          val key = extractValue(keyVec, i, structMetaCache)
+          val value = extractValue(valVec, i, structMetaCache)
+          builder += (key -> value)
+          i += 1
+        builder.result()
 
       case v: ListVector =>
         val inner = v.getDataVector
         val start = v.getElementStartIndex(index)
         val end = v.getElementEndIndex(index)
-        (start until end).map(i => extractValue(inner, i, structMetaCache)).toSeq
+        // while loop into a pre-sized array — avoids boxing the index and the intermediate
+        // collection a Range.map(...).toSeq would allocate.
+        val arr = new Array[Any](end - start)
+        var i = start
+        while i < end do
+          arr(i - start) = extractValue(inner, i, structMetaCache)
+          i += 1
+        ArraySeq.unsafeWrapArray(arr)
 
       case v: StructVector =>
         val meta = structMetaCache.getOrElseUpdate(
