@@ -22,7 +22,8 @@ final class SparkConnectClient private (
     val userId: String,
     private val retryHandler: GrpcRetryHandler,
     private val connectionUrl: String,
-    private val token: Option[String]
+    private val token: Option[String],
+    private val planCompressionEnabled: Boolean = true
 ):
 
   /** The connection URL with any token redacted — safe for logging/display. */
@@ -112,6 +113,7 @@ final class SparkConnectClient private (
     * issues) leave the cache `Uninitialized` so callers can retry.
     */
   private def getPlanCompressionOptions: CompressionState =
+    if !planCompressionEnabled then return CompressionState.Disabled
     _planCompressionOptions match
       case CompressionState.Uninitialized =>
         synchronized {
@@ -548,7 +550,8 @@ object SparkConnectClient:
       configs: Map[String, String] = Map.empty,
       interceptors: List[ClientInterceptor] = List.empty,
       maxInboundMessageSize: Option[Int] = None,
-      retryPolicy: RetryPolicy = RetryPolicy.defaultPolicy()
+      retryPolicy: RetryPolicy = RetryPolicy.defaultPolicy(),
+      planCompressionEnabled: Boolean = true
   ): SparkConnectClient =
     val (host, port, params) = parseUrl(url)
     val paramMap = params.toMap
@@ -603,7 +606,8 @@ object SparkConnectClient:
       userId,
       GrpcRetryHandler(retryPolicy),
       sanitizedUrl,
-      token
+      token,
+      planCompressionEnabled
     )
 
     configs.foreach((k, v) => client.setConfig(k, v))

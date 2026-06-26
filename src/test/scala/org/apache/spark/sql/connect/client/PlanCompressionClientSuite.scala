@@ -53,3 +53,19 @@ class PlanCompressionClientSuite extends AnyFunSuite with Matchers:
       finally spark.stop()
     finally server.stop()
   }
+
+  test("planCompression(false) leaves a large plan uncompressed and skips the server config") {
+    val thresholdRequests = new AtomicInteger(0)
+    val server = FakeSparkConnectServer(compressionService(thresholdRequests))
+    try
+      val spark = SparkSession.builder().remote(server.url).planCompression(false).build()
+      try
+        val plan = largePlan()
+        val result = spark.client.tryCompressPlan(plan)
+        result shouldBe plan
+        result.getOpTypeCase shouldBe Plan.OpTypeCase.ROOT
+        // Disabling compression short-circuits before consulting the server config.
+        thresholdRequests.get() shouldBe 0
+      finally spark.stop()
+    finally server.stop()
+  }

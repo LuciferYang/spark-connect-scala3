@@ -522,10 +522,21 @@ object SparkSession:
     private var interceptors: List[io.grpc.ClientInterceptor] = List.empty
     private var maxInboundMessageSizeBytes: Option[Int] = None
     private var retryPolicyValue: RetryPolicy = RetryPolicy.defaultPolicy()
+    private var planCompressionEnabledValue: Boolean = true
 
     /** Override the gRPC retry policy (max retries, backoff, jitter, retryable conditions). */
     def retryPolicy(policy: RetryPolicy): Builder =
       retryPolicyValue = policy
+      this
+
+    /** Enable or disable client-side plan compression (default enabled).
+      *
+      * When enabled, large plans are zstd-compressed before send, using the threshold/algorithm
+      * advertised by the server. Disable to skip compression entirely — e.g. when the zstd-jni cost
+      * is not worthwhile for a workload, or to bypass a server-advertised setting.
+      */
+    def planCompression(enabled: Boolean): Builder =
+      planCompressionEnabledValue = enabled
       this
 
     def remote(connectionString: String): Builder =
@@ -584,7 +595,8 @@ object SparkSession:
         configs = configs,
         interceptors = interceptors,
         maxInboundMessageSize = maxInboundMessageSizeBytes,
-        retryPolicy = retryPolicyValue
+        retryPolicy = retryPolicyValue,
+        planCompressionEnabled = planCompressionEnabledValue
       )
       val session = SparkSession(client)
       if defaultSession.get() == null then defaultSession.compareAndSet(null, session)
