@@ -143,42 +143,42 @@ class EncoderSuite extends AnyFunSuite with Matchers:
 
   test("Int encoder provides PrimitiveIntEncoder agnosticEncoder") {
     val enc = summon[Encoder[Int]]
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("Long encoder provides PrimitiveLongEncoder agnosticEncoder") {
     val enc = summon[Encoder[Long]]
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("Double encoder provides PrimitiveDoubleEncoder agnosticEncoder") {
     val enc = summon[Encoder[Double]]
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("Float encoder provides PrimitiveFloatEncoder agnosticEncoder") {
     val enc = summon[Encoder[Float]]
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("Short encoder provides PrimitiveShortEncoder agnosticEncoder") {
     val enc = summon[Encoder[Short]]
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("Byte encoder provides PrimitiveByteEncoder agnosticEncoder") {
     val enc = summon[Encoder[Byte]]
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("Boolean encoder provides PrimitiveBooleanEncoder agnosticEncoder") {
     val enc = summon[Encoder[Boolean]]
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("String encoder provides StringEncoder agnosticEncoder") {
     val enc = summon[Encoder[String]]
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ class EncoderSuite extends AnyFunSuite with Matchers:
     enc.schema shouldBe StructType(Seq(StructField("value", DateType)))
     val d = java.sql.Date.valueOf("2026-01-15")
     enc.fromRow(enc.toRow(d)) shouldBe d
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("java.sql.Timestamp encoder schema and round-trip") {
@@ -198,7 +198,7 @@ class EncoderSuite extends AnyFunSuite with Matchers:
     enc.schema shouldBe StructType(Seq(StructField("value", TimestampType)))
     val ts = java.sql.Timestamp.valueOf("2026-01-15 10:30:00")
     enc.fromRow(enc.toRow(ts)) shouldBe ts
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("java.time.LocalDate encoder schema and round-trip") {
@@ -206,7 +206,7 @@ class EncoderSuite extends AnyFunSuite with Matchers:
     enc.schema shouldBe StructType(Seq(StructField("value", DateType)))
     val ld = java.time.LocalDate.of(2026, 1, 15)
     enc.fromRow(enc.toRow(ld)) shouldBe ld
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("java.time.Instant encoder schema and round-trip") {
@@ -214,7 +214,7 @@ class EncoderSuite extends AnyFunSuite with Matchers:
     enc.schema shouldBe StructType(Seq(StructField("value", TimestampType)))
     val inst = java.time.Instant.parse("2026-01-15T10:30:00Z")
     enc.fromRow(enc.toRow(inst)) shouldBe inst
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("BigDecimal encoder schema and round-trip") {
@@ -222,7 +222,7 @@ class EncoderSuite extends AnyFunSuite with Matchers:
     enc.schema shouldBe StructType(Seq(StructField("value", DecimalType.DEFAULT)))
     val bd = BigDecimal("123.456")
     enc.fromRow(enc.toRow(bd)) shouldBe bd
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   test("BigDecimal encoder fromRow handles java.math.BigDecimal") {
@@ -251,7 +251,7 @@ class EncoderSuite extends AnyFunSuite with Matchers:
     enc.schema shouldBe StructType(Seq(StructField("value", BinaryType)))
     val bytes = Array[Byte](1, 2, 3, 4)
     enc.fromRow(enc.toRow(bytes)) shouldBe bytes
-    enc.agnosticEncoder should not be null
+    enc.agnosticEncoder shouldBe defined
   }
 
   // ---------------------------------------------------------------------------
@@ -294,9 +294,9 @@ class EncoderSuite extends AnyFunSuite with Matchers:
 
   test("derived encoder agnosticEncoder returns ProductEncoder") {
     val enc = summon[Encoder[Person]]
-    enc.agnosticEncoder should not be null
-    enc.agnosticEncoder shouldBe a[AgnosticEncoders.ProductEncoder[?]]
-    val pe = enc.agnosticEncoder.asInstanceOf[AgnosticEncoders.ProductEncoder[?]]
+    enc.agnosticEncoder shouldBe defined
+    enc.agnosticEncoder.get shouldBe a[AgnosticEncoders.ProductEncoder[?]]
+    val pe = enc.agnosticEncoder.get.asInstanceOf[AgnosticEncoders.ProductEncoder[?]]
     pe.fields.map(_.name) shouldBe Seq("name", "age")
   }
 

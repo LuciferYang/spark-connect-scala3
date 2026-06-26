@@ -39,7 +39,7 @@ object Encoders:
       case _: AgnosticEncoders.RowEncoder     => value.asInstanceOf[Row]
       case AgnosticEncoders.UnboundRowEncoder => value.asInstanceOf[Row]
       case _                                  => Row(value)
-    override def agnosticEncoder: AgnosticEncoder[?] = underlying
+    override def agnosticEncoder: Option[AgnosticEncoder[?]] = Some(underlying)
 
   private def wrap[T](ae: AgnosticEncoder[T]): Encoder[T] = AgnosticEncoderWrapper(ae)
 
@@ -50,7 +50,8 @@ object Encoders:
     def schema: StructType = unsupported
     def fromRow(row: Row): T = unsupported
     def toRow(value: T): Row = unsupported
-    override def agnosticEncoder: AgnosticEncoder[?] = unsupported
+    // An unsupported encoder has no agnostic encoder; callers fall back rather than crash.
+    override def agnosticEncoder: Option[AgnosticEncoder[?]] = None
 
   private def unsupported[T](name: String): Encoder[T] = UnsupportedEncoder(name)
 
@@ -80,7 +81,7 @@ object Encoders:
       (v1, v2)
     def toRow(value: (T1, T2)): Row =
       Row(e1.toRow(value._1), e2.toRow(value._2))
-    override def agnosticEncoder: AgnosticEncoder[?] = ae
+    override def agnosticEncoder: Option[AgnosticEncoder[?]] = Some(ae)
 
   private class TupleEncoder3[T1, T2, T3](
       e1: Encoder[T1],
@@ -99,7 +100,7 @@ object Encoders:
       (v1, v2, v3)
     def toRow(value: (T1, T2, T3)): Row =
       Row(e1.toRow(value._1), e2.toRow(value._2), e3.toRow(value._3))
-    override def agnosticEncoder: AgnosticEncoder[?] = ae
+    override def agnosticEncoder: Option[AgnosticEncoder[?]] = Some(ae)
 
   private class TupleEncoder4[T1, T2, T3, T4](
       e1: Encoder[T1],
@@ -123,7 +124,7 @@ object Encoders:
       (v1, v2, v3, v4)
     def toRow(value: (T1, T2, T3, T4)): Row =
       Row(e1.toRow(value._1), e2.toRow(value._2), e3.toRow(value._3), e4.toRow(value._4))
-    override def agnosticEncoder: AgnosticEncoder[?] = ae
+    override def agnosticEncoder: Option[AgnosticEncoder[?]] = Some(ae)
 
   private class TupleEncoder5[T1, T2, T3, T4, T5](
       e1: Encoder[T1],
@@ -156,7 +157,7 @@ object Encoders:
         e4.toRow(value._4),
         e5.toRow(value._5)
       )
-    override def agnosticEncoder: AgnosticEncoder[?] = ae
+    override def agnosticEncoder: Option[AgnosticEncoder[?]] = Some(ae)
 
   def scalaBoolean: Encoder[Boolean] = wrap(PrimitiveBooleanEncoder)
   def scalaByte: Encoder[Byte] = wrap(PrimitiveByteEncoder)
@@ -315,9 +316,9 @@ object Encoders:
       case w: AgnosticEncoderWrapper[?] => w.underlying
       case ae: AgnosticEncoder[?]       => ae
       case other                        =>
-        val ae = other.agnosticEncoder
-        require(ae != null, s"Encoder does not provide AgnosticEncoder: $other")
-        ae
+        other.agnosticEncoder.getOrElse(
+          throw IllegalArgumentException(s"Encoder does not provide AgnosticEncoder: $other")
+        )
 
   private def tupleProductEncoder[T: ClassTag](encoders: AgnosticEncoder[?]*): ProductEncoder[T] =
     val fields = encoders.zipWithIndex.map { (enc, i) =>

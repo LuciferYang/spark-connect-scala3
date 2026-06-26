@@ -96,7 +96,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val keyAg = keyEncoder.agnosticEncoder
     val valueAg = valueEncoder.agnosticEncoder
     val cachedGroupingUdf =
-      if keyAg != null && valueAg != null then Some(buildGroupingUdf(keyAg, valueAg))
+      if keyAg.isDefined && valueAg.isDefined then Some(buildGroupingUdf(keyAg.get, valueAg.get))
       else groupingUdfOverride
     // Preserve the original (pre-mapValues) relation for GroupMap input.
     // If this KVGD already has an originalRelation (chained mapValues), keep that.
@@ -172,10 +172,10 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val inputValueAg =
       originalValueEncoder.map(_.agnosticEncoder).getOrElse(valueEncoder.agnosticEncoder)
     val currentValueAg = valueEncoder.agnosticEncoder
-    if keyAg == null || inputValueAg == null || currentValueAg == null || outAg == null then
+    if keyAg.isEmpty || inputValueAg.isEmpty || currentValueAg.isEmpty || outAg.isEmpty then
       return flatMapGroupsLocal(func, outEnc)
     // Build server-side GroupMap
-    val groupingUdf = buildGroupingUdf(keyAg, inputValueAg)
+    val groupingUdf = buildGroupingUdf(keyAg.get, inputValueAg.get)
     // When mapValuesFunc is set, compose it with the user function so the server-side UDF
     // accepts the original value type and internally maps values before calling user func.
     val effectiveFunc: AnyRef = mapValuesFunc match
@@ -185,7 +185,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
           func.asInstanceOf[(K, Iterator[Any]) => IterableOnce[U]]
         )
       case None => func.asInstanceOf[AnyRef]
-    val mapUdf = buildGroupMapUdf(effectiveFunc, keyAg, inputValueAg, outAg)
+    val mapUdf = buildGroupMapUdf(effectiveFunc, keyAg.get, inputValueAg.get, outAg.get)
     val groupMapBuilder = GroupMap
       .newBuilder()
       .setInput(inputRelation)
@@ -228,7 +228,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       pairCt: ClassTag[(K, V)]
   ): Dataset[(K, V)] =
     val valueAg = valueEncoder.agnosticEncoder
-    if valueAg != null then
+    if valueAg.isDefined then
       val reducer = ReduceAggregator[V](func)(using valueEncoder)
       agg(reducer.toColumn)
     else mapGroups(new ReduceGroupsAdaptor(func))
@@ -285,7 +285,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val valueAg = valueEncoder.agnosticEncoder
     val otherValueAg = otherEnc.agnosticEncoder
     val outAg = outEnc.agnosticEncoder
-    if keyAg == null || valueAg == null || otherValueAg == null || outAg == null then
+    if keyAg.isEmpty || valueAg.isEmpty || otherValueAg.isEmpty || outAg.isEmpty then
       return onMissingEncoders
     // For mapValues-derived KVGDs, use the original relations and value encoders.
     val thisInputRelation = originalRelation.getOrElse(ds.df.relation)
@@ -294,8 +294,8 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       originalValueEncoder.map(_.agnosticEncoder).getOrElse(valueAg)
     val otherInputValueAg =
       other.originalValueEncoder.map(_.agnosticEncoder).getOrElse(otherValueAg)
-    val thisGroupingUdf = buildGroupingUdf(keyAg, thisInputValueAg)
-    val otherGroupingUdf = other.buildGroupingUdf(keyAg, otherInputValueAg)
+    val thisGroupingUdf = buildGroupingUdf(keyAg.get, thisInputValueAg.get)
+    val otherGroupingUdf = other.buildGroupingUdf(keyAg.get, otherInputValueAg.get)
     val effectiveFunc: AnyRef =
       if mapValuesFunc.isDefined || other.mapValuesFunc.isDefined then
         new MapValuesCoGroupAdaptor[K, V, U, R](
@@ -306,10 +306,10 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       else new CoGroupAdaptor(func)
     val cogroupUdf = buildCoGroupUdf(
       effectiveFunc,
-      keyAg,
-      thisInputValueAg,
-      otherInputValueAg,
-      outAg
+      keyAg.get,
+      thisInputValueAg.get,
+      otherInputValueAg.get,
+      outAg.get
     )
     val builder = CoGroupMap
       .newBuilder()
@@ -552,10 +552,10 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val keyAg = keyEncoder.agnosticEncoder
     val valueAg = valueEncoder.agnosticEncoder
     require(
-      keyAg != null && valueAg != null,
+      keyAg.isDefined && valueAg.isDefined,
       "agg(TypedColumn) requires AgnosticEncoder support for key and value types"
     )
-    val groupingUdf = buildGroupingUdf(keyAg, valueAg)
+    val groupingUdf = buildGroupingUdf(keyAg.get, valueAg.get)
     val aggBuilder = Aggregate
       .newBuilder()
       .setInput(ds.df.relation)
@@ -781,16 +781,16 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val outAg = outEnc.agnosticEncoder
     val stateAg = stateEnc.agnosticEncoder
     require(
-      keyAg != null && valueAg != null && outAg != null && stateAg != null,
+      keyAg.isDefined && valueAg.isDefined && outAg.isDefined && stateAg.isDefined,
       "Stateful operations require AgnosticEncoder support for all types"
     )
-    val groupingUdf = buildGroupingUdf(keyAg, valueAg)
+    val groupingUdf = buildGroupingUdf(keyAg.get, valueAg.get)
     val funcUdf = buildStatefulUdf(
       func.asInstanceOf[AnyRef],
-      keyAg,
-      stateAg,
-      valueAg,
-      outAg,
+      keyAg.get,
+      stateAg.get,
+      valueAg.get,
+      outAg.get,
       "flatMapGroupsWithState"
     )
     val groupMapBuilder = GroupMap
@@ -806,12 +806,12 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
       .setIsMapGroupsWithState(isMapGroupsWithState)
       .setOutputMode(outputMode.toString)
       .setTimeoutConf(timeoutConf.toString)
-      .setStateSchema(DataTypeProtoConverter.toProto(stateAg.dataType))
+      .setStateSchema(DataTypeProtoConverter.toProto(stateAg.get.dataType))
     groupingColumnExprs.foreach(_.foreach(c => groupMapBuilder.addGroupingExpressions(c.expr)))
     initialState.foreach { is =>
       val isKeyAg = is.keyEncoder.agnosticEncoder
       val isValueAg = is.valueEncoder.agnosticEncoder
-      val isGroupingUdf = is.buildGroupingUdf(isKeyAg, isValueAg)
+      val isGroupingUdf = is.buildGroupingUdf(isKeyAg.get, isValueAg.get)
       groupMapBuilder
         .setInitialInput(is.ds.df.relation)
         .addInitialGroupingExpressions(
@@ -849,27 +849,29 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     val valueAg = valueEncoder.agnosticEncoder
     val outAg = outEnc.agnosticEncoder
     require(
-      keyAg != null && valueAg != null && outAg != null,
+      keyAg.isDefined && valueAg.isDefined && outAg.isDefined,
       "transformWithState requires AgnosticEncoder support for key, value, and output types"
     )
     val initialStateAg: AgnosticEncoder[?] = initialState match
       case Some(is) =>
-        val isEnc = is.valueEncoder.agnosticEncoder
-        require(isEnc != null, "transformWithState requires AgnosticEncoder for initial state type")
-        isEnc
+        is.valueEncoder.agnosticEncoder.getOrElse(
+          throw IllegalArgumentException(
+            "transformWithState requires AgnosticEncoder for initial state type"
+          )
+        )
       case None =>
         // Use an empty ProductEncoder as placeholder when no initial state is provided
         AgnosticEncoders.ProductEncoder[EmptyInitialStateStruct](
           summon[ClassTag[EmptyInitialStateStruct]],
           Seq.empty
         )
-    val inputEncoders: Seq[AgnosticEncoder[?]] = Seq(keyAg, initialStateAg, valueAg)
+    val inputEncoders: Seq[AgnosticEncoder[?]] = Seq(keyAg.get, initialStateAg, valueAg.get)
     val funcUdf = buildTransformWithStateUdf(
       statefulProcessor.asInstanceOf[AnyRef],
       inputEncoders,
-      outAg
+      outAg.get
     )
-    val groupingUdf = buildGroupingUdf(keyAg, valueAg)
+    val groupingUdf = buildGroupingUdf(keyAg.get, valueAg.get)
     val twsInfoBuilder = TransformWithStateInfo.newBuilder()
       .setTimeMode(timeMode.toString)
     if eventTimeColumnName.nonEmpty then
@@ -890,7 +892,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     initialState.foreach { is =>
       val isKeyAg = is.keyEncoder.agnosticEncoder
       val isValueAg = is.valueEncoder.agnosticEncoder
-      val isGroupingUdf = is.buildGroupingUdf(isKeyAg, isValueAg)
+      val isGroupingUdf = is.buildGroupingUdf(isKeyAg.get, isValueAg.get)
       groupMapBuilder
         .setInitialInput(is.ds.df.relation)
         .addInitialGroupingExpressions(
@@ -996,7 +998,7 @@ final class KeyValueGroupedDataset[K: Encoder: ClassTag, V: Encoder: ClassTag] p
     Dataset(newDf, outEnc)
 
   private def classTagFromEncoder[T](encoder: Encoder[T]): ClassTag[T] =
-    Option(encoder.agnosticEncoder)
+    encoder.agnosticEncoder
       .map(_.clsTag.asInstanceOf[ClassTag[T]])
       .getOrElse(ClassTag(classOf[Object]).asInstanceOf[ClassTag[T]])
 
