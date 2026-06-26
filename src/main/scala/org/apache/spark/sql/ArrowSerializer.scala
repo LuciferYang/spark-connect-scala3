@@ -195,8 +195,8 @@ private[sql] object ArrowSerializer:
     *
     * The vector-type dispatch happens once here instead of once per (row × column) cell. The
     * returned closure handles nulls uniformly; for the fixed vector type it writes directly.
-    * Complex/nested vectors (Map/List/Struct) delegate to [[setArrowValue]], which recurses
-    * per element — those columns are uncommon and inherently per-element.
+    * Complex/nested vectors (Map/List/Struct) delegate to [[setArrowValue]], which recurses per
+    * element — those columns are uncommon and inherently per-element.
     */
   private def buildColumnSetter(vec: FieldVector, dt: types.DataType): (Int, Any) => Unit =
     val raw: (Int, Any) => Unit = vec match
